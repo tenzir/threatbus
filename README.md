@@ -1,9 +1,9 @@
 # Intel Control
 
 **Intel Control** (`ictl`) enables live correlation of threat intelligence with
-historical data. Concretely, `ictl` hooks into the real-time feed of
-[MISP][misp] intelligence and translates them into queries against
-[VAST][vast], a scalable platform for network forensics.
+historical data. Concretely, `ictl` hooks into [MISP][misp]'s intelligence feeds
+and translates new intelligence into queries against [VAST][vast], a scalable
+platform for network forensics.
 
 ## Prerequisites
 
