@@ -40,7 +40,8 @@ export MISP_API_KEY=qrtyJV9VMwo2immC8S4cZEaqFEK4m13UrlTvoSGl
 
 ### VAST Setup
 
-All you need is the `vast` binary in your `PATH`.
+You need is the `vast` binary in your `PATH`, and a running VAST server with
+some preloaded data listening on the default port.
 
 ## Usage
 
