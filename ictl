@@ -128,7 +128,7 @@ async def spawn(*args, stderr_color="magenta"):
 async def export(query):
     log(f"spawning VAST process for expression {query}")
     # FIXME: remove limit of 10 results
-    return await spawn("vast", "export", "-e", "10", "json", query,
+    return await spawn("core", "export", "-e", "10", "json", query,
                        stderr_color="green")
 
 # -- types --------------------------------------------------------------------
