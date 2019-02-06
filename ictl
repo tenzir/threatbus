@@ -102,7 +102,7 @@ def make_predicate(attribute_type, values):
         log("unsupported attribute type:", attribute_type)
         sys.exit(1)
 
-def make_vast_query(attributes):
+def make_query(attributes):
     """Creates a VAST expression from MISP attributes."""
     xs = {}
     for attr in attributes:
@@ -125,7 +125,7 @@ async def spawn(*args, stderr_color="magenta"):
     log(stderr.decode().strip(), color=stderr_color)
     return stdout.decode().strip()
 
-async def vast_export(query):
+async def export(query):
     log(f"spawning VAST process for expression {query}")
     # FIXME: remove limit of 10 results
     return await spawn("vast", "export", "-e", "10", "json", query,
@@ -156,17 +156,17 @@ class Controller:
         attributes = await self.__historical_misp_query(expression)
         log(attributes)
         if attributes:
-            await self.__run_vast_query(attributes)
+            await self.__run_query(attributes)
         else:
             log("no results found for", expression)
 
     async def continuous_query(self, expression):
-        await self.__continuous_misp_query(expression, self.__run_vast_query)
+        await self.__continuous_misp_query(expression, self.__run_query)
 
     async def __continuous_misp_query(self, expression, callback):
         assert self.zmq_sub_socket
         assert expression
-        log("executing continuous query")
+        log("running in continuous query mode")
         if expression.type:
             log(f"restricting query to {expression.type}")
         if expression.value:
@@ -209,11 +209,10 @@ class Controller:
                                   values=expression.value)
         return result["response"]["Attribute"]
 
-    async def __run_vast_query(self, attributes):
+    async def __run_query(self, attributes):
         make_ts = lambda x: datetime.datetime.utcfromtimestamp(int(x))
-        # Get all VAST events for the given set of attributes.
-        expr = make_vast_query(attributes)
-        stdout = await vast_export(expr)
+        # Get all events for the given set of attributes.
+        stdout = await export(make_query(attributes))
         results = stdout.splitlines()
         log(f"processing {len(results)} results")
         for result in results:
