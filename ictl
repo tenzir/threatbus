@@ -166,9 +166,9 @@ class Controller:
             log("no results found for", expression)
 
     async def continuous_query(self, expression):
-        await self.__continuous_misp_query(expression, self.__run_query)
+        await self.__continuous_misp_query(expression)
 
-    async def __continuous_misp_query(self, expression, callback):
+    async def __continuous_misp_query(self, expression):
         assert self.zmq_sub_socket
         assert expression
         log("running in continuous query mode")
@@ -200,7 +200,7 @@ class Controller:
                 continue
             if expression.value and attr["value"] not in expression.value:
                 continue
-            asyncio.create_task(callback([attr]))
+            asyncio.create_task(self.__run_query([attr]))
 
     async def __historical_misp_query(self, expression):
         assert self.misp
