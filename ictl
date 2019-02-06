@@ -125,10 +125,11 @@ async def spawn(*args, stderr_color="magenta"):
     log(stderr.decode().strip(), color=stderr_color)
     return stdout.decode().strip()
 
-async def export(query):
+async def export(app, query):
+    assert app == "vast" or "core"
     log(f"spawning VAST process for expression {query}")
     # FIXME: remove limit of 10 results
-    return await spawn("core", "export", "-e", "10", "json", query,
+    return await spawn(app, "export", "-e", "10", "json", query,
                        stderr_color="green")
 
 # -- types --------------------------------------------------------------------
@@ -141,7 +142,9 @@ class Expression(NamedTuple):
     end_time: datetime.datetime
 
 class Controller:
-    def __init__(self, host, web_port, zmq_port):
+    def __init__(self, app, host, web_port, zmq_port):
+        log(f"using '{app}' for historical queries")
+        self.app = app
         # Connect to MISP instance via API.
         if "MISP_API_KEY" not in os.environ:
             log("no environment variable MISP_API_KEY found")
@@ -214,7 +217,7 @@ class Controller:
     async def __run_query(self, attributes):
         make_ts = lambda x: datetime.datetime.utcfromtimestamp(int(x))
         # Get all events for the given set of attributes.
-        stdout = await export(make_query(attributes))
+        stdout = await export(self.app, make_query(attributes))
         results = stdout.splitlines()
         log(f"processing {len(results)} results")
         for result in results:
@@ -242,8 +245,8 @@ async def main():
     parser.add_argument(
         "-a",
         "--app",
-        default="vast",
-        help="Path to the VAST/CORE executable (vast/core)")
+        default="core",
+        help="Path to the VAST/CORE executable")
     parser.add_argument(
         "-m",
         "--misp-host",
@@ -283,7 +286,7 @@ async def main():
     parser.add_argument(
         "-v",
         "--value",
-        help="The value to restrict the query to ")
+        help="The value to restrict the query to")
     parser.add_argument(
         "-s",
         "--start-time",
@@ -297,7 +300,8 @@ async def main():
     args = parser.parse_args()
     expr = Expression(args.type, args.value, args.start_time, args.end_time)
     # Create a MISP Controller.
-    controller = Controller(args.misp_host, args.web_port, args.zmq_port)
+    controller = Controller(args.app, args.misp_host, args.web_port,
+                            args.zmq_port)
     # Run historical query.
     if args.historical or args.unified:
         if not expr.value:
