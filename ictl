@@ -148,8 +148,10 @@ class Controller:
             sys.exit(1)
         api_key = os.environ['MISP_API_KEY']
         url = f"http://{host}:{web_port}"
+        log(f"connecting to MISP REST API at {url}")
         self.misp = PyMISP(url, api_key, ssl=False, debug=False)
         # Connect to MISP via 0mq.
+        log(f"subcribing to MISP 0mq socket at {host}:{zmq_port}")
         self.zmq_sub_socket = make_zmq_socket(host, zmq_port, zmq.SUB)
 
     async def historical_query(self, expression):
