@@ -7,7 +7,6 @@ import json
 import maya
 import os
 import sys
-from typing import NamedTuple
 import urllib.parse
 import zmq
 from zmq.asyncio import Context
@@ -134,13 +133,6 @@ async def export(app, query):
 
 # -- types --------------------------------------------------------------------
 
-class Expression(NamedTuple):
-    """A query expression"""
-    type: str
-    value: str
-    start_time: datetime.datetime
-    end_time: datetime.datetime
-
 class Controller:
     def __init__(self, app, host, web_port, zmq_port):
         log(f"using '{app}' for historical queries")
@@ -157,25 +149,21 @@ class Controller:
         log(f"subcribing to MISP 0mq socket at {host}:{zmq_port}")
         self.zmq_sub_socket = make_zmq_socket(host, zmq_port, zmq.SUB)
 
-    async def historical_query(self, expression):
-        attributes = await self.__historical_misp_query(expression)
-        log(attributes)
+    async def historical_query(self, values, window=None):
+        attributes = await self.__historical_misp_query(values)
         if attributes:
-            await self.__run_query(attributes)
+            await self.__run_query(attributes, window)
         else:
-            log("no results found for", expression)
+            log("MISP has no indicators for", values)
 
-    async def continuous_query(self, expression):
-        await self.__continuous_misp_query(expression)
+    async def continuous_query(self, values, window=None):
+        await self.__continuous_misp_query(values, window)
 
-    async def __continuous_misp_query(self, expression):
+    async def __continuous_misp_query(self, values, window):
         assert self.zmq_sub_socket
-        assert expression
         log("running in continuous query mode")
-        if expression.type:
-            log(f"restricting query to {expression.type}")
-        if expression.value:
-            log(f"restricting query to {expression.value}")
+        if values:
+            log(f"restricting query to values {values}")
         while True:
             msg = await self.zmq_sub_socket.recv()
             topic, _, payload = msg.decode("utf-8").partition(" ")
@@ -196,28 +184,28 @@ class Controller:
                 log(f"ignoring '{action}' of attribute {attr['id']}")
                 continue
             log(json.dumps(data, indent=2), color="yellow")
-            if expression.type and attr["type"] not in expression.type:
+            if values and attr["value"] not in values:
                 continue
-            if expression.value and attr["value"] not in expression.value:
-                continue
-            asyncio.create_task(self.__run_query([attr]))
+            asyncio.create_task(self.__run_query([attr], window))
 
-    async def __historical_misp_query(self, expression):
+    async def __historical_misp_query(self, values, attr_type=None, start=None):
         assert self.misp
-        log("executing historical query for value", expression.value)
-        if expression.type:
-            log("restricting search to type", expression.type)
+        log("executing historical query for", values)
+        if attr_type:
+            log("restricting search to type", attr_type)
         result = self.misp.search(controller="attributes",
-                                  date_from=expression.start_time,
-                                  date_to=expression.end_time,
-                                  type_attribute=expression.type,
-                                  values=expression.value)
+                                  date_from=start,
+                                  type_attribute=attr_type,
+                                  values=values)
         return result["response"]["Attribute"]
 
-    async def __run_query(self, attributes):
+    async def __run_query(self, attributes, window):
         make_ts = lambda x: datetime.datetime.utcfromtimestamp(int(x))
         # Get all events for the given set of attributes.
-        stdout = await export(self.app, make_query(attributes))
+        expr = make_query(attributes)
+        if window:
+            expr = f"&time > now - {window} && {expr}"
+        stdout = await export(self.app, expr)
         results = stdout.splitlines()
         log(f"processing {len(results)} results")
         for result in results:
@@ -281,36 +269,22 @@ async def main():
         help="Perform a historical and continuous query")
     parser.add_argument(
         "-t",
-        "--type",
-        help="The attribute type to restrict the query to")
-    parser.add_argument(
-        "-v",
-        "--value",
-        help="The value to restrict the query to")
-    parser.add_argument(
-        "-s",
-        "--start-time",
-        type=lambda x: maya.when(x).datetime(),
-        help="The timepoint where a historical query starts")
-    parser.add_argument(
-        "-e",
-        "--end-time",
-        type=lambda x: maya.when(x).datetime(),
-        help="The timepoint where a historical query ends")
+        "--time-window",
+        help="The time window to restrict intel searches to")
+    parser.add_argument("values", nargs=argparse.REMAINDER)
     args = parser.parse_args()
-    expr = Expression(args.type, args.value, args.start_time, args.end_time)
     # Create a MISP Controller.
     controller = Controller(args.app, args.misp_host, args.web_port,
                             args.zmq_port)
     # Run historical query.
     if args.historical or args.unified:
-        if not expr.value:
-            log("historical queries require a value")
+        if not args.values:
+            log("historical queries requires at least one value")
             sys.exit(1)
-        await controller.historical_query(expr)
+        await controller.historical_query(args.values, args.time_window)
     # Subscribe to future results.
     if args.continuous or args.unified:
-        await controller.continuous_query(expr)
+        await controller.continuous_query(args.values, args.time_window)
 
 if __name__ == '__main__':
     asyncio.run(main())
