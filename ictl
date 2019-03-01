@@ -125,7 +125,7 @@ async def spawn(*args, stderr_color="magenta"):
     return stdout.decode().strip()
 
 async def export(app, query):
-    assert app == "vast" or "core"
+    assert app == "vast" or "tenzir"
     log(f"spawning {app} process for expression {query}")
     return await spawn(app, "export", "json", query, stderr_color="green")
 
@@ -231,8 +231,8 @@ async def main():
     parser.add_argument(
         "-a",
         "--app",
-        default="core",
-        help="Path to the VAST/CORE executable")
+        default="tenzir",
+        help="Path to the VAST/Tenzir executable")
     parser.add_argument(
         "-m",
         "--misp-host",
