@@ -124,10 +124,11 @@ async def spawn(*args, stderr_color="magenta"):
     log(stderr.decode().strip(), color=stderr_color)
     return stdout.decode().strip()
 
-async def export(app, query):
+async def export(app, query, max_results):
     assert app == "vast" or "tenzir"
     log(f"spawning {app} process for expression {query}")
-    return await spawn(app, "export", "json", query, stderr_color="green")
+    return await spawn(app, "export", "-e", max_results, "json", query,
+                       stderr_color="green")
 
 # -- types --------------------------------------------------------------------
 
@@ -146,6 +147,9 @@ class Controller:
         # Connect to MISP via 0mq.
         log(f"subcribing to MISP 0mq socket at {host}:{zmq_port}")
         self.zmq_sub_socket = make_zmq_socket(host, zmq_port, zmq.SUB)
+        # Prevent overflow with historical data.
+        self.max_results = 100 # TODO: make configurable
+        log(f"capping results at '{self.max_results}'")
 
     async def historical_query(self, values, window=None):
         attributes = await self.__historical_misp_query(values)
@@ -204,8 +208,8 @@ class Controller:
         # Get all events for the given set of attributes.
         expr = make_query(attributes)
         if window:
-            expr = f"&time > now - {window} && {expr}"
-        stdout = await export(self.app, expr)
+            expr = f"&time > {window} ago && {expr}"
+        stdout = await export(self.app, expr, self.max_results)
         results = stdout.splitlines()
         log(f"processing {len(results)} results")
         for result in results:
