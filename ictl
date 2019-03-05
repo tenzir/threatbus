@@ -127,7 +127,7 @@ async def spawn(*args, stderr_color="magenta"):
 async def export(app, query, max_results):
     assert app == "vast" or "tenzir"
     log(f"spawning {app} process for expression {query}")
-    return await spawn(app, "export", "-e", max_results, "json", query,
+    return await spawn(app, "export", "-e", str(max_results), "json", query,
                        stderr_color="green")
 
 # -- types --------------------------------------------------------------------
