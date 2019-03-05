@@ -11,7 +11,7 @@ import urllib.parse
 import zmq
 from zmq.asyncio import Context
 
-from pymisp import PyMISP, MISPSighting
+from pymisp import PyMISP, MISPAttribute, MISPSighting
 
 MISP_DEFAULT_HOST = "localhost"
 MISP_DEFAULT_WEB_PORT = 80
@@ -105,7 +105,7 @@ def make_query(attributes):
     """Creates a VAST expression from MISP attributes."""
     xs = {}
     for attr in attributes:
-        xs.setdefault(attr["type"], []).append(attr["value"])
+        xs.setdefault(attr.type, []).append(attr.value)
     predicates = [make_predicate(k, v) for (k, v) in xs.items()]
     return make_disjunction(predicates)
 
@@ -184,18 +184,20 @@ class Controller:
             log(json.dumps(data, indent=2), color="yellow")
             if values and attr["value"] not in values:
                 continue
-            asyncio.create_task(self.__run_query([attr], window))
+            misp_attr = MISPAttribute()
+            misp_attr.from_dict(**attr)
+            asyncio.create_task(self.__run_query([misp_attr], window))
 
     async def __historical_misp_query(self, values, attr_type=None, start=None):
         assert self.misp
         log("executing historical query for", values)
         if attr_type:
             log("restricting search to type", attr_type)
-        result = self.misp.search(controller="attributes",
+        return self.misp.search(controller="attributes",
                                   date_from=start,
                                   type_attribute=attr_type,
-                                  values=values)
-        return result["response"]["Attribute"]
+                                  values=values,
+                                  pythonify=True)
 
     async def __run_query(self, attributes, window):
         make_ts = lambda x: datetime.datetime.utcfromtimestamp(int(x))
@@ -215,7 +217,7 @@ class Controller:
                 sys.exit(1)
             timestamp = int(record["ts"])
             # Create a list of sightings, one for each attribute.
-            xs = [make_sighting(x["id"], timestamp) for x in attributes]
+            xs = [make_sighting(x.id, timestamp) for x in attributes]
             log(f"publishing sighting for {len(xs)} attributes", "at",
                 make_ts(timestamp).strftime('%Y-%m-%d %H:%M:%S'), color="red")
             # Publish sightings to MISP.
