@@ -182,7 +182,7 @@ class Controller:
             attr = data["Attribute"]
             action = data["action"]
             # Consider only new events.
-            if action != "add":
+            if action not in ["add", "edit"]:
                 log(f"ignoring '{action}' of attribute {attr['id']}")
                 continue
             log(json.dumps(data, indent=2), color="yellow")
