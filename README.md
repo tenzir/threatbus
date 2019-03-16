@@ -1,14 +1,21 @@
-# Intel Control
+# Robo Investigator
 
-**Intel Control** (`ictl`) enables live correlation of threat intelligence with
-historical data. Concretely, `ictl` hooks into [MISP][misp]'s intelligence feeds
-and translates new intelligence into queries against [VAST][vast], a scalable
-platform for network forensics.
+The **Robo Investigor** (`robo`) autonomously performs routine task of an
+incidnet response team.
+
+## Features
+
+We currently support the following features:
+
+- Live correlation of threat intelligence with historical data by hooking into
+  [MISP][misp]'s intelligence feeds and translating new intelligence into
+  queries against [VAST][vast] and [Tenzir][tenzir].
 
 ## Prerequisites
 
-To run `ictl`, you need to make sure you have the necessary Python modules, a
-running [MISP][misp] instance, as well as running [VAST][vast] node.
+You need to make sure you have the necessary Python modules, a running
+[MISP][misp] instance, as well as running [Tenzir][tenzir] or [VAST][vast]
+node.
 
 ### Python Setup
 
@@ -45,7 +52,7 @@ some preloaded data listening on the default port.
 
 ## Usage
 
-`ictl` supports two modes of operation: *historical* and *continuous* queries.
+`robo` supports two modes of operation: *historical* and *continuous* queries.
 A historical query looks for a specific value in the MISP database, translates
 the matching attributes into a VAST query, and then publishes the VAST results
 as sightings back to MISP. A continuous has a similar worflow, with the only
@@ -53,22 +60,22 @@ difference that each newly arriving attribute elicits a historical query.
 
 The historical query feature exists primarily for ad-hoc testing. For
 operational deployments, the continous query mode makes most sense. To launch
-`ictl` in continuous mode, and a MISP instance located at IP address `1.2.3.4`,
+`robo` in continuous mode, and a MISP instance located at IP address `1.2.3.4`,
 use the following invocation:
 
 ```sh
-ictl -m 1.2.3.4 -C
+robo -m 1.2.3.4 -C
 ```
 
-`ictl` will not return until you kill the process.
+`robo` will not return until you kill the process.
 
 You can issue a historical query for IP address `6.6.6.6` as follows:
 
 ```sh
-ictl -m 1.2.3.4 -H -v 6.6.6.6
+robo -m 1.2.3.4 -H -v 6.6.6.6
 ```
 
-The full list of options is available via `ictl -h`.
+The full list of options is available via `robo -h`.
 
 ## License
 
@@ -77,4 +84,5 @@ All rights reserved.
 
 [misp]: https://github.com/misp/misp
 [vast]: https://github.com/vast-io/vast
+[tenzir]: https://docs.tenzir.com
 [misp-zmq-config]: https://github.com/MISP/misp-book/tree/master/misp-zmq#misp-zeromq-configuration
