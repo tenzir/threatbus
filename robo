@@ -7,6 +7,7 @@ import json
 import maya
 import os
 import sys
+from typing import NamedTuple
 import urllib.parse
 import zmq
 from zmq.asyncio import Context
@@ -40,6 +41,10 @@ def log(*args, color="cyan"):
     line = " ".join(map(str, args))
     print(f"\033[{to_color(color)}m", line, "\033[0m", sep="", file=sys.stderr)
 
+def fail(*args):
+    log(*args, color="red")
+    sys.exit(1)
+
 def make_zmq_socket(host, port, kind):
     assert kind == zmq.SUB or zmq.PUB
     context = Context.instance()
@@ -51,64 +56,6 @@ def make_zmq_socket(host, port, kind):
 
 def str_escape(x):
     return '"' + x.replace('"','\\"') + '"'
-
-def make_conjunction(xs):
-    return "({})".format(" && ".join(xs))
-
-def make_disjunction(xs):
-    return "({})".format(" || ".join(xs))
-
-def make_predicate(attribute_type, values):
-    assert values
-    # Combine singleton values into a set query.
-    def condense(lhs, rhs):
-        if len(rhs) == 1:
-            return f"{lhs} == {rhs[0]}"
-        else:
-            return f"{lhs} in {{{', '.join(rhs)}}}"
-    # IP addresses
-    if attribute_type in ["ip-src", "ip-dst"]:
-        return condense(":addr", values)
-    # URLs
-    elif attribute_type in ["url", "uri"]:
-        def make_http_log_expr(x):
-            result = urllib.parse.urlsplit(x)
-            host = result.hostname
-            path = result.path
-            if not host and path and path[0] != "/":
-                # If there is no protocol in the URI, then the "host" part will
-                # be prepended to "path". We're "fixing" this behavior by
-                # manually splitting at the first "/".
-                host, path = tuple(path.split("/", 1))
-                path = "/" + path # bring back leading slash
-            host = f"host == {str_escape(host)}" if host else None
-            path = f"uri == {str_escape(path)}" if path else None
-            if host and path:
-                return make_conjunction([host, path])
-            if host:
-                return host
-            if path:
-                return path
-            return None
-        return make_disjunction(map(make_http_log_expr, values))
-    # Domains
-    elif attribute_type == "domain":
-        return condense("host", list(map(str_escape, values)))
-    # Other
-    elif attribute_type == "http-method":
-        return condense("method", list(map(str_escape, values)))
-    else:
-        log("unsupported attribute type:", attribute_type)
-        sys.exit(1)
-
-def make_query(attributes):
-    """Creates a VAST expression from MISP attributes."""
-    xs = {}
-    for attr in attributes:
-        xs.setdefault(attr.type, []).append(attr.value)
-    predicates = [make_predicate(k, v) for (k, v) in xs.items()]
-    return make_disjunction(predicates)
-
 def make_sighting(attr_id, timestamp):
     x = MISPSighting()
     x.from_dict(id=attr_id, source="VAST", type="0", timestamp=timestamp)
@@ -124,56 +71,43 @@ async def spawn(*args, stderr_color="magenta"):
     log(stderr.decode().strip(), color=stderr_color)
     return stdout.decode().strip()
 
-async def export(app, query, max_results):
-    assert app == "vast" or "tenzir"
-    log(f"spawning {app} process for expression {query}")
-    return await spawn(app, "export", "-e", str(max_results), "json", query,
-                       stderr_color="green")
-
 # -- types --------------------------------------------------------------------
 
-class Controller:
-    def __init__(self, app, host, web_port, zmq_port):
-        log(f"using '{app}' for historical queries")
-        self.app = app
+class Intelligence(NamedTuple):
+    id: str         # A unique identifier (within the producer's context).
+    type: str       # The type of intelligence.
+    value: str      # The value of the item.
+    data: str       # The raw data as given by the source
+    producer: str   # The origin of the intelligence.
+
+class MISP:
+    """Subscribes to MISP's ZeroMQ channel that publishes intel."""
+    def __init__(self, host, web_port, zmq_port):
         # Connect to MISP instance via API.
         if "MISP_API_KEY" not in os.environ:
-            log("no environment variable MISP_API_KEY found")
-            sys.exit(1)
+            fail("no environment variable MISP_API_KEY found")
         api_key = os.environ['MISP_API_KEY']
-        url = f"http://{host}:{web_port}"
-        log(f"connecting to MISP REST API at {url}")
-        self.misp = PyMISP(url, api_key, ssl=False, debug=False)
+        api_url = f"http://{host}:{web_port}"
+        log(f"connecting to MISP REST API at {api_url}")
+        self.misp = PyMISP(api_url, api_key, ssl=False, debug=False)
         # Connect to MISP via 0mq.
-        log(f"subcribing to MISP 0mq socket at {host}:{zmq_port}")
-        self.zmq_sub_socket = make_zmq_socket(host, zmq_port, zmq.SUB)
-        # Prevent overflow with historical data.
-        self.max_results = 100 # TODO: make configurable
-        log(f"capping results at '{self.max_results}'")
+        zmq_url = f"tcp://{host}:{zmq_port}"
+        log(f"connecting to MISP 0mq socket at {zmq_url}")
+        context = Context.instance()
+        self.socket = context.socket(zmq.SUB)
+        self.socket.connect(zmq_url)
+        self.socket.setsockopt(zmq.SUBSCRIBE, b"")
 
-    async def historical_query(self, values, window=None):
-        attributes = await self.__historical_misp_query(values)
-        if attributes:
-            await self.__run_query(attributes, window)
-        else:
-            log("MISP has no indicators for", values)
-
-    async def continuous_query(self, values, window=None):
-        await self.__continuous_misp_query(values, window)
-
-    async def __continuous_misp_query(self, values, window):
-        assert self.zmq_sub_socket
-        log("running in continuous query mode")
-        if values:
-            log(f"restricting query to values {values}")
+    async def intel(self):
         while True:
-            msg = await self.zmq_sub_socket.recv()
+            msg = await self.socket.recv()
             topic, _, payload = msg.decode("utf-8").partition(" ")
             # Filter out heartbeats.
             if topic == "misp_json_self":
                 uptime = int(json.loads(payload)["uptime"])
                 delta = datetime.timedelta(seconds=uptime)
-                log("received keep-alive (uptime", "{:0>8})".format(str(delta)))
+                log("received 0mq keep-alive (uptime",
+                    "{:0>8})".format(str(delta)))
                 continue
             if topic != "misp_json_attribute":
                 continue
@@ -186,59 +120,149 @@ class Controller:
                 log(f"ignoring '{action}' of attribute {attr['id']}")
                 continue
             log(json.dumps(data, indent=2), color="yellow")
-            if values and attr["value"] not in values:
-                continue
+            # Instantiate the intel item.
             misp_attr = MISPAttribute()
             misp_attr.from_dict(**attr)
-            asyncio.create_task(self.__run_query([misp_attr], window))
+            return Intelligence(
+                id=misp_attr.id,
+                type=misp_attr.type,
+                value=misp_attr.value,
+                data=misp_attr,
+                producer="misp")
 
-    async def __historical_misp_query(self, values, attr_type=None, start=None):
-        assert self.misp
-        log("executing historical query for", values)
+    async def report(self, intel, time_seen):
+        """Reports intelligence as (true-positive) sighting."""
+        x = MISPSighting()
+        x.from_dict(id=intel.id, source="VAST", type="0", timestamp=time_seen)
+        ts = datetime.datetime.utcfromtimestamp(time_seen)
+        log(f"reporting intel seen at", ts.strftime('%Y-%m-%d %H:%M:%S'))
+        self.misp.set_sightings(x)
+
+    async def search(self, values, attr_type=None, start=None):
+        """Performs a search over MISP attributes"""
+        log("searching MISP database for", values)
         if attr_type:
             log("restricting search to type", attr_type)
         return self.misp.search(controller="attributes",
-                                  date_from=start,
-                                  type_attribute=attr_type,
-                                  values=values,
-                                  pythonify=True)
+                                date_from=start,
+                                type_attribute=attr_type,
+                                values=values,
+                                pythonify=True)
 
-    async def __run_query(self, attributes, window):
-        make_ts = lambda x: datetime.datetime.utcfromtimestamp(int(x))
-        # Get all events for the given set of attributes.
-        expr = make_query(attributes)
-        if window:
-            expr = f"&time > {window} ago && {expr}"
-        stdout = await export(self.app, expr, self.max_results)
-        results = stdout.splitlines()
-        log(f"processing {len(results)} results")
-        for result in results:
-            log(result, color="blue")
-            record = json.loads(result)
-            # Extract time of sighting.
-            if "ts" not in record:
-                log("couldn't find Zeek log with 'ts' column")
-                sys.exit(1)
-            timestamp = int(record["ts"])
-            # Create a list of sightings, one for each attribute.
-            xs = [make_sighting(x.id, timestamp) for x in attributes]
-            log(f"publishing sighting for {len(xs)} attributes", "at",
-                make_ts(timestamp).strftime('%Y-%m-%d %H:%M:%S'), color="red")
-            # Publish sightings to MISP.
-            self.misp.set_sightings(xs)
+class VAST:
+    def __init__(self, path, max_results=10):
+        self.app = path
+        self.max_results = max_results
+        log(f"capping VAST results at '{self.max_results}' events")
+
+    async def status(self):
+        try:
+            return json.loads(await spawn(self.app, "status"))
+        except json.decoder.JSONDecodeError:
+            fail(f"failed to connect to remote VAST node")
+        except FileNotFoundError:
+            fail(f"could not find {self.app} in PATH")
+
+    async def export(self, expr, window=None):
+        log(f"spawning {self.app} process for expression {expr}")
+        stdout = await spawn(self.app, "export", "-e", str(self.max_results),
+                             "json", expr)
+        return stdout.splitlines()
+
+    @staticmethod
+    def make_conjunction(xs):
+        return "({})".format(" && ".join(xs))
+
+    @staticmethod
+    def make_disjunction(xs):
+        return "({})".format(" || ".join(xs))
+
+    @staticmethod
+    def make_predicate(intel_type, values):
+        assert values
+        # Combine singleton values into a set query.
+        def condense(lhs, rhs):
+            if len(rhs) == 1:
+                return f"{lhs} == {rhs[0]}"
+            else:
+                return f"{lhs} in {{{', '.join(rhs)}}}"
+        # IP addresses
+        if intel_type in ["ip-src", "ip-dst"]:
+            return condense(":addr", values)
+        # URLs
+        elif intel_type in ["url", "uri"]:
+            def make_http_log_expr(x):
+                result = urllib.parse.urlsplit(x)
+                host = result.hostname
+                path = result.path
+                if not host and path and path[0] != "/":
+                    # If there is no protocol in the URI, then the "host" part will
+                    # be prepended to "path". We're "fixing" this behavior by
+                    # manually splitting at the first "/".
+                    host, path = tuple(path.split("/", 1))
+                    path = "/" + path # bring back leading slash
+                host = f"host == {str_escape(host)}" if host else None
+                path = f"uri == {str_escape(path)}" if path else None
+                if host and path:
+                    return VAST.make_conjunction([host, path])
+                if host:
+                    return host
+                if path:
+                    return path
+                return None
+            return VAST.make_disjunction(map(make_http_log_expr, values))
+        # Domains
+        elif intel_type == "domain":
+            return condense("host", list(map(str_escape, values)))
+        # Other
+        elif intel_type == "http-method":
+            return condense("method", list(map(str_escape, values)))
+        else:
+            fail("unsupported intel type:", intel_type)
+
+    @staticmethod
+    def make_expression(intel, window=None):
+        """Creates a VAST expression from an intel item."""
+        # FIXME: type queries currently prevent this from working.
+        #filter = '#type == "zeek::conn"'
+        #if window:
+        #    filter = f"#time > {window} ago && {filter}"
+        #pred = VAST.make_predicate(intel.type, [intel.value])
+        #return f'{filter} && {pred}'
+        return VAST.make_predicate(intel.type, [intel.value])
+
+
+class Controller:
+    def __init__(self, vast, misp):
+        self.vast = vast
+        self.misp = misp
+
+    async def run(self, window=None):
+        while True:
+            intel = await self.misp.intel()
+            expr = VAST.make_expression(intel, window)
+            results = await self.vast.export(expr)
+            log(f"reporting sightings for {len(results)} results")
+            for result in results:
+                log(result, color="blue")
+                record = json.loads(result)
+                # Extract time of sighting.
+                if "ts" not in record:
+                    fail("couldn't find Zeek log with 'ts' column")
+                timestamp = int(record["ts"])
+                # Report sightings back to producer.
+                await self.misp.report(intel, timestamp)
 
 # -- main ---------------------------------------------------------------------
 
 async def main():
     """The main function"""
     parser = argparse.ArgumentParser(
-        description=os.path.basename(__file__),
+        description="The Robo Investigor autonomously correlates threat "
+        "intelligence with historical data to uncover attacks that began in "
+        "the past. Matching activity is published back to the intelligence "
+        "providers to confirm sightings",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument(
-        "-a",
-        "--app",
-        default="tenzir",
-        help="Path to the VAST/Tenzir executable")
     parser.add_argument(
         "-m",
         "--misp-host",
@@ -257,38 +281,31 @@ async def main():
         default=MISP_DEFAULT_WEB_PORT,
         help="The web UI port of the MISP instance")
     parser.add_argument(
-        "-H",
-        "--historical",
-        action='store_true',
-        help="Perform a historical query through the REST API")
-    parser.add_argument(
-        "-C",
-        "--continuous",
-        action='store_true',
-        help="Perform a continuous query by subscribing via 0mq")
-    parser.add_argument(
-        "-U",
-        "--unified",
-        action='store_true',
-        help="Perform a historical and continuous query")
-    parser.add_argument(
         "-t",
         "--time-window",
         help="The time window to restrict intel searches to")
+    parser.add_argument(
+        "-v",
+        "--vast",
+        default="tenzir",
+        help="Path to the VAST executable")
+#    parser.add_argument(
+#        "-z",
+#        "--zeek-host",
+#        help="The Zeek node to which to relay new intel")
     parser.add_argument("values", nargs=argparse.REMAINDER)
     args = parser.parse_args()
-    # Create a MISP Controller.
-    controller = Controller(args.app, args.misp_host, args.web_port,
-                            args.zmq_port)
-    # Run historical query.
-    if args.historical or args.unified:
-        if not args.values:
-            log("historical queries requires at least one value")
-            sys.exit(1)
-        await controller.historical_query(args.values, args.time_window)
-    # Subscribe to future results.
-    if args.continuous or args.unified:
-        await controller.continuous_query(args.values, args.time_window)
+    # Setup VAST
+    vast = VAST(args.vast)
+    vast_status = await vast.status()
+    vast_threads = vast_status['system']['worker-threads']
+    log(f"found VAST running with {vast_threads} threads")
+    # Setup MISP.
+    misp = MISP(args.misp_host, args.web_port, args.zmq_port)
+    # Create controller.
+    controller = Controller(vast, misp)
+    log(f"waiting for new intel")
+    await controller.run(args.time_window)
 
 if __name__ == '__main__':
     asyncio.run(main())
