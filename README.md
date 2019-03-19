@@ -9,13 +9,12 @@ We currently support the following features:
 
 - Live correlation of threat intelligence with historical data by hooking into
   [MISP][misp]'s intelligence feeds and translating new intelligence into
-  queries against [VAST][vast] and [Tenzir][tenzir].
+  queries against [VAST][vast] (or [Tenzir][tenzir]).
 
 ## Prerequisites
 
 You need to make sure you have the necessary Python modules, a running
-[MISP][misp] instance, as well as running [Tenzir][tenzir] or [VAST][vast]
-node.
+[MISP][misp] instance, as well as a running [VAST][vast] node.
 
 ### Python Setup
 
@@ -47,35 +46,29 @@ export MISP_API_KEY=qrtyJV9VMwo2immC8S4cZEaqFEK4m13UrlTvoSGl
 
 ### VAST Setup
 
-You need is the `vast` binary in your `PATH`, and a running VAST server with
-some preloaded data listening on the default port.
+You need the `vast` (or `tenzir`) binary in your `PATH`, and a running VAST
+node.
 
 ## Usage
 
-`robo` supports two modes of operation: *historical* and *continuous* queries.
-A historical query looks for a specific value in the MISP database, translates
-the matching attributes into a VAST query, and then publishes the VAST results
-as sightings back to MISP. A continuous has a similar worflow, with the only
-difference that each newly arriving attribute elicits a historical query.
+`robo` receives intelligence items from MISP (in the form of MISP *attributes*)
+and translates them data into VAST queries. Upon receiving results from the queries, `robo` publishes them back to MISP as sightings.
 
-The historical query feature exists primarily for ad-hoc testing. For
-operational deployments, the continous query mode makes most sense. To launch
-`robo` in continuous mode, and a MISP instance located at IP address `1.2.3.4`,
-use the following invocation:
+Assuming your MISP instance runs at host `1.2.3.4`, you would start `robo` as
+follows to receive intelligence via MISP's 0mq channel:
 
 ```sh
-robo -m 1.2.3.4 -C
+robo -m 1.2.3.4 --misp-zmq
 ```
 
-`robo` will not return until you kill the process.
-
-You can issue a historical query for IP address `6.6.6.6` as follows:
+To receive intelligence via MISP's Kafka channel, run `robo` like this:
 
 ```sh
-robo -m 1.2.3.4 -H -v 6.6.6.6
+robo -m 1.2.3.4 --misp-kafka
 ```
 
-The full list of options is available via `robo -h`.
+The full list of options is available via `robo -h`, e.g., to specify a
+different 0mq port or to choose a different Kafka bootstrap server.
 
 ## License
 

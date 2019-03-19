@@ -1,3 +1,4 @@
+aiokafka
 maya
 pymisp
 zmq

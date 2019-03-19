@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from aiokafka import AIOKafkaConsumer
 import argparse
 import asyncio
 import datetime
@@ -17,7 +18,10 @@ from pymisp import PyMISP, MISPAttribute, MISPSighting
 MISP_DEFAULT_HOST = "localhost"
 MISP_DEFAULT_WEB_PORT = 80
 MISP_DEFAULT_ZMQ_PORT = 50000
-VAST_PORT = 42000
+MISP_DEFAULT_KAFKA_ATTRIBUTE_TOPIC = "misp_attribute"
+MISP_DEFAULT_KAFKA_BOOTSTRAP_SERVER = "localhost"
+ZEEK_DEFAULT_HOST = "localhost"
+ZEEK_DEFAULT_PORT = 44444
 
 # -- utilities ----------------------------------------------------------------
 
@@ -81,8 +85,7 @@ class Intelligence(NamedTuple):
     producer: str   # The origin of the intelligence.
 
 class MISP:
-    """Subscribes to MISP's ZeroMQ channel that publishes intel."""
-    def __init__(self, host, web_port, zmq_port):
+    def __init__(self, host, web_port):
         # Connect to MISP instance via API.
         if "MISP_API_KEY" not in os.environ:
             fail("no environment variable MISP_API_KEY found")
@@ -90,45 +93,53 @@ class MISP:
         api_url = f"http://{host}:{web_port}"
         log(f"connecting to MISP REST API at {api_url}")
         self.misp = PyMISP(api_url, api_key, ssl=False, debug=False)
-        # Connect to MISP via 0mq.
-        zmq_url = f"tcp://{host}:{zmq_port}"
-        log(f"connecting to MISP 0mq socket at {zmq_url}")
-        context = Context.instance()
-        self.socket = context.socket(zmq.SUB)
-        self.socket.connect(zmq_url)
-        self.socket.setsockopt(zmq.SUBSCRIBE, b"")
+
+    def subscribe(self, channel):
+        if type(channel) == AIOKafkaConsumer:
+            async def generate():
+                try:
+                    while True:
+                        msg = await channel.getone()
+                        data  = json.loads(msg.value)
+                        intel = MISP.make_intel_from_attribute(data)
+                        if intel:
+                            return intel
+                except:
+                    await channel.stop()
+                    fail("failure during Kafka attribute consumption:",
+                         sys.exc_info())
+            self.generator = generate
+        elif type(channel) == zmq.asyncio.Socket:
+            async def generate():
+                while True:
+                    msg = await channel.recv()
+                    topic, _, payload = msg.decode("utf-8").partition(" ")
+                    # Filter out heartbeats.
+                    if topic == "misp_json_self":
+                        uptime = int(json.loads(payload)["uptime"])
+                        delta = datetime.timedelta(seconds=uptime)
+                        log("received 0mq keep-alive (uptime",
+                            "{:0>8})".format(str(delta)))
+                        continue
+                    if topic != "misp_json_attribute":
+                        continue
+                    # Parse the payload.
+                    data = json.loads(payload)
+                    result = MISP.make_intel_from_attribute(data)
+                    if result:
+                        return result
+            self.generator = generate
+        else:
+            fail(f"unknown channel type {type(channel)}")
+
+    async def unsubscribe(self, channel):
+        if type(channel) == AIOKafkaConsumer:
+            await channel.stop()
+        elif type(channel) == zmq.Socket:
+            channel.disconnect()
 
     async def intel(self):
-        while True:
-            msg = await self.socket.recv()
-            topic, _, payload = msg.decode("utf-8").partition(" ")
-            # Filter out heartbeats.
-            if topic == "misp_json_self":
-                uptime = int(json.loads(payload)["uptime"])
-                delta = datetime.timedelta(seconds=uptime)
-                log("received 0mq keep-alive (uptime",
-                    "{:0>8})".format(str(delta)))
-                continue
-            if topic != "misp_json_attribute":
-                continue
-            # Parse the payload.
-            data = json.loads(payload)
-            attr = data["Attribute"]
-            action = data["action"]
-            # Consider only new events.
-            if action not in ["add", "edit"]:
-                log(f"ignoring '{action}' of attribute {attr['id']}")
-                continue
-            log(json.dumps(data, indent=2), color="yellow")
-            # Instantiate the intel item.
-            misp_attr = MISPAttribute()
-            misp_attr.from_dict(**attr)
-            return Intelligence(
-                id=misp_attr.id,
-                type=misp_attr.type,
-                value=misp_attr.value,
-                data=misp_attr,
-                producer="misp")
+        return await self.generator()
 
     async def report(self, intel, time_seen):
         """Reports intelligence as (true-positive) sighting."""
@@ -148,6 +159,25 @@ class MISP:
                                 type_attribute=attr_type,
                                 values=values,
                                 pythonify=True)
+
+    @staticmethod
+    def make_intel_from_attribute(data):
+        attr = data["Attribute"]
+        action = data["action"]
+        # Consider only new events.
+        if action not in ["add", "edit"]:
+            log(f"ignoring '{action}' of attribute {attr['id']}")
+            return None
+        log(json.dumps(data, indent=2), color="yellow")
+        # Instantiate the intel item.
+        misp_attr = MISPAttribute()
+        misp_attr.from_dict(**attr)
+        return Intelligence(
+            id=misp_attr.id,
+            type=misp_attr.type,
+            value=misp_attr.value,
+            data=misp_attr,
+            producer="misp")
 
 class VAST:
     def __init__(self, path, max_results=10):
@@ -231,6 +261,9 @@ class VAST:
         #return f'{filter} && {pred}'
         return VAST.make_predicate(intel.type, [intel.value])
 
+class Zeek:
+    def ___init__(self, host, port):
+        pass
 
 class Controller:
     def __init__(self, vast, misp):
@@ -269,16 +302,32 @@ async def main():
         default=MISP_DEFAULT_HOST,
         help="The host where the MISP instance is running")
     parser.add_argument(
-        "-z",
-        "--zmq-port",
+        "--misp-web-port",
+        type=int,
+        default=MISP_DEFAULT_WEB_PORT,
+        help="The web UI port of the MISP instance")
+    parser.add_argument(
+        "--misp-zmq",
+        action="store_true",
+        help="The ZeroMQ port of the MISP instance")
+    parser.add_argument(
+        "--misp-zmq-port",
         type=int,
         default=MISP_DEFAULT_ZMQ_PORT,
         help="The ZeroMQ port of the MISP instance")
     parser.add_argument(
-        "-w",
-        "--web-port",
-        type=int,
-        default=MISP_DEFAULT_WEB_PORT,
+        "--misp-kafka",
+        action="store_true",
+        help="The web UI port of the MISP instance")
+    parser.add_argument(
+        "--misp-kafka-bootstrap-server",
+        type=str,
+        default=MISP_DEFAULT_KAFKA_BOOTSTRAP_SERVER,
+        help="The web UI port of the MISP instance")
+    parser.add_argument(
+        "--misp-kafka-attribute-topic",
+        type=str,
+        default=MISP_DEFAULT_KAFKA_ATTRIBUTE_TOPIC,
         help="The web UI port of the MISP instance")
     parser.add_argument(
         "-t",
@@ -301,7 +350,29 @@ async def main():
     vast_threads = vast_status['system']['worker-threads']
     log(f"found VAST running with {vast_threads} threads")
     # Setup MISP.
-    misp = MISP(args.misp_host, args.web_port, args.zmq_port)
+    misp = MISP(args.misp_host, args.misp_web_port)
+    if args.misp_kafka and args.misp_zmq:
+        fail("cannot receive intel via both Kafka and 0mq")
+    if args.misp_zmq:
+        zmq_url = f"tcp://{args.misp_host}:{args.misp_zmq_port}"
+        log(f"connecting to MISP 0mq socket at {zmq_url}")
+        context = Context.instance()
+        socket = context.socket(zmq.SUB)
+        socket.connect(zmq_url)
+        socket.setsockopt(zmq.SUBSCRIBE, b"")
+        misp.subscribe(socket)
+    elif args.misp_kafka:
+        log("subscribing to MISP Kafka publisher at "
+            f"{args.misp_kafka_bootstrap_server} at topic "
+            f"{args.misp_kafka_attribute_topic}")
+        consumer = AIOKafkaConsumer(
+            args.misp_kafka_attribute_topic,
+            loop=asyncio.get_event_loop(),
+            bootstrap_servers=args.misp_kafka_bootstrap_server)
+        await consumer.start()
+        misp.subscribe(consumer)
+    else:
+        fail("need an intel subscription either via Kafka or 0mq")
     # Create controller.
     controller = Controller(vast, misp)
     log(f"waiting for new intel")
