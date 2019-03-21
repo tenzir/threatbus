@@ -29,6 +29,31 @@ source env/bin/activate
 pip install -r requirements.txt
 ```
 
+### Zeek/Broker Setup
+
+We use [Broker][broker] for the (optional) Zeek integration, which we also
+install into our Python virtual environment:
+
+```sh
+mkdir env/src
+git clone git@github.com:zeek/broker.git env/src/broker
+cd env/src/broker
+git submodule update --recursive --init
+./configure --generator=Ninja --prefix=$PREFIX --with-python=$PREFIX/bin/python
+cd build
+ninja
+ninja install
+cd ../../..
+```
+
+Finally, we make sure that we find the Broker Python modules without setting
+`PYTHONPATH` to `$PREFIX/lib/python`:
+
+```sh
+site_packages=$(python -c "import site; print(site.getsitepackages()[0])")
+cp sitecustomize.py $site_packages
+```
+
 ### MISP Setup
 
 First, you need to setup a MISP instance with [ZeroMQ
@@ -77,5 +102,6 @@ All rights reserved.
 
 [misp]: https://github.com/misp/misp
 [vast]: https://github.com/vast-io/vast
+[broker]: https://github.com/zeek/broker
 [tenzir]: https://docs.tenzir.com
 [misp-zmq-config]: https://github.com/MISP/misp-book/tree/master/misp-zmq#misp-zeromq-configuration
