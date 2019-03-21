@@ -35,6 +35,7 @@ We use [Broker][broker] for the (optional) Zeek integration, which we also
 install into our Python virtual environment:
 
 ```sh
+export PREFIX="$(pwd)/env"
 mkdir env/src
 git clone git@github.com:zeek/broker.git env/src/broker
 cd env/src/broker
@@ -77,7 +78,8 @@ node.
 ## Usage
 
 `robo` receives intelligence items from MISP (in the form of MISP *attributes*)
-and translates them data into VAST queries. Upon receiving results from the queries, `robo` publishes them back to MISP as sightings.
+and translates them data into VAST queries. Upon receiving results from the
+queries, `robo` publishes them back to MISP as sightings.
 
 Assuming your MISP instance runs at host `1.2.3.4`, you would start `robo` as
 follows to receive intelligence via MISP's 0mq channel:

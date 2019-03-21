@@ -13,15 +13,23 @@ import urllib.parse
 import zmq
 from zmq.asyncio import Context
 
-from pymisp import PyMISP, MISPAttribute, MISPSighting
+from pymisp import PyMISP, MISPAttribute, PyMISPError, MISPSighting
+
+ZEEK_TOPIC = "tenzir/robo"
+ZEEK_DEFAULT_HOST = "localhost"
+ZEEK_DEFAULT_PORT = 54321
+ZEEK_INTEGRATION = True
+try:
+    import broker
+    import broker.bro
+except ImportError:
+    ZEEK_INTEGRATION = False
 
 MISP_DEFAULT_HOST = "localhost"
 MISP_DEFAULT_WEB_PORT = 80
 MISP_DEFAULT_ZMQ_PORT = 50000
 MISP_DEFAULT_KAFKA_ATTRIBUTE_TOPIC = "misp_attribute"
 MISP_DEFAULT_KAFKA_BOOTSTRAP_SERVER = "localhost"
-ZEEK_DEFAULT_HOST = "localhost"
-ZEEK_DEFAULT_PORT = 44444
 
 # -- utilities ----------------------------------------------------------------
 
@@ -78,11 +86,11 @@ async def spawn(*args, stderr_color="magenta"):
 # -- types --------------------------------------------------------------------
 
 class Intelligence(NamedTuple):
-    id: str         # A unique identifier (within the producer's context).
+    id: str         # A unique identifier (within the intel source's context).
     type: str       # The type of intelligence.
     value: str      # The value of the item.
     data: str       # The raw data as given by the source
-    producer: str   # The origin of the intelligence.
+    source: str     # The origin of the intelligence.
 
 class MISP:
     def __init__(self, host, web_port):
@@ -92,7 +100,11 @@ class MISP:
         api_key = os.environ['MISP_API_KEY']
         api_url = f"http://{host}:{web_port}"
         log(f"connecting to MISP REST API at {api_url}")
-        self.misp = PyMISP(api_url, api_key, ssl=False, debug=False)
+        try:
+            self.misp = PyMISP(api_url, api_key, ssl=False, debug=False)
+        except PyMISPError:
+            fail(f"connection refused while trying to connect to {api_url}")
+
 
     def subscribe(self, channel):
         if type(channel) == AIOKafkaConsumer:
@@ -177,7 +189,7 @@ class MISP:
             type=misp_attr.type,
             value=misp_attr.value,
             data=misp_attr,
-            producer="misp")
+            source="misp")
 
 class VAST:
     def __init__(self, path, max_results=10):
@@ -262,13 +274,58 @@ class VAST:
         return VAST.make_predicate(intel.type, [intel.value])
 
 class Zeek:
-    def ___init__(self, host, port):
-        pass
+    def __init__(self, host, port):
+        self.endpoint = broker.Endpoint()
+        log(f"establishing peering with Zeek at {host}:{port}")
+        self.endpoint.peer(host, port)
+        log("established peering succesfully")
+
+    def add(self, intel):
+        """Forwards intelligence to Zeek"""
+        log("forwarding intel to Zeek:", intel)
+        event = broker.bro.Event(
+            "Tenzir::add_intel",
+            Zeek.misp_to_intel_framework_type(intel),
+            intel.value,
+            intel.source)
+        self.endpoint.publish(ZEEK_TOPIC, event)
+
+    def remove(self, intel):
+        """Forwards intelligence to Zeek"""
+        log("deleting intel from Zeek:", intel)
+        event = broker.bro.Event(
+            "Tenzir::remove_intel",
+            Zeek.misp_to_intel_framework_type(intel),
+            intel.value)
+        self.endpoint.publish(ZEEK_TOPIC, event)
+
+    @staticmethod
+    def misp_to_intel_framework_type(intel):
+        """Translates type names of internal intel to names in Zeek's intel
+        framework."""
+        # TODO: complete mapping MISP types to Zeek types.
+        table = {
+            "ip-src": "ADDR",
+            "ip-dst": "ADDR",
+            "domain": "DOMAIN",
+            "email-dst": "EMAIL",
+            "email-src": "EMAIL",
+            "email-reply-to": "EMAIL",
+            "hostname": "DOMAIN",
+            "url": "URL",
+            "uri": "URL",
+            "x509-fingerprint-md5": "CERT_HASH",
+            "x509-fingerprint-sha1": "CERT_HASH",
+            "x509-fingerprint-sha256": "CERT_HASH",
+        }
+        return table[intel.type]
+
 
 class Controller:
-    def __init__(self, vast, misp):
+    def __init__(self, vast, misp, zeek):
         self.vast = vast
         self.misp = misp
+        self.zeek = zeek
 
     async def run(self, window=None):
         while True:
@@ -283,8 +340,11 @@ class Controller:
                 if "ts" not in record:
                     fail("couldn't find Zeek log with 'ts' column")
                 timestamp = int(record["ts"])
-                # Report sightings back to producer.
+                # Report sightings back to source.
                 await self.misp.report(intel, timestamp)
+            # Relay new intel to Zeek
+            if self.zeek:
+                self.zeek.add(intel)
 
 # -- main ---------------------------------------------------------------------
 
@@ -296,6 +356,15 @@ async def main():
         "the past. Matching activity is published back to the intelligence "
         "providers to confirm sightings",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument(
+        "-t",
+        "--time-window",
+        help="The time window to restrict intel searches to")
+    parser.add_argument(
+        "-v",
+        "--vast",
+        default="tenzir",
+        help="Path to the VAST executable")
     parser.add_argument(
         "-m",
         "--misp-host",
@@ -321,7 +390,6 @@ async def main():
         help="The web UI port of the MISP instance")
     parser.add_argument(
         "--misp-kafka-bootstrap-server",
-        type=str,
         default=MISP_DEFAULT_KAFKA_BOOTSTRAP_SERVER,
         help="The web UI port of the MISP instance")
     parser.add_argument(
@@ -330,19 +398,15 @@ async def main():
         default=MISP_DEFAULT_KAFKA_ATTRIBUTE_TOPIC,
         help="The web UI port of the MISP instance")
     parser.add_argument(
-        "-t",
-        "--time-window",
-        help="The time window to restrict intel searches to")
+        "--zeek-host",
+        default=ZEEK_DEFAULT_HOST,
+        help="The host where Zeek integration runs")
     parser.add_argument(
-        "-v",
-        "--vast",
-        default="tenzir",
-        help="Path to the VAST executable")
-#    parser.add_argument(
-#        "-z",
-#        "--zeek-host",
-#        help="The Zeek node to which to relay new intel")
-    parser.add_argument("values", nargs=argparse.REMAINDER)
+        "--zeek-port",
+        type=int,
+        default=ZEEK_DEFAULT_PORT,
+        help="The port where the Zeek integration listens")
+    #parser.add_argument("values", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     # Setup VAST
     vast = VAST(args.vast)
@@ -373,8 +437,10 @@ async def main():
         misp.subscribe(consumer)
     else:
         fail("need an intel subscription either via Kafka or 0mq")
+    # Connect to Zeek
+    zeek = Zeek(args.zeek_host, args.zeek_port) if ZEEK_INTEGRATION else None
     # Create controller.
-    controller = Controller(vast, misp)
+    controller = Controller(vast, misp, zeek)
     log(f"waiting for new intel")
     await controller.run(args.time_window)
 
