@@ -30,9 +30,13 @@ pip install -r requirements.txt
 
 ### MISP Setup
 
-First, you need to setup a MISP instance with [ZeroMQ
-support][misp-zmq-config]. In the diagnostic section, make sure that the ZeroMQ
-extension is up and running.
+First, you need to setup a MISP instance with [0mq][misp-zmq-config] or
+[Kafka][kafka] support. In the diagnostic section, make sure that the the
+plugin is up and running. The 0mq plugin is usally enabled by default, but the
+Kafka plugin requires explicit activation. In addition to enabling the Kafka
+plugin globally via `Plugin.Kafka_enable`, you need to set your Kafka brokers
+via `Plugin.Kafka_brokers` and set
+`Plugin.Kafka_attribute_notifications_enable` to `true`.
 
 Second, you need an automation key, which is available from
 `https://<misp url>/events/automation` or from your profile at
