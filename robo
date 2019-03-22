@@ -7,11 +7,14 @@ import datetime
 import json
 import maya
 import os
+from shutil import which
 import sys
 from typing import NamedTuple
 import urllib.parse
 import zmq
 from zmq.asyncio import Context
+
+
 
 from pymisp import PyMISP, MISPAttribute, PyMISPError, MISPSighting
 
@@ -105,6 +108,10 @@ class MISP:
         except PyMISPError:
             fail(f"connection refused while trying to connect to {api_url}")
 
+    def __del__(self):
+        if self.cleanup:
+            self.cleanup()
+
 
     def subscribe(self, channel):
         if type(channel) == AIOKafkaConsumer:
@@ -192,10 +199,21 @@ class MISP:
             source="misp")
 
 class VAST:
-    def __init__(self, path, max_results=10):
+    def __init__(self, path, window, max_results=10):
         self.app = path
+        self.window = window
         self.max_results = max_results
         log(f"capping VAST results at '{self.max_results}' events")
+
+    def make_expression(self, intel):
+        """Creates a VAST expression from an intel item."""
+        # FIXME: type queries currently prevent this from working.
+        #filter = '#type == "zeek::conn"'
+        #if self.window:
+        #    filter = f"#time > {self.window} ago && {filter}"
+        #pred = VAST.make_predicate(intel.type, [intel.value])
+        #return f'{filter} && {pred}'
+        return VAST.make_predicate(intel.type, [intel.value])
 
     async def status(self):
         try:
@@ -210,6 +228,10 @@ class VAST:
         stdout = await spawn(self.app, "export", "-e", str(self.max_results),
                              "json", expr)
         return stdout.splitlines()
+
+    def path(self):
+        """Retrieves the full path to the VAST binary"""
+        return self.app
 
     @staticmethod
     def make_conjunction(xs):
@@ -261,17 +283,6 @@ class VAST:
             return condense("method", list(map(str_escape, values)))
         else:
             fail("unsupported intel type:", intel_type)
-
-    @staticmethod
-    def make_expression(intel, window=None):
-        """Creates a VAST expression from an intel item."""
-        # FIXME: type queries currently prevent this from working.
-        #filter = '#type == "zeek::conn"'
-        #if window:
-        #    filter = f"#time > {window} ago && {filter}"
-        #pred = VAST.make_predicate(intel.type, [intel.value])
-        #return f'{filter} && {pred}'
-        return VAST.make_predicate(intel.type, [intel.value])
 
 class Zeek:
     def __init__(self, host, port):
@@ -327,22 +338,20 @@ class Controller:
         self.misp = misp
         self.zeek = zeek
 
-    async def run(self, window=None):
+    async def run(self):
         while True:
             intel = await self.misp.intel()
-            expr = VAST.make_expression(intel, window)
-            results = await self.vast.export(expr)
-            log(f"reporting sightings for {len(results)} results")
-            for result in results:
-                log(result, color="blue")
-                record = json.loads(result)
-                # Extract time of sighting.
-                if "ts" not in record:
-                    fail("couldn't find Zeek log with 'ts' column")
-                timestamp = int(record["ts"])
-                # Report sightings back to source.
-                await self.misp.report(intel, timestamp)
-            # Relay new intel to Zeek
+            if self.vast:
+                expr = self.vast.make_expression(intel)
+                results = await self.vast.export(expr)
+                log(f"reporting sightings for {len(results)} results")
+                for result in results:
+                    log(result, color="blue")
+                    record = json.loads(result)
+                    if "ts" not in record:
+                        fail("couldn't find Zeek log with 'ts' column")
+                    timestamp = int(record["ts"])
+                    await self.misp.report(intel, timestamp)
             if self.zeek:
                 self.zeek.add(intel)
 
@@ -356,15 +365,6 @@ async def main():
         "the past. Matching activity is published back to the intelligence "
         "providers to confirm sightings",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument(
-        "-t",
-        "--time-window",
-        help="The time window to restrict intel searches to")
-    parser.add_argument(
-        "-v",
-        "--vast",
-        default="tenzir",
-        help="Path to the VAST executable")
     parser.add_argument(
         "-m",
         "--misp-host",
@@ -398,6 +398,23 @@ async def main():
         default=MISP_DEFAULT_KAFKA_ATTRIBUTE_TOPIC,
         help="The web UI port of the MISP instance")
     parser.add_argument(
+        "-V",
+        "--vast",
+        action="store_true",
+        help="Enable intelligence forwarding to VAST")
+    parser.add_argument(
+        "--vast-executable",
+        default=which("tenzir"),
+        help="Path to the VAST executable")
+    parser.add_argument(
+        "--vast-time-window",
+        help="The time window to restrict intel searches to")
+    parser.add_argument(
+        "-Z",
+        "--zeek",
+        action="store_true",
+        help="Enable intelligence forwarding to Zeek")
+    parser.add_argument(
         "--zeek-host",
         default=ZEEK_DEFAULT_HOST,
         help="The host where Zeek integration runs")
@@ -409,10 +426,14 @@ async def main():
     #parser.add_argument("values", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     # Setup VAST
-    vast = VAST(args.vast)
-    vast_status = await vast.status()
-    vast_threads = vast_status['system']['worker-threads']
-    log(f"found VAST running with {vast_threads} threads")
+    vast = None
+    if args.vast:
+        if not args.vast_executable:
+            fail(f"could not find VAST at {args.vast_executable}")
+        vast = VAST(args.vast_executable, args.vast_time_window)
+        vast_status = await vast.status()
+        vast_threads = vast_status['system']['worker-threads']
+        log(f"found VAST running with {vast_threads} threads")
     # Setup MISP.
     misp = MISP(args.misp_host, args.misp_web_port)
     if args.misp_kafka and args.misp_zmq:
@@ -437,12 +458,18 @@ async def main():
         misp.subscribe(consumer)
     else:
         fail("need an intel subscription either via Kafka or 0mq")
-    # Connect to Zeek
-    zeek = Zeek(args.zeek_host, args.zeek_port) if ZEEK_INTEGRATION else None
+    # Connect to Zeek.
+    zeek = None
+    if args.zeek:
+        if not ZEEK_INTEGRATION:
+            fail("no broker python module found")
+        zeek = Zeek(args.zeek_host, args.zeek_port)
     # Create controller.
+    if not (args.vast or args.zeek):
+        fail("no intel consumer provided; enable VAST or Zeek")
     controller = Controller(vast, misp, zeek)
     log(f"waiting for new intel")
-    await controller.run(args.time_window)
+    await controller.run()
 
 if __name__ == '__main__':
     asyncio.run(main())

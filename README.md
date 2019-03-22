@@ -1,20 +1,19 @@
 # Robo Investigator
 
 The **Robo Investigor** (`robo`) autonomously performs routine task of an
-incidnet response team.
+incident response team.
 
-## Features
+In particular, `robo` performs live correlation of threat intelligence with
+historical data by hooking into [MISP][misp]'s intelligence feeds and
+dispatching new intelligence into to downstream consumers. We support the
+following consumers:
 
-We currently support the following features:
-
-- Live correlation of threat intelligence with historical data by hooking into
-  [MISP][misp]'s intelligence feeds and translating new intelligence into
-  queries against [VAST][vast] (or [Tenzir][tenzir]).
+  - [VAST][vast] (or [Tenzir][tenzir]): perform historical queries
+  - [Zeek][zeek]: convert MISP intel into Zeek intel
 
 ## Prerequisites
 
-You need to make sure you have the necessary Python modules, a running
-[MISP][misp] instance, as well as a running [VAST][vast] node.
+You need a running [MISP][misp] instance and at least one intel consumer.
 
 ### Python Setup
 
@@ -27,32 +26,6 @@ virtual environment:
 python3 -m venv env
 source env/bin/activate
 pip install -r requirements.txt
-```
-
-### Zeek/Broker Setup
-
-We use [Broker][broker] for the (optional) Zeek integration, which we also
-install into our Python virtual environment:
-
-```sh
-export PREFIX="$(pwd)/env"
-mkdir env/src
-git clone git@github.com:zeek/broker.git env/src/broker
-cd env/src/broker
-git submodule update --recursive --init
-./configure --generator=Ninja --prefix=$PREFIX --with-python=$PREFIX/bin/python
-cd build
-ninja
-ninja install
-cd ../../..
-```
-
-Finally, we make sure that we find the Broker Python modules without setting
-`PYTHONPATH` to `$PREFIX/lib/python`:
-
-```sh
-site_packages=$(python -c "import site; print(site.getsitepackages()[0])")
-cp sitecustomize.py $site_packages
 ```
 
 ### MISP Setup
@@ -70,22 +43,53 @@ your shell under `MISP_API_KEY`, e.g.:
 export MISP_API_KEY=qrtyJV9VMwo2immC8S4cZEaqFEK4m13UrlTvoSGl
 ```
 
-### VAST Setup
+### VAST/Tenzir Integration
 
-You need the `vast` (or `tenzir`) binary in your `PATH`, and a running VAST
-node.
+For the VAST/Tenzir consumer, you only need to ensure that the `vast` or
+`tenzir` binary is found in the `PATH` environment variable. Alternatively, you
+can specify a custom location via `--vast-executable`.
+
+### Zeek/Broker Integration
+
+We use [Broker][broker] for the Zeek consumer. The easist solution is to
+install Broker inteo a Python virtual environment:
+
+```sh
+export PREFIX="$(pwd)/env"
+mkdir env/src
+git clone git@github.com:zeek/broker.git env/src/broker
+cd env/src/broker
+git checkout v1.1.2 # for Zeek 2.6.1
+git submodule update --recursive --init
+./configure --generator=Ninja --prefix=$PREFIX --with-python=$PREFIX/bin/python
+cd build
+ninja
+ninja install
+cd ../../..
+```
+
+Finally, we make sure that we find the Broker Python modules without setting
+`PYTHONPATH` to `$PREFIX/lib/python`:
+
+```sh
+site_packages=$(python -c "import site; print(site.getsitepackages()[0])")
+cp sitecustomize.py $site_packages
+```
 
 ## Usage
 
-`robo` receives intelligence items from MISP (in the form of MISP *attributes*)
-and translates them data into VAST queries. Upon receiving results from the
-queries, `robo` publishes them back to MISP as sightings.
-
 Assuming your MISP instance runs at host `1.2.3.4`, you would start `robo` as
-follows to receive intelligence via MISP's 0mq channel:
+follows to receive intelligence via MISP's 0mq channel and dispatch the intel
+to Zeek:
 
 ```sh
-robo -m 1.2.3.4 --misp-zmq
+robo -Z -m 1.2.3.4 --misp-zmq
+```
+
+To dispatch the intel also to VAST/Tenzir, add the `-V` switch:
+
+```sh
+robo -Z -V -m 1.2.3.4 --misp-zmq
 ```
 
 To receive intelligence via MISP's Kafka channel, run `robo` like this:
@@ -106,4 +110,5 @@ All rights reserved.
 [vast]: https://github.com/vast-io/vast
 [broker]: https://github.com/zeek/broker
 [tenzir]: https://docs.tenzir.com
+[zeek]: https://www.zeek.org
 [misp-zmq-config]: https://github.com/MISP/misp-book/tree/master/misp-zmq#misp-zeromq-configuration
