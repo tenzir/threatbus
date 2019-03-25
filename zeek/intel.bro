@@ -5,43 +5,43 @@
 module Tenzir;
 
 export {
-	## Broker bind address.
-	const broker_host = "localhost" &redef;
+  ## Broker bind address.
+  const broker_host = "localhost" &redef;
 
-	## Broker port.
-	const broker_port = 54321/tcp &redef;
+  ## Broker port.
+  const broker_port = 54321/tcp &redef;
 
-	## Topic to subscribe to for receiving intel.
-	const robo_investigator_topic = "tenzir/robo" &redef;
+  ## Topic to subscribe to for receiving intel.
+  const robo_investigator_topic = "tenzir/robo" &redef;
 
-	## Flag that indicates whether to log intel operations via reporter.log
-	const log_operations = T &redef;
+  ## Flag that indicates whether to log intel operations via reporter.log
+  const log_operations = T &redef;
 
-	## Event to raise for intel item insertion.
-	global add_intel: event(kind: string, value: string, source: string);
+  ## Event to raise for intel item insertion.
+  global add_intel: event(kind: string, value: string, source: string);
 
-	## Event to raise for intel item removal.
-	global remove_intel: event(kind: string, value: string);
+  ## Event to raise for intel item removal.
+  global remove_intel: event(kind: string, value: string);
 }
 
 # Maps string to their corresponding Intel framework types. Because Broker
 # cannot send enums, we must use this mapping table to obtain a native intel
 # type.
 global type_map: table[string] of Intel::Type = {
-		["ADDR"] = Intel::ADDR,
-		["SUBNET"] = Intel::SUBNET,
-		["URL"] = Intel::URL,
-		["SOFTWARE"] = Intel::SOFTWARE,
-		["EMAIL"] = Intel::EMAIL,
-		["DOMAIN"] = Intel::DOMAIN,
-		["USER_NAME"] = Intel::USER_NAME,
-		["CERT_HASH"] = Intel::CERT_HASH,
-		["PUBKEY_HASH"] = Intel::PUBKEY_HASH,
+  ["ADDR"] = Intel::ADDR,
+  ["SUBNET"] = Intel::SUBNET,
+  ["URL"] = Intel::URL,
+  ["SOFTWARE"] = Intel::SOFTWARE,
+  ["EMAIL"] = Intel::EMAIL,
+  ["DOMAIN"] = Intel::DOMAIN,
+  ["USER_NAME"] = Intel::USER_NAME,
+  ["CERT_HASH"] = Intel::CERT_HASH,
+  ["PUBKEY_HASH"] = Intel::PUBKEY_HASH,
 };
 
 # The enum to represent where data came from when it was discovered.
 redef enum Intel::Where += {
-	Intel::IN_TENZIR,
+  Intel::IN_TENZIR,
 };
 
 function is_valid_intel_type(kind: string): bool
@@ -64,7 +64,7 @@ function make_intel(kind: string, value: string,
 
 event add_intel(kind: string, value: string, source: string)
   {
-  if (!is_valid_intel_type(kind))
+  if ( !is_valid_intel_type(kind) )
     Reporter::fatal(fmt("got invalid intel type: %s", kind));
   if ( log_operations )
     Reporter::info(fmt("adding intel of type %s: %s", kind, value));
@@ -73,7 +73,7 @@ event add_intel(kind: string, value: string, source: string)
 
 event remove_intel(kind: string, value: string)
   {
-  if (!is_valid_intel_type(kind))
+  if ( !is_valid_intel_type(kind) )
     Reporter::fatal(fmt("got invalid intel type: %s", kind));
   if ( log_operations )
     Reporter::info(fmt("removing intel of type %s: %s", kind, value));
@@ -81,19 +81,19 @@ event remove_intel(kind: string, value: string)
   }
 
 event bro_init()
-	{
-	Broker::subscribe(robo_investigator_topic);
-	Broker::listen(broker_host, broker_port);
-	}
+  {
+  Broker::subscribe(robo_investigator_topic);
+  Broker::listen(broker_host, broker_port);
+  }
 
 event Broker::peer_added(endpoint: Broker::EndpointInfo, msg: string)
-	{
-	if ( log_operations )
+  {
+  if ( log_operations )
     Reporter::info(fmt("robo investigator connected: %s", endpoint));
-	}
+  }
 
 event Broker::peer_lost(endpoint: Broker::EndpointInfo, msg: string)
-	{
-	if ( log_operations )
+  {
+  if ( log_operations )
     Reporter::info(fmt("robo investigator disconnected: %s", endpoint));
-	}
+  }
