@@ -47,16 +47,18 @@ your shell under `MISP_API_KEY`, e.g.:
 export MISP_API_KEY=qrtyJV9VMwo2immC8S4cZEaqFEK4m13UrlTvoSGl
 ```
 
+Alternatively, you can place the API key in the configuration file.
+
 ### VAST/Tenzir Integration
 
 For the VAST/Tenzir consumer, you only need to ensure that the `vast` or
 `tenzir` binary is found in the `PATH` environment variable. Alternatively, you
-can specify a custom location via `--vast-executable`.
+can specify a custom location in the configuration file.
 
 ### Zeek/Broker Integration
 
 We use [Broker][broker] for the Zeek consumer. The easist solution is to
-install Broker inteo a Python virtual environment:
+install Broker into a Python virtual environment:
 
 ```sh
 export PREFIX="$(pwd)/env"
