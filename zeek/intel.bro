@@ -11,6 +11,9 @@ export {
 	## Broker port.
 	const broker_port = 54321/tcp &redef;
 
+	## Topic to subscribe to for receiving intel.
+	const robo_investigator_topic = "tenzir/robo" &redef;
+
 	## Event to raise for intel item insertion.
 	global add_intel: event(kind: string, value: string, source: string);
 
@@ -74,7 +77,7 @@ event remove_intel(kind: string, value: string)
 
 event bro_init()
 	{
-	Broker::subscribe("tenzir/robo");
+	Broker::subscribe(robo_investigator_topic);
 	Broker::listen(broker_host, broker_port);
 	}
 

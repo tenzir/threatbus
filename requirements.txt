@@ -1,3 +1,4 @@
 aiokafka
+confuse
 pymisp
 zmq

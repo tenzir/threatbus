@@ -8,10 +8,10 @@ historical data by hooking into [MISP][misp]'s intelligence feeds and
 dispatching new intelligence into to downstream consumers. We support the
 following consumers:
 
-  - [VAST][vast] (or [Tenzir][tenzir]): perform historical queries
-  - [Zeek][zeek]: convert MISP intel into Zeek intel
+- [VAST][vast] (or [Tenzir][tenzir]): perform historical queries
+- [Zeek][zeek]: convert MISP intel into Zeek intel
 
-## Prerequisites
+## Installation
 
 You need a running [MISP][misp] instance and at least one intel consumer.
 
@@ -82,28 +82,26 @@ cp sitecustomize.py $site_packages
 
 ## Usage
 
-Assuming your MISP instance runs at host `1.2.3.4`, you would start `robo` as
-follows to receive intelligence via MISP's 0mq channel and dispatch the intel
-to Zeek:
+The general architecture of `robo` resembles a publish/subscribe system:
+subscriptions to intelligence producers generate a stream of indicators that
+`robo` translates for various intel consumers.
+
+The [example configuration file](config.yaml) illustrates how to configure a
+deployment. After customizing the values to your environment, launch `robo`
+with a configuration:
 
 ```sh
-robo -Z -m 1.2.3.4 --misp-zmq
+robo -c custom.yaml
 ```
 
-To dispatch the intel also to VAST/Tenzir, add the `-V` switch:
+For ease of use, a subset of the configuration values can be overriden on the
+command line. For example, to override the MISP and Zeek host, you can use:
 
 ```sh
-robo -Z -V -m 1.2.3.4 --misp-zmq
+robo -m 1.2.3.4 -z 5.6.7.8
 ```
 
-To receive intelligence via MISP's Kafka channel, run `robo` like this:
-
-```sh
-robo -m 1.2.3.4 --misp-kafka
-```
-
-The full list of options is available via `robo -h`, e.g., to specify a
-different 0mq port or to choose a different Kafka bootstrap server.
+The full list of overriding options is available via `robo -h`.
 
 ## License
 

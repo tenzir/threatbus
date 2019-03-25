@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-from aiokafka import AIOKafkaConsumer
 import argparse
 import asyncio
 import datetime
@@ -10,11 +9,11 @@ from shutil import which
 import sys
 from typing import NamedTuple
 import urllib.parse
+
+from aiokafka import AIOKafkaConsumer
+import confuse
 import zmq
 from zmq.asyncio import Context
-
-
-
 from pymisp import PyMISP, MISPAttribute, PyMISPError, MISPSighting
 
 ZEEK_TOPIC = "tenzir/robo"
@@ -95,22 +94,18 @@ class Intelligence(NamedTuple):
     source: str     # The origin of the intelligence.
 
 class MISP:
-    def __init__(self, host, web_port):
+    def __init__(self, config):
         # Connect to MISP instance via API.
         if "MISP_API_KEY" not in os.environ:
             fail("no environment variable MISP_API_KEY found")
-        api_key = os.environ['MISP_API_KEY']
-        api_url = f"http://{host}:{web_port}"
+        api_key = os.environ['MISP_API_KEY'] or config.rest.api_key
+        api_url = f"http://{config.rest.host}:{config.rest.port}"
         log(f"connecting to MISP REST API at {api_url}")
         try:
-            self.misp = PyMISP(api_url, api_key, ssl=False, debug=False)
+            self.misp = PyMISP(api_url, config.rest.api_key,
+                               ssl=config.rest.ssl)
         except PyMISPError:
             fail(f"connection refused while trying to connect to {api_url}")
-
-    def __del__(self):
-        if self.cleanup:
-            self.cleanup()
-
 
     def subscribe(self, channel):
         if type(channel) == AIOKafkaConsumer:
@@ -198,10 +193,10 @@ class MISP:
             source="misp")
 
 class VAST:
-    def __init__(self, path, window, max_results=10):
-        self.app = path
-        self.window = window
-        self.max_results = max_results
+    def __init__(self, config):
+        self.app = config.executable
+        self.window = config.time_window
+        self.max_results = config.max_results
         log(f"capping VAST results at '{self.max_results}' events")
 
     def make_expression(self, intel):
@@ -284,10 +279,10 @@ class VAST:
             fail("unsupported intel type:", intel_type)
 
 class Zeek:
-    def __init__(self, host, port):
+    def __init__(self, config):
         self.endpoint = broker.Endpoint()
-        log(f"establishing peering with Zeek at {host}:{port}")
-        self.endpoint.peer(host, port)
+        log(f"establishing peering with Zeek at {config.host}:{config.port}")
+        self.endpoint.peer(config.host, config.port)
         log("established peering succesfully")
 
     def add(self, intel):
@@ -356,118 +351,121 @@ class Controller:
 
 # -- main ---------------------------------------------------------------------
 
+# The valid schema for the configuration.
+template = {
+    'consumers': confuse.StrSeq(),
+    'producers': confuse.StrSeq(),
+    'misp': {
+        'channel': confuse.OneOf(['zmq', 'kafka']),
+        'zmq': {
+            'host': str,
+            'port': int,
+        },
+        'kafka': {
+            'host': str,
+            'attribute_topic': str,
+        },
+        'rest': {
+            'host': str,
+            'port': int,
+            'ssl': bool,
+            'api_key': str,
+        }
+    },
+    'zeek': {
+        'host': str,
+        'port': int,
+        'topic': str,
+    },
+    'vast': {
+        'executable': str,
+        'max_results': int,
+        'time_window': str,
+    },
+}
+
 async def main():
     """The main function"""
-    parser = argparse.ArgumentParser(
-        description="The Robo Investigor autonomously correlates threat "
-        "intelligence with historical data to uncover attacks that began in "
-        "the past. Matching activity is published back to the intelligence "
-        "providers to confirm sightings",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    lazy_config = confuse.LazyConfig('RoboInvestigator', __name__)
+    parser = argparse.ArgumentParser()
     parser.add_argument(
+        '--config',
+        '-c',
+        help='path to a configuration file')
+    parser.add_argument(
+        '--verbose',
+        '-v',
+        dest='verbose',
+        action='store_true',
+        help='print debugging messages')
+    # MISP
+    parser.add_argument(
+        "--misp-rest-host",
         "-m",
-        "--misp-host",
-        default=MISP_DEFAULT_HOST,
-        help="The host where the MISP instance is running")
+        dest="misp.rest.host",
+        help="The REST API host of the MISP instance")
     parser.add_argument(
-        "--misp-web-port",
-        type=int,
-        default=MISP_DEFAULT_WEB_PORT,
-        help="The web UI port of the MISP instance")
-    parser.add_argument(
-        "--misp-zmq",
-        action="store_true",
-        help="The ZeroMQ port of the MISP instance")
-    parser.add_argument(
-        "--misp-zmq-port",
-        type=int,
-        default=MISP_DEFAULT_ZMQ_PORT,
-        help="The ZeroMQ port of the MISP instance")
-    parser.add_argument(
-        "--misp-kafka",
-        action="store_true",
-        help="The web UI port of the MISP instance")
-    parser.add_argument(
-        "--misp-kafka-bootstrap-server",
-        default=MISP_DEFAULT_KAFKA_BOOTSTRAP_SERVER,
-        help="The web UI port of the MISP instance")
-    parser.add_argument(
-        "--misp-kafka-attribute-topic",
-        type=str,
-        default=MISP_DEFAULT_KAFKA_ATTRIBUTE_TOPIC,
-        help="The web UI port of the MISP instance")
-    parser.add_argument(
-        "-V",
-        "--vast",
-        action="store_true",
-        help="Enable intelligence forwarding to VAST")
-    parser.add_argument(
-        "--vast-executable",
-        default=which("tenzir"),
-        help="Path to the VAST executable")
-    parser.add_argument(
-        "--vast-time-window",
-        help="The time window to restrict intel searches to")
-    parser.add_argument(
-        "-Z",
-        "--zeek",
-        action="store_true",
-        help="Enable intelligence forwarding to Zeek")
+        "--misp-kafka-host",
+        "-k",
+        dest="misp.kafka.host",
+        help="The Kafka bootstrap server configured with MISP")
     parser.add_argument(
         "--zeek-host",
-        default=ZEEK_DEFAULT_HOST,
-        help="The host where Zeek integration runs")
-    parser.add_argument(
-        "--zeek-port",
-        type=int,
-        default=ZEEK_DEFAULT_PORT,
-        help="The port where the Zeek integration listens")
-    #parser.add_argument("values", nargs=argparse.REMAINDER)
+        "-z",
+        dest="zeek.host",
+        help="The Zeek host running the integration scripts")
     args = parser.parse_args()
+    if args.config:
+        lazy_config.set_file(args.config)
+    lazy_config.set_args(args, dots=True)
+    config = lazy_config.get(template)
+
     # Setup VAST
     vast = None
-    if args.vast:
-        if not args.vast_executable:
-            fail(f"could not find VAST at {args.vast_executable}")
-        vast = VAST(args.vast_executable, args.vast_time_window)
+    if "vast" in config.consumers:
+        if not config.vast.executable:
+            fail(f"could not find VAST at {config.vast.executable}")
+        vast = VAST(config.vast)
         vast_status = await vast.status()
         vast_threads = vast_status['system']['worker-threads']
         log(f"found VAST running with {vast_threads} threads")
     # Setup MISP.
-    misp = MISP(args.misp_host, args.misp_web_port)
-    if args.misp_kafka and args.misp_zmq:
-        fail("cannot receive intel via both Kafka and 0mq")
-    if args.misp_zmq:
-        zmq_url = f"tcp://{args.misp_host}:{args.misp_zmq_port}"
-        log(f"connecting to MISP 0mq socket at {zmq_url}")
-        context = Context.instance()
-        socket = context.socket(zmq.SUB)
-        socket.connect(zmq_url)
-        socket.setsockopt(zmq.SUBSCRIBE, b"")
-        misp.subscribe(socket)
-    elif args.misp_kafka:
-        log("subscribing to MISP Kafka publisher at "
-            f"{args.misp_kafka_bootstrap_server} at topic "
-            f"{args.misp_kafka_attribute_topic}")
-        consumer = AIOKafkaConsumer(
-            args.misp_kafka_attribute_topic,
-            loop=asyncio.get_event_loop(),
-            bootstrap_servers=args.misp_kafka_bootstrap_server)
-        await consumer.start()
-        misp.subscribe(consumer)
-    else:
-        fail("need an intel subscription either via Kafka or 0mq")
+    misp = None
+    if "misp" in config.producers:
+        misp = MISP(config.misp)
+        if config.misp.channel == "zmq":
+            zmq_url = f"tcp://{config.misp.zmq.host}:{config.misp.zmq.port}"
+            log(f"connecting to MISP 0mq socket at {zmq_url}")
+            context = Context.instance()
+            socket = context.socket(zmq.SUB)
+            socket.connect(zmq_url)
+            socket.setsockopt(zmq.SUBSCRIBE, b"")
+            misp.subscribe(socket)
+        elif config.misp.channel == "kafka":
+            log("subscribing to MISP Kafka publisher at "
+                f"{config.misp.kafka.host} at topic "
+                f"{config.misp.kafka.attribute_topic}")
+            consumer = AIOKafkaConsumer(
+                config.misp.kafka.attribute_topic,
+                loop=asyncio.get_event_loop(),
+                bootstrap_servers=args.config.misp.kafka.host)
+            await consumer.start()
+            misp.subscribe(consumer)
+        else:
+            fail("need an intel subscription either via Kafka or 0mq")
     # Connect to Zeek.
     zeek = None
-    if args.zeek:
+    if "zeek" in config.consumers:
         if not ZEEK_INTEGRATION:
             fail("no broker python module found")
-        zeek = Zeek(args.zeek_host, args.zeek_port)
+        zeek = Zeek(config.zeek)
     # Create controller.
-    if not (args.vast or args.zeek):
+    if not misp:
+        fail("MISP intel producer not provided") # currently mandatory
+    if not (vast or zeek):
         fail("no intel consumer provided; enable VAST or Zeek")
     controller = Controller(vast, misp, zeek)
-    log(f"waiting for new intel")
+    log("waiting for new intel")
     await controller.run()
 
 if __name__ == '__main__':

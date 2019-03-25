@@ -1,0 +1,37 @@
+# Robo Investigator configuration file
+
+# The enabled intelligence producers.
+# Available values: "misp"
+producers: ["misp"]
+
+# The enabled intelligence consumers.
+# Available values: "zeek", "vast"
+consumers: ["vast", "zeek"]
+
+# MISP settings
+misp:
+  # The channel to use for acquiring intelligence.
+  channel: "zmq" # either "zmq" or "kafka"
+  zmq:
+    host: "localhost"
+    port: 50000
+  kafka:
+    host: "localhost"
+    attribute_topic: "misp_attribute"
+  rest:
+    api_key: "iVse3nJ1M6UMuBR3s8zCZYDjyAF6n9M4bKvI43RU"
+    host: "localhost"
+    port: 80
+    ssl: false
+
+# Zeek settings
+zeek:
+  host: "localhost"
+  port: 54321
+  topic: "tenzir/robo"
+
+# VAST settings
+vast:
+  executable: "vast"
+  max_results: 100
+  time_window: "1 year"
