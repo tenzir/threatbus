@@ -14,6 +14,9 @@ export {
 	## Topic to subscribe to for receiving intel.
 	const robo_investigator_topic = "tenzir/robo" &redef;
 
+	## Flag that indicates whether to log intel operations via reporter.log
+	const log_operations = T &redef;
+
 	## Event to raise for intel item insertion.
 	global add_intel: event(kind: string, value: string, source: string);
 
@@ -63,7 +66,8 @@ event add_intel(kind: string, value: string, source: string)
   {
   if (!is_valid_intel_type(kind))
     Reporter::fatal(fmt("got invalid intel type: %s", kind));
-  print fmt("adding intel of type %s: %s", kind, value);
+  if ( log_operations )
+    Reporter::info(fmt("adding intel of type %s: %s", kind, value));
   Intel::insert(make_intel(kind, value, source));
   }
 
@@ -71,7 +75,8 @@ event remove_intel(kind: string, value: string)
   {
   if (!is_valid_intel_type(kind))
     Reporter::fatal(fmt("got invalid intel type: %s", kind));
-  print fmt("removing intel of type %s: %s", kind, value);
+  if ( log_operations )
+    Reporter::info(fmt("removing intel of type %s: %s", kind, value));
   Intel::remove(make_intel(kind, value), T);
   }
 
@@ -83,10 +88,12 @@ event bro_init()
 
 event Broker::peer_added(endpoint: Broker::EndpointInfo, msg: string)
 	{
-	print "robo investigator connected", endpoint;
+	if ( log_operations )
+    Reporter::info(fmt("robo investigator connected: %s", endpoint));
 	}
 
 event Broker::peer_lost(endpoint: Broker::EndpointInfo, msg: string)
 	{
-	print "robo investigator disconnected", endpoint;
+	if ( log_operations )
+    Reporter::info(fmt("robo investigator disconnected: %s", endpoint));
 	}
