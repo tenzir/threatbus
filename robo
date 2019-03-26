@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import datetime
 import json
+import logging
 import os
 from shutil import which
 import sys
@@ -16,21 +17,12 @@ import zmq
 from zmq.asyncio import Context
 from pymisp import PyMISP, MISPAttribute, PyMISPError, MISPSighting
 
-ZEEK_TOPIC = "tenzir/robo"
-ZEEK_DEFAULT_HOST = "localhost"
-ZEEK_DEFAULT_PORT = 54321
 ZEEK_INTEGRATION = True
 try:
     import broker
     import broker.bro
 except ImportError:
     ZEEK_INTEGRATION = False
-
-MISP_DEFAULT_HOST = "localhost"
-MISP_DEFAULT_WEB_PORT = 80
-MISP_DEFAULT_ZMQ_PORT = 50000
-MISP_DEFAULT_KAFKA_ATTRIBUTE_TOPIC = "misp_attribute"
-MISP_DEFAULT_KAFKA_BOOTSTRAP_SERVER = "localhost"
 
 # -- utilities ----------------------------------------------------------------
 
@@ -58,21 +50,8 @@ def fail(*args):
     log(*args, color="red")
     sys.exit(1)
 
-def make_zmq_socket(host, port, kind):
-    assert kind == zmq.SUB or zmq.PUB
-    context = Context.instance()
-    socket = context.socket(kind)
-    socket.connect(f"tcp://{host}:{port}")
-    option = zmq.SUBSCRIBE if zmq.SUB else zmq.PUBLISH
-    socket.setsockopt(option, b"")
-    return socket
-
 def str_escape(x):
     return '"' + x.replace('"','\\"') + '"'
-def make_sighting(attr_id, timestamp):
-    x = MISPSighting()
-    x.from_dict(id=attr_id, source="VAST", type="0", timestamp=timestamp)
-    return x
 
 async def spawn(*args, stderr_color="magenta"):
     """Spawns a process asynchronously."""
@@ -280,6 +259,7 @@ class VAST:
 
 class Zeek:
     def __init__(self, config):
+        self.config = config
         self.endpoint = broker.Endpoint()
         log(f"establishing peering with Zeek at {config.host}:{config.port}")
         self.endpoint.peer(config.host, config.port)
@@ -293,7 +273,7 @@ class Zeek:
             Zeek.misp_to_intel_framework_type(intel),
             intel.value,
             intel.source)
-        self.endpoint.publish(ZEEK_TOPIC, event)
+        self.endpoint.publish(self.config.topic, event)
 
     def remove(self, intel):
         """Forwards intelligence to Zeek"""
@@ -302,7 +282,7 @@ class Zeek:
             "Tenzir::remove_intel",
             Zeek.misp_to_intel_framework_type(intel),
             intel.value)
-        self.endpoint.publish(ZEEK_TOPIC, event)
+        self.endpoint.publish(self.config.topic, event)
 
     @staticmethod
     def misp_to_intel_framework_type(intel):
