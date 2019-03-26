@@ -1,4 +1,10 @@
 # Robo Investigator configuration file
+logger:
+  console: true
+  console_verbosity: "DEBUG"
+  file: false
+  file_verbosity: "DEBUG"
+  filename: "robo.log"
 
 # The enabled intelligence producers.
 # Available values: "misp"

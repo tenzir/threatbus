@@ -47,7 +47,8 @@ your shell under `MISP_API_KEY`, e.g.:
 export MISP_API_KEY=qrtyJV9VMwo2immC8S4cZEaqFEK4m13UrlTvoSGl
 ```
 
-Alternatively, you can place the API key in the configuration file.
+Alternatively, you can place the API key in the configuration file. An existing
+environment variable will always take precedence to the configuration file.
 
 ### VAST/Tenzir Integration
 

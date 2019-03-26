@@ -26,41 +26,18 @@ except ImportError:
 
 # -- utilities ----------------------------------------------------------------
 
-# Poor man's logging.
-def log(*args, color="cyan"):
-    def to_color(col):
-        if col == "red":
-            return 31
-        if col == "green":
-            return 32
-        if col == "yellow":
-            return 33
-        if col == "blue":
-            return 34
-        if col == "magenta":
-            return 35
-        if col == "cyan":
-            return 36
-        sys.exit(1)
-    """Prints logging output to standard error"""
-    line = " ".join(map(str, args))
-    print(f"\033[{to_color(color)}m", line, "\033[0m", sep="", file=sys.stderr)
-
-def fail(*args):
-    log(*args, color="red")
-    sys.exit(1)
-
 def str_escape(x):
     return '"' + x.replace('"','\\"') + '"'
 
-async def spawn(*args, stderr_color="magenta"):
+async def spawn(*args):
     """Spawns a process asynchronously."""
     proc = await asyncio.create_subprocess_exec(
         *args,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE)
     stdout, stderr = await proc.communicate()
-    log(stderr.decode().strip(), color=stderr_color)
+    logger = logging.getLogger("robo")
+    logger.debug(stderr.decode().strip())
     return stdout.decode().strip()
 
 # -- types --------------------------------------------------------------------
@@ -74,17 +51,24 @@ class Intelligence(NamedTuple):
 
 class MISP:
     def __init__(self, config):
+        self.logger = logging.getLogger("robo.misp")
         # Connect to MISP instance via API.
-        if "MISP_API_KEY" not in os.environ:
-            fail("no environment variable MISP_API_KEY found")
-        api_key = os.environ['MISP_API_KEY'] or config.rest.api_key
+        api_key = None
+        if "MISP_API_KEY" in os.environ:
+            api_key = os.environ['MISP_API_KEY']
+        elif config.rest.api_key:
+            api_key = config.rest.api_key
+        else:
+            self.logger.critical("no MISP API key found: use MISP_API_KEY "
+                                 "environment variable or config file")
         api_url = f"http://{config.rest.host}:{config.rest.port}"
-        log(f"connecting to MISP REST API at {api_url}")
+        self.logger.info(f"connecting to MISP REST API at {api_url}")
         try:
             self.misp = PyMISP(api_url, config.rest.api_key,
                                ssl=config.rest.ssl)
         except PyMISPError:
-            fail(f"connection refused while trying to connect to {api_url}")
+            self.logger.critical("connection refused while trying to connect "
+                                 f"to {api_url}")
 
     def subscribe(self, channel):
         if type(channel) == AIOKafkaConsumer:
@@ -93,13 +77,14 @@ class MISP:
                     while True:
                         msg = await channel.getone()
                         data  = json.loads(msg.value)
-                        intel = MISP.make_intel_from_attribute(data)
+                        self.logger.debug(f"got attribute via Kafka: {data}")
+                        intel = self.make_intel_from_attribute(data)
                         if intel:
                             return intel
                 except:
                     await channel.stop()
-                    fail("failure during Kafka attribute consumption:",
-                         sys.exc_info())
+                    self.logger.critical("failure during Kafka attribute "
+                                         "consumption:", sys.exc_info())
             self.generator = generate
         elif type(channel) == zmq.asyncio.Socket:
             async def generate():
@@ -110,19 +95,20 @@ class MISP:
                     if topic == "misp_json_self":
                         uptime = int(json.loads(payload)["uptime"])
                         delta = datetime.timedelta(seconds=uptime)
-                        log("received 0mq keep-alive (uptime",
-                            "{:0>8})".format(str(delta)))
+                        self.logger.debug("received 0mq keep-alive (uptime "
+                                          "{:0>8})".format(str(delta)))
                         continue
                     if topic != "misp_json_attribute":
                         continue
                     # Parse the payload.
                     data = json.loads(payload)
-                    result = MISP.make_intel_from_attribute(data)
+                    self.logger.debug(f"got attribute via 0mq: {data}")
+                    result = self.make_intel_from_attribute(data)
                     if result:
                         return result
             self.generator = generate
         else:
-            fail(f"unknown channel type {type(channel)}")
+            self.logger.critical(f"unknown channel type {type(channel)}")
 
     async def unsubscribe(self, channel):
         if type(channel) == AIOKafkaConsumer:
@@ -138,29 +124,29 @@ class MISP:
         x = MISPSighting()
         x.from_dict(id=intel.id, source="VAST", type="0", timestamp=time_seen)
         ts = datetime.datetime.utcfromtimestamp(time_seen)
-        log(f"reporting intel seen at", ts.strftime('%Y-%m-%d %H:%M:%S'))
+        self.logger.debug(f"reporting intel seen at",
+                          ts.strftime('%Y-%m-%d %H:%M:%S'))
         self.misp.set_sightings(x)
 
     async def search(self, values, attr_type=None, start=None):
         """Performs a search over MISP attributes"""
-        log("searching MISP database for", values)
+        self.logger.debug("searching MISP database for", values)
         if attr_type:
-            log("restricting search to type", attr_type)
+            self.logger.debug("restricting search to type", attr_type)
         return self.misp.search(controller="attributes",
                                 date_from=start,
                                 type_attribute=attr_type,
                                 values=values,
                                 pythonify=True)
 
-    @staticmethod
-    def make_intel_from_attribute(data):
+    def make_intel_from_attribute(self, data):
         attr = data["Attribute"]
         action = data["action"]
+        # TODO: support deletion of events
         # Consider only new events.
         if action not in ["add", "edit"]:
-            log(f"ignoring '{action}' of attribute {attr['id']}")
+            self.logger.debug(f"ignoring '{action}' of attribute {attr['id']}")
             return None
-        log(json.dumps(data, indent=2), color="yellow")
         # Instantiate the intel item.
         misp_attr = MISPAttribute()
         misp_attr.from_dict(**attr)
@@ -173,10 +159,11 @@ class MISP:
 
 class VAST:
     def __init__(self, config):
+        self.logger = logging.getLogger("robo.vast")
         self.app = config.executable
         self.window = config.time_window
         self.max_results = config.max_results
-        log(f"capping VAST results at '{self.max_results}' events")
+        self.logger.debug(f"capping VAST results at '{self.max_results}' events")
 
     def make_expression(self, intel):
         """Creates a VAST expression from an intel item."""
@@ -192,12 +179,12 @@ class VAST:
         try:
             return json.loads(await spawn(self.app, "status"))
         except json.decoder.JSONDecodeError:
-            fail(f"failed to connect to remote VAST node")
+            self.logger.critical(f"failed to connect to remote VAST node")
         except FileNotFoundError:
-            fail(f"could not find {self.app} in PATH")
+            self.logger.critical(f"could not find {self.app} in PATH")
 
     async def export(self, expr, window=None):
-        log(f"spawning {self.app} process for expression {expr}")
+        self.logger.debug(f"spawning {self.app} process for expression {expr}")
         stdout = await spawn(self.app, "export", "-e", str(self.max_results),
                              "json", expr)
         return stdout.splitlines()
@@ -255,19 +242,21 @@ class VAST:
         elif intel_type == "http-method":
             return condense("method", list(map(str_escape, values)))
         else:
-            fail("unsupported intel type:", intel_type)
+            self.logger.critical("unsupported intel type:", intel_type)
 
 class Zeek:
     def __init__(self, config):
+        self.logger = logging.getLogger("robo.zeek")
         self.config = config
         self.endpoint = broker.Endpoint()
-        log(f"establishing peering with Zeek at {config.host}:{config.port}")
+        self.logger.info("establishing peering with Zeek at "
+                         f"{config.host}:{config.port}")
         self.endpoint.peer(config.host, config.port)
-        log("established peering succesfully")
+        self.logger.info("established peering succesfully")
 
     def add(self, intel):
         """Forwards intelligence to Zeek"""
-        log("forwarding intel to Zeek:", intel)
+        self.logger.debug(f"forwarding intel to Zeek: {intel}")
         event = broker.bro.Event(
             "Tenzir::add_intel",
             Zeek.misp_to_intel_framework_type(intel),
@@ -277,7 +266,7 @@ class Zeek:
 
     def remove(self, intel):
         """Forwards intelligence to Zeek"""
-        log("deleting intel from Zeek:", intel)
+        self.logger.debug(f"deleting intel from Zeek: {intel}")
         event = broker.bro.Event(
             "Tenzir::remove_intel",
             Zeek.misp_to_intel_framework_type(intel),
@@ -308,6 +297,7 @@ class Zeek:
 
 class Controller:
     def __init__(self, vast, misp, zeek):
+        self.logger = logging.getLogger("robo.controller")
         self.vast = vast
         self.misp = misp
         self.zeek = zeek
@@ -318,12 +308,12 @@ class Controller:
             if self.vast:
                 expr = self.vast.make_expression(intel)
                 results = await self.vast.export(expr)
-                log(f"reporting sightings for {len(results)} results")
+                self.logger.info(f"reporting sightings for {len(results)} results")
                 for result in results:
-                    log(result, color="blue")
+                    self.logger.debug(result)
                     record = json.loads(result)
                     if "ts" not in record:
-                        fail("couldn't find Zeek log with 'ts' column")
+                        self.logger.critical("couldn't find Zeek log with 'ts' column")
                     timestamp = int(record["ts"])
                     await self.misp.report(intel, timestamp)
             if self.zeek:
@@ -332,7 +322,15 @@ class Controller:
 # -- main ---------------------------------------------------------------------
 
 # The valid schema for the configuration.
+log_levels = confuse.Choice(['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG'])
 template = {
+    'logger': {
+        'console': bool,
+        'file': bool,
+        'filename': str,
+        'console_verbosity': log_levels,
+        'file_verbosity': log_levels,
+    },
     'consumers': confuse.StrSeq(),
     'producers': confuse.StrSeq(),
     'misp': {
@@ -366,6 +364,7 @@ template = {
 
 async def main():
     """The main function"""
+    # Setup configuration
     lazy_config = confuse.LazyConfig('RoboInvestigator', __name__)
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -373,11 +372,11 @@ async def main():
         '-c',
         help='path to a configuration file')
     parser.add_argument(
-        '--verbose',
-        '-v',
-        dest='verbose',
-        action='store_true',
-        help='print debugging messages')
+        '--quiet',
+        '-q',
+        dest='logger.console',
+        action='store_false',
+        help='do not log to console')
     # MISP
     parser.add_argument(
         "--misp-rest-host",
@@ -390,6 +389,11 @@ async def main():
         dest="misp.kafka.host",
         help="The Kafka bootstrap server configured with MISP")
     parser.add_argument(
+        "--misp-zmq-host",
+        "-0",
+        dest="misp.zmq.host",
+        help="The ZMQ host configured with MISP")
+    parser.add_argument(
         "--zeek-host",
         "-z",
         dest="zeek.host",
@@ -399,53 +403,74 @@ async def main():
         lazy_config.set_file(args.config)
     lazy_config.set_args(args, dots=True)
     config = lazy_config.get(template)
-
+    # Setup logging.
+    logger = logging.getLogger('robo')
+    logger.setLevel(logging.DEBUG) # FIXME: compute min(file, console)
+    formatter = logging.Formatter('%(asctime)s %(levelname)-8s [%(name)s] '
+                                  '%(message)s')
+    if config.logger.file:
+        fh = logging.FileHandler(config.logger.filename)
+        fh.setLevel(config.logger.file_verbosity)
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
+    if config.logger.console:
+        ch = logging.StreamHandler()
+        ch.setLevel(config.logger.console_verbosity)
+        ch.setFormatter(formatter)
+        logger.addHandler(ch)
+    class ShutdownHandler(logging.Handler):
+        def emit(self, record):
+            logging.shutdown()
+            sys.exit(1)
+    sh = ShutdownHandler(level=50)
+    sh.setFormatter(formatter)
+    logger.addHandler(sh)
     # Setup VAST
     vast = None
     if "vast" in config.consumers:
         if not config.vast.executable:
-            fail(f"could not find VAST at {config.vast.executable}")
+            logger.critical(f"could not find VAST at {config.vast.executable}")
         vast = VAST(config.vast)
         vast_status = await vast.status()
         vast_threads = vast_status['system']['worker-threads']
-        log(f"found VAST running with {vast_threads} threads")
+        logger.info(f"found VAST running with {vast_threads} threads")
     # Setup MISP.
     misp = None
     if "misp" in config.producers:
         misp = MISP(config.misp)
         if config.misp.channel == "zmq":
             zmq_url = f"tcp://{config.misp.zmq.host}:{config.misp.zmq.port}"
-            log(f"connecting to MISP 0mq socket at {zmq_url}")
+            logger.info(f"connecting to MISP 0mq socket at {zmq_url}")
             context = Context.instance()
             socket = context.socket(zmq.SUB)
             socket.connect(zmq_url)
             socket.setsockopt(zmq.SUBSCRIBE, b"")
             misp.subscribe(socket)
         elif config.misp.channel == "kafka":
-            log("subscribing to MISP Kafka publisher at "
-                f"{config.misp.kafka.host} at topic "
-                f"{config.misp.kafka.attribute_topic}")
+            logger.info("subscribing to MISP Kafka publisher at "
+                        f"{config.misp.kafka.host} at topic "
+                        f"{config.misp.kafka.attribute_topic}")
             consumer = AIOKafkaConsumer(
                 config.misp.kafka.attribute_topic,
                 loop=asyncio.get_event_loop(),
-                bootstrap_servers=args.config.misp.kafka.host)
+                bootstrap_servers=config.misp.kafka.host)
             await consumer.start()
             misp.subscribe(consumer)
         else:
-            fail("need an intel subscription either via Kafka or 0mq")
+            logger.critical("need an intel subscription either via Kafka or 0mq")
     # Connect to Zeek.
     zeek = None
     if "zeek" in config.consumers:
         if not ZEEK_INTEGRATION:
-            fail("no broker python module found")
+            logger.critical("no broker python module found")
         zeek = Zeek(config.zeek)
     # Create controller.
     if not misp:
-        fail("MISP intel producer not provided") # currently mandatory
+        logger.critical("MISP intel producer not provided") # currently mandatory
     if not (vast or zeek):
-        fail("no intel consumer provided; enable VAST or Zeek")
+        logger.critical("no intel consumer provided; enable VAST or Zeek")
     controller = Controller(vast, misp, zeek)
-    log("waiting for new intel")
+    logger.info("waiting for new intel")
     await controller.run()
 
 if __name__ == '__main__':
