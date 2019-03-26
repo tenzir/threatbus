@@ -61,10 +61,9 @@ class MISP:
         else:
             self.logger.critical("no MISP API key found: use MISP_API_KEY "
                                  "environment variable or config file")
-        api_url = f"http://{config.rest.host}:{config.rest.port}"
-        self.logger.info(f"connecting to MISP REST API at {api_url}")
+        self.logger.info(f"connecting to MISP REST API at {config.url}")
         try:
-            self.misp = PyMISP(api_url, config.rest.api_key,
+            self.misp = PyMISP(config.url, config.rest.api_key,
                                ssl=config.rest.ssl)
         except PyMISPError:
             self.logger.critical("connection refused while trying to connect "
@@ -379,9 +378,9 @@ async def main():
         help='do not log to console')
     # MISP
     parser.add_argument(
-        "--misp-rest-host",
+        "--misp-rest-uri",
         "-m",
-        dest="misp.rest.host",
+        dest="misp.rest.uri",
         help="The REST API host of the MISP instance")
     parser.add_argument(
         "--misp-kafka-host",

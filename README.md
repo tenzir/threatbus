@@ -98,10 +98,11 @@ robo -c custom.yaml
 ```
 
 For ease of use, a subset of the configuration values can be overriden on the
-command line. For example, to override the MISP and Zeek host, you can use:
+command line. For example, to override the MISP REST API URL and Zeek host, you
+can use:
 
 ```sh
-robo -m 1.2.3.4 -z 5.6.7.8
+robo -m https://1.2.3.4:8080 -z 5.6.7.8
 ```
 
 The full list of overriding options is available via `robo -h`.
