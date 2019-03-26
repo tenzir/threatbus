@@ -1,4 +1,4 @@
-aiokafka
+confluent-kafka
 confuse
 pymisp
 zmq

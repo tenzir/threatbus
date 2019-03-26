@@ -22,11 +22,17 @@ misp:
     host: "localhost"
     port: 50000
   kafka:
-    host: "localhost"
     attribute_topic: "misp_attribute"
+    # All configuration options from this configuration file are supported: 
+    # https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
+    config: {
+      bootstrap.servers: "localhost",
+      group.id: "robo",
+      auto.offset.reset: "earliest"
+    }
   rest:
     api_key: "iVse3nJ1M6UMuBR3s8zCZYDjyAF6n9M4bKvI43RU"
-    uri: "http://localhost:80"
+    url: "http://localhost:80"
     ssl: false
 
 # Zeek settings

@@ -11,7 +11,7 @@ import sys
 from typing import NamedTuple
 import urllib.parse
 
-from aiokafka import AIOKafkaConsumer
+from confluent_kafka import Consumer, KafkaError
 import confuse
 import zmq
 from zmq.asyncio import Context
@@ -61,59 +61,62 @@ class MISP:
         else:
             self.logger.critical("no MISP API key found: use MISP_API_KEY "
                                  "environment variable or config file")
-        self.logger.info(f"connecting to MISP REST API at {config.url}")
+        self.logger.info(f"connecting to MISP REST API at {config.rest.url}")
         try:
-            self.misp = PyMISP(config.url, config.rest.api_key,
+            self.misp = PyMISP(config.rest.url, config.rest.api_key,
                                ssl=config.rest.ssl)
         except PyMISPError:
             self.logger.critical("connection refused while trying to connect "
                                  f"to {api_url}")
 
     def subscribe(self, channel):
-        if type(channel) == AIOKafkaConsumer:
+        if type(channel) == Consumer:
             async def generate():
                 try:
                     while True:
-                        msg = await channel.getone()
-                        data  = json.loads(msg.value)
-                        self.logger.debug(f"got attribute via Kafka: {data}")
+                        msg = channel.poll(0)
+                        if msg is None:
+                            continue
+                        if msg.error():
+                            if msg.error().code() != KafkaError._PARTITION_EOF:
+                                self.logger.error(f"got Kafka error: {msg.error()}")
+                            continue
+                        data  = json.loads(msg.value())
+                        self.logger.debug(f"got Kafka message: {data}")
                         intel = self.make_intel_from_attribute(data)
                         if intel:
                             return intel
                 except:
-                    await channel.stop()
-                    self.logger.critical("failure during Kafka attribute "
-                                         "consumption:", sys.exc_info())
+                    self.logger.debug("leaving Kafka group and "
+                                      "committing offsets")
+                    channel.close()
             self.generator = generate
         elif type(channel) == zmq.asyncio.Socket:
             async def generate():
-                while True:
-                    msg = await channel.recv()
-                    topic, _, payload = msg.decode("utf-8").partition(" ")
-                    # Filter out heartbeats.
-                    if topic == "misp_json_self":
-                        uptime = int(json.loads(payload)["uptime"])
-                        delta = datetime.timedelta(seconds=uptime)
-                        self.logger.debug("received 0mq keep-alive (uptime "
-                                          "{:0>8})".format(str(delta)))
-                        continue
-                    if topic != "misp_json_attribute":
-                        continue
-                    # Parse the payload.
-                    data = json.loads(payload)
-                    self.logger.debug(f"got attribute via 0mq: {data}")
-                    result = self.make_intel_from_attribute(data)
-                    if result:
-                        return result
+                try:
+                    while True:
+                        msg = await channel.recv()
+                        topic, _, payload = msg.decode("utf-8").partition(" ")
+                        # Filter out heartbeats.
+                        if topic == "misp_json_self":
+                            uptime = int(json.loads(payload)["uptime"])
+                            delta = datetime.timedelta(seconds=uptime)
+                            self.logger.debug("received 0mq keep-alive (uptime "
+                                              "{:0>8})".format(str(delta)))
+                            continue
+                        if topic != "misp_json_attribute":
+                            continue
+                        # Parse the payload.
+                        data = json.loads(payload)
+                        self.logger.debug(f"got attribute via 0mq: {data}")
+                        result = self.make_intel_from_attribute(data)
+                        if result:
+                            return result
+                except:
+                    channel.disconnect()
             self.generator = generate
         else:
             self.logger.critical(f"unknown channel type {type(channel)}")
-
-    async def unsubscribe(self, channel):
-        if type(channel) == AIOKafkaConsumer:
-            await channel.stop()
-        elif type(channel) == zmq.Socket:
-            channel.disconnect()
 
     async def intel(self):
         return await self.generator()
@@ -304,6 +307,8 @@ class Controller:
     async def run(self):
         while True:
             intel = await self.misp.intel()
+            if not intel:
+                return
             if self.vast:
                 expr = self.vast.make_expression(intel)
                 results = await self.vast.export(expr)
@@ -339,12 +344,11 @@ template = {
             'port': int,
         },
         'kafka': {
-            'host': str,
             'attribute_topic': str,
+            'config': dict,
         },
         'rest': {
-            'host': str,
-            'port': int,
+            'url': str,
             'ssl': bool,
             'api_key': str,
         }
@@ -380,13 +384,8 @@ async def main():
     parser.add_argument(
         "--misp-rest-uri",
         "-m",
-        dest="misp.rest.uri",
+        dest="misp.rest.url",
         help="The REST API host of the MISP instance")
-    parser.add_argument(
-        "--misp-kafka-host",
-        "-k",
-        dest="misp.kafka.host",
-        help="The Kafka bootstrap server configured with MISP")
     parser.add_argument(
         "--misp-zmq-host",
         "-0",
@@ -446,14 +445,11 @@ async def main():
             socket.setsockopt(zmq.SUBSCRIBE, b"")
             misp.subscribe(socket)
         elif config.misp.channel == "kafka":
-            logger.info("subscribing to MISP Kafka publisher at "
-                        f"{config.misp.kafka.host} at topic "
-                        f"{config.misp.kafka.attribute_topic}")
-            consumer = AIOKafkaConsumer(
-                config.misp.kafka.attribute_topic,
-                loop=asyncio.get_event_loop(),
-                bootstrap_servers=config.misp.kafka.host)
-            await consumer.start()
+            logger.info("subscribing to MISP Kafka at topic "
+                        f"'{config.misp.kafka.attribute_topic}')
+            logger.debug(f"launching Kafka with {config.misp.kafka.config}")
+            consumer = Consumer(config.misp.kafka.config)
+            consumer.subscribe([config.misp.kafka.attribute_topic])
             misp.subscribe(consumer)
         else:
             logger.critical("need an intel subscription either via Kafka or 0mq")
