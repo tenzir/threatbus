@@ -2,6 +2,7 @@
 
 import argparse
 import asyncio
+import confuse
 import datetime
 import json
 import logging
@@ -10,21 +11,6 @@ from shutil import which
 import sys
 from typing import NamedTuple
 import urllib.parse
-
-from confluent_kafka import Consumer, KafkaError
-import confuse
-import zmq
-from zmq.asyncio import Context
-from pymisp import PyMISP, MISPAttribute, PyMISPError, MISPSighting
-
-ZEEK_INTEGRATION = True
-try:
-    import broker
-    import broker.bro
-except ImportError:
-    ZEEK_INTEGRATION = False
-
-# -- utilities ----------------------------------------------------------------
 
 def str_escape(x):
     return '"' + x.replace('"','\\"') + '"'
@@ -40,8 +26,6 @@ async def spawn(*args):
     logger.debug(stderr.decode().strip())
     return stdout.decode().strip()
 
-# -- types --------------------------------------------------------------------
-
 class Intelligence(NamedTuple):
     id: str         # A unique identifier (within the intel source's context).
     type: str       # The type of intelligence.
@@ -50,8 +34,10 @@ class Intelligence(NamedTuple):
     source: str     # The origin of the intelligence.
 
 class MISP:
-    def __init__(self, config):
+    def __init__(self, config, generator):
+        assert generator
         self.logger = logging.getLogger("robo.misp")
+        self.generator = generator
         # Connect to MISP instance via API.
         api_key = None
         if "MISP_API_KEY" in os.environ:
@@ -63,74 +49,31 @@ class MISP:
                                  "environment variable or config file")
         self.logger.info(f"connecting to MISP REST API at {config.rest.url}")
         try:
-            self.misp = PyMISP(config.rest.url, config.rest.api_key,
+            self.misp = pymisp.PyMISP(config.rest.url, config.rest.api_key,
                                ssl=config.rest.ssl)
-        except PyMISPError:
+        except pymisp.PyMISPError:
             self.logger.critical("connection refused while trying to connect "
                                  f"to {api_url}")
 
-    def subscribe(self, channel):
-        if type(channel) == Consumer:
-            async def generate():
-                try:
-                    while True:
-                        msg = channel.poll(0)
-                        if msg is None:
-                            continue
-                        if msg.error():
-                            if msg.error().code() != KafkaError._PARTITION_EOF:
-                                self.logger.error(f"got Kafka error: {msg.error()}")
-                            continue
-                        data  = json.loads(msg.value())
-                        self.logger.debug(f"got Kafka message: {data}")
-                        intel = self.make_intel_from_attribute(data)
-                        if intel:
-                            return intel
-                except:
-                    self.logger.debug("leaving Kafka group and "
-                                      "committing offsets")
-                    channel.close()
-            self.generator = generate
-        elif type(channel) == zmq.asyncio.Socket:
-            async def generate():
-                try:
-                    while True:
-                        msg = await channel.recv()
-                        topic, _, payload = msg.decode("utf-8").partition(" ")
-                        # Filter out heartbeats.
-                        if topic == "misp_json_self":
-                            uptime = int(json.loads(payload)["uptime"])
-                            delta = datetime.timedelta(seconds=uptime)
-                            self.logger.debug("received 0mq keep-alive (uptime "
-                                              "{:0>8})".format(str(delta)))
-                            continue
-                        if topic != "misp_json_attribute":
-                            continue
-                        # Parse the payload.
-                        data = json.loads(payload)
-                        self.logger.debug(f"got attribute via 0mq: {data}")
-                        result = self.make_intel_from_attribute(data)
-                        if result:
-                            return result
-                except:
-                    channel.disconnect()
-            self.generator = generate
-        else:
-            self.logger.critical(f"unknown channel type {type(channel)}")
-
     async def intel(self):
-        return await self.generator()
+        """Generates the next intelligence item."""
+        # TODO: support deletion of events
+        while True:
+            data = await self.generator()
+            intel = self.__make_intel_from_attribute(data)
+            if intel:
+                return intel
 
     async def report(self, intel, time_seen):
         """Reports intelligence as (true-positive) sighting."""
-        x = MISPSighting()
+        x = pymisp.MISPSighting()
         x.from_dict(id=intel.id, source="VAST", type="0", timestamp=time_seen)
         ts = datetime.datetime.utcfromtimestamp(time_seen)
         self.logger.debug(f"reporting intel seen at",
                           ts.strftime('%Y-%m-%d %H:%M:%S'))
         self.misp.set_sightings(x)
 
-    async def search(self, values, attr_type=None, start=None):
+    async def __search(self, values, attr_type=None, start=None):
         """Performs a search over MISP attributes"""
         self.logger.debug("searching MISP database for", values)
         if attr_type:
@@ -141,16 +84,15 @@ class MISP:
                                 values=values,
                                 pythonify=True)
 
-    def make_intel_from_attribute(self, data):
+    def __make_intel_from_attribute(self, data):
         attr = data["Attribute"]
         action = data["action"]
-        # TODO: support deletion of events
         # Consider only new events.
         if action not in ["add", "edit"]:
             self.logger.debug(f"ignoring '{action}' of attribute {attr['id']}")
             return None
         # Instantiate the intel item.
-        misp_attr = MISPAttribute()
+        misp_attr = pymisp.MISPAttribute()
         misp_attr.from_dict(**attr)
         return Intelligence(
             id=misp_attr.id,
@@ -435,29 +377,70 @@ async def main():
     # Setup MISP.
     misp = None
     if "misp" in config.producers:
-        misp = MISP(config.misp)
+        generator = None
         if config.misp.channel == "zmq":
+            import zmq
+            from zmq.asyncio import Context
             zmq_url = f"tcp://{config.misp.zmq.host}:{config.misp.zmq.port}"
             logger.info(f"connecting to MISP 0mq socket at {zmq_url}")
             context = Context.instance()
             socket = context.socket(zmq.SUB)
             socket.connect(zmq_url)
             socket.setsockopt(zmq.SUBSCRIBE, b"")
-            misp.subscribe(socket)
+            async def generate():
+                try:
+                    while True:
+                        msg = await socket.recv()
+                        topic, _, payload = msg.decode("utf-8").partition(" ")
+                        # Filter out heartbeats.
+                        if topic == "misp_json_self":
+                            uptime = int(json.loads(payload)["uptime"])
+                            delta = datetime.timedelta(seconds=uptime)
+                            logger.debug("received 0mq keep-alive (uptime "
+                                         "{:0>8})".format(str(delta)))
+                            continue
+                        if topic != "misp_json_attribute":
+                            continue
+                        # Parse the payload.
+                        data = json.loads(payload)
+                        logger.debug(f"got attribute via 0mq: {data}")
+                        return data
+                except:
+                    socket.disconnect()
+            generator = generate
         elif config.misp.channel == "kafka":
+            from confluent_kafka import Consumer, KafkaError
             logger.info("subscribing to MISP Kafka at topic "
                         f"{config.misp.kafka.attribute_topic}")
             logger.debug(f"launching Kafka with {config.misp.kafka.config}")
             consumer = Consumer(config.misp.kafka.config)
             consumer.subscribe([config.misp.kafka.attribute_topic])
-            misp.subscribe(consumer)
+            async def generate():
+                try:
+                    while True:
+                        msg = consumer.poll(0)
+                        if msg is None:
+                            continue
+                        if msg.error():
+                            if msg.error().code() != KafkaError._PARTITION_EOF:
+                                logger.error(f"got Kafka error: {msg.error()}")
+                            continue
+                        data  = json.loads(msg.value())
+                        logger.debug(f"got Kafka message: {data}")
+                        return data
+                except:
+                    logger.debug("leaving Kafka group and committing offsets")
+                    consumer.close()
+            generator = generate
         else:
             logger.critical("need an intel subscription either via Kafka or 0mq")
+        globals()["pymisp"] = __import__("pymisp")
+        misp = MISP(config.misp, generator)
     # Connect to Zeek.
     zeek = None
     if "zeek" in config.consumers:
-        if not ZEEK_INTEGRATION:
-            logger.critical("no broker python module found")
+        globals()["broker"] = __import__("broker")
+        globals()["broker.bro"] = __import__("broker.bro")
         zeek = Zeek(config.zeek)
     # Create controller.
     if not misp:
