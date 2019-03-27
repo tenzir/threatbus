@@ -446,7 +446,7 @@ async def main():
             misp.subscribe(socket)
         elif config.misp.channel == "kafka":
             logger.info("subscribing to MISP Kafka at topic "
-                        f"'{config.misp.kafka.attribute_topic}')
+                        f"{config.misp.kafka.attribute_topic}")
             logger.debug(f"launching Kafka with {config.misp.kafka.config}")
             consumer = Consumer(config.misp.kafka.config)
             consumer.subscribe([config.misp.kafka.attribute_topic])
