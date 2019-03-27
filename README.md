@@ -75,8 +75,8 @@ ninja install
 cd ../../..
 ```
 
-Finally, we make sure that we find the Broker Python modules without setting
-`PYTHONPATH` to `$PREFIX/lib/python`:
+Finally, we make sure that we find the Broker Python modules in the virtual
+environment without setting `PYTHONPATH` to `$PREFIX/lib/python`:
 
 ```sh
 site_packages=$(python -c "import site; print(site.getsitepackages()[0])")
