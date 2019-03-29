@@ -106,7 +106,16 @@ class MISP:
         self.misp.set_sightings(x)
 
     async def snapshot(self):
-        data = await self.__search(**self.config.snapshot.query)
+        data = None
+        if self.config.snapshot.query:
+            format = { "returnFormat": "json" }
+            params = self.config.snapshot.query
+            data = await self.__query({**format, **params})
+        elif self.config.snapshot.search:
+            data = await self.__search(**self.config.snapshot.search)
+        else:
+            self.logger.critical("missing config key: search or query")
+        assert data
         attrs = data["response"]["Attribute"]
         return [MISP.make_intel_from_attribute(x) for x in attrs]
 
@@ -114,6 +123,12 @@ class MISP:
     def __search(self, **kwargs):
         """Performs a search over MISP attributes"""
         return self.misp.search(controller="attributes", **kwargs)
+
+    @asyncify
+    def __rest_search(self, query):
+        """Performs a search over MISP attributes via the internal REST API"""
+        return self.misp._PyMISP__query("restSearch", query,
+                                        controller="attributes")
 
     @staticmethod
     def make_intel_from_attribute(attr):
@@ -370,7 +385,8 @@ template = {
             'api_key': str,
         },
         'snapshot': {
-            'query': dict,
+            'search': confuse.OneOf([None, dict]),
+            'query': confuse.OneOf([None, dict]),
         },
     },
     'zeek': {

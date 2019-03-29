@@ -37,11 +37,12 @@ misp:
     # For a list of valid query parameters, please consult consult the
     # documentation for the PyMISP search function:
     # https://pymisp.readthedocs.io/modules.html#pymisp.PyMISP.search
-    query:
+    # If null, then 'query' below must be specified.
+    search:
       last: "30d"
       to_ids: true
-      #values: ["1.2.3.4"]
-      # not_values: ["8.8.8.8", "8.8.4.4."]
+      # values: ["6.6.6.6"]
+      # not_values: ["8.8.8.8", "8.8.4.4"]
       # type_attribute: "ip-src"
       # category: "Network activity"
       # org: "organization"
@@ -55,6 +56,20 @@ misp:
       # published: true
       # deleted: true
       # includeProposals: true
+    # Raw query via the REST API. If not null, it will always take precedence
+    # over the search defined above.
+    # query:
+    #   limit: 10
+    #   type:
+    #     OR:
+    #     - "ip-src"
+    #     - "ip-dst"
+    #   tags:
+    #     NOT:
+    #     - "tlp:red"
+    #     OR:
+    #     - "tlp:%"
+    query: null
 
 # Zeek settings
 zeek:
