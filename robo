@@ -406,7 +406,8 @@ async def main():
                         logger.debug(f"got attribute via 0mq: {data}")
                         return data
                 except:
-                    socket.disconnect()
+                    socket.disconnect(zmq_url)
+                    raise
             generator = generate
         elif config.misp.channel == "kafka":
             from confluent_kafka import Consumer, KafkaError
@@ -431,6 +432,7 @@ async def main():
                 except:
                     logger.debug("leaving Kafka group and committing offsets")
                     consumer.close()
+                    raise
             generator = generate
         else:
             logger.critical("need an intel subscription either via Kafka or 0mq")
