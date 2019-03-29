@@ -19,21 +19,42 @@ misp:
   # The channel to use for acquiring intelligence.
   channel: "zmq" # either "zmq" or "kafka"
   zmq:
-    host: "localhost"
+    host: "192.168.168.140"
     port: 50000
   kafka:
     attribute_topic: "misp_attribute"
     # All configuration options from this configuration file are supported: 
     # https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
-    config: {
-      bootstrap.servers: "localhost",
-      group.id: "robo",
+    config:
+      bootstrap.servers: "192.168.168.13"
+      group.id: "robo"
       auto.offset.reset: "earliest"
-    }
   rest:
     api_key: "iVse3nJ1M6UMuBR3s8zCZYDjyAF6n9M4bKvI43RU"
     url: "http://localhost:80"
     ssl: false
+  snapshot:
+    # For a list of valid query parameters, please consult consult the
+    # documentation for the PyMISP search function:
+    # https://pymisp.readthedocs.io/modules.html#pymisp.PyMISP.search
+    query:
+      last: "30d"
+      to_ids: true
+      #values: ["1.2.3.4"]
+      # not_values: ["8.8.8.8", "8.8.4.4."]
+      # type_attribute: "ip-src"
+      # category: "Network activity"
+      # org: "organization"
+      # tags: ["foo"]
+      # not_tags: ["bar", "baz"]
+      # date_from: "2018-01-01"
+      # date_to: "2019-01-01"
+      # eventid: ["id0", "id1"]
+      # uuid: "5c496564-b4d0-49aa-9738-437e574aec6f"
+      # searchall: true
+      # published: true
+      # deleted: true
+      # includeProposals: true
 
 # Zeek settings
 zeek:

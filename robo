@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import confuse
 import datetime
+import functools
 import json
 import logging
 import os
@@ -12,8 +13,35 @@ import sys
 from typing import NamedTuple
 import urllib.parse
 
+POLL_INTERVAL = 0.05
+PYTHON_3_6 = (3, 6, 6, 'final', 0)
+PYTHON_3_7 = (3, 7)
+
 def str_escape(x):
     return '"' + x.replace('"','\\"') + '"'
+
+def async_loop():
+    if sys.version_info == PYTHON_3_6:
+        return asyncio.get_event_loop()
+    else:
+        assert sys.version_info >= PYTHON_3_7
+        return asyncio.get_running_loop()
+
+def async_run(f):
+    if sys.version_info == PYTHON_3_6:
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(f())
+        loop.close()
+    else:
+        assert sys.version_info >= PYTHON_3_7
+        asyncio.run(f())
+
+def asyncify(f):
+    @functools.wraps(f)
+    async def coroutine(*args, **kwargs):
+        partial = functools.partial(f, *args, **kwargs)
+        return await async_loop().run_in_executor(None, partial)
+    return coroutine
 
 async def spawn(*args):
     """Spawns a process asynchronously."""
@@ -36,6 +64,7 @@ class Intelligence(NamedTuple):
 class MISP:
     def __init__(self, config, generator):
         assert generator
+        self.config = config
         self.logger = logging.getLogger("robo.misp")
         self.generator = generator
         # Connect to MISP instance via API.
@@ -57,12 +86,15 @@ class MISP:
 
     async def intel(self):
         """Generates the next intelligence item."""
-        # TODO: support deletion of events
         while True:
             data = await self.generator()
-            intel = self.__make_intel_from_attribute(data)
-            if intel:
-                return intel
+            assert data
+            attr = data["Attribute"]
+            action = data["action"]
+            if action not in ["add", "edit"]:
+                self.logger.debug(f"ignoring '{action}' of attribute {attr['id']}")
+                continue
+            return MISP.make_intel_from_attribute(attr)
 
     async def report(self, intel, time_seen):
         """Reports intelligence as (true-positive) sighting."""
@@ -73,32 +105,23 @@ class MISP:
                           ts.strftime('%Y-%m-%d %H:%M:%S'))
         self.misp.set_sightings(x)
 
-    async def __search(self, values, attr_type=None, start=None):
-        """Performs a search over MISP attributes"""
-        self.logger.debug("searching MISP database for", values)
-        if attr_type:
-            self.logger.debug("restricting search to type", attr_type)
-        return self.misp.search(controller="attributes",
-                                date_from=start,
-                                type_attribute=attr_type,
-                                values=values,
-                                pythonify=True)
+    async def snapshot(self):
+        data = await self.__search(**self.config.snapshot.query)
+        attrs = data["response"]["Attribute"]
+        return [MISP.make_intel_from_attribute(x) for x in attrs]
 
-    def __make_intel_from_attribute(self, data):
-        attr = data["Attribute"]
-        action = data["action"]
-        # Consider only new events.
-        if action not in ["add", "edit"]:
-            self.logger.debug(f"ignoring '{action}' of attribute {attr['id']}")
-            return None
-        # Instantiate the intel item.
-        misp_attr = pymisp.MISPAttribute()
-        misp_attr.from_dict(**attr)
+    @asyncify
+    def __search(self, **kwargs):
+        """Performs a search over MISP attributes"""
+        return self.misp.search(controller="attributes", **kwargs)
+
+    @staticmethod
+    def make_intel_from_attribute(attr):
         return Intelligence(
-            id=misp_attr.id,
-            type=misp_attr.type,
-            value=misp_attr.value,
-            data=misp_attr,
+            id=attr["id"],
+            type=attr["type"],
+            value=attr["value"],
+            data=attr,
             source="misp")
 
 class VAST:
@@ -193,10 +216,12 @@ class Zeek:
         self.logger = logging.getLogger("robo.zeek")
         self.config = config
         self.endpoint = broker.Endpoint()
+        self.subscriber = self.endpoint.make_subscriber([config.topic])
+        self.logger.debug(f"creating subscriber for topic '{config.topic}'")
         self.logger.info("establishing peering with Zeek at "
                          f"{config.host}:{config.port}")
         self.endpoint.peer(config.host, config.port)
-        self.logger.info("established peering succesfully")
+        self.logger.debug("established peering succesfully")
 
     def add(self, intel):
         """Forwards intelligence to Zeek"""
@@ -215,6 +240,27 @@ class Zeek:
             "Tenzir::remove_intel",
             Zeek.misp_to_intel_framework_type(intel),
             intel.value)
+        self.endpoint.publish(self.config.topic, event)
+
+    async def get(self):
+        """Retrieves an event from Zeek"""
+        while True:
+            if self.subscriber.available():
+                topic, data = self.subscriber.get()
+                event = broker.bro.Event(data)
+                self.logger.debug(f"{topic} -> event {event.name()}{event.args()}")
+                return event
+            else:
+                # This is a poor workaround for the lack of asynchrony in the
+                # Broker Python bindings. For some weird reason, we cannot just
+                # run this function in the executor because it blocks all other
+                # coroutines. So now we do polling with asynchronous sleepping
+                # at fixed rate.
+                await asyncio.sleep(POLL_INTERVAL)
+
+    def put(self, event_name, *args):
+        """Sends an event to Zeek"""
+        event = broker.bro.Event(event_name, *args)
         self.endpoint.publish(self.config.topic, event)
 
     @staticmethod
@@ -247,23 +293,52 @@ class Controller:
         self.zeek = zeek
 
     async def run(self):
+        self.logger.debug("starting main loop")
+        zeek = None
+        misp = None
         while True:
-            intel = await self.misp.intel()
-            if not intel:
-                return
-            if self.vast:
-                expr = self.vast.make_expression(intel)
-                results = await self.vast.export(expr)
-                self.logger.info(f"reporting sightings for {len(results)} results")
-                for result in results:
-                    self.logger.debug(result)
-                    record = json.loads(result)
-                    if "ts" not in record:
-                        self.logger.critical("couldn't find Zeek log with 'ts' column")
-                    timestamp = int(record["ts"])
-                    await self.misp.report(intel, timestamp)
-            if self.zeek:
-                self.zeek.add(intel)
+            if not zeek:
+                self.logger.debug("scheduling Zeek task")
+                zeek = asyncio.create_task(self.zeek.get())
+            if not misp:
+                self.logger.debug("scheduling MISP task")
+                misp = asyncio.create_task(self.misp.intel())
+            done, pending = await asyncio.wait(
+                [zeek, misp],
+                timeout=1,
+                return_when=asyncio.FIRST_COMPLETED)
+            if zeek in done:
+                event = zeek.result()
+                zeek = None
+                if event.name() == "Tenzir::intel_snapshot_request":
+                    self.logger.debug("retrieving snapshot from MISP")
+                    snapshot = await self.misp.snapshot()
+                    self.logger.debug("sending Zeek snapshot from MISP with "
+                                      f"{len(snapshot)} intel items")
+                    f = lambda x: Zeek.misp_to_intel_framework_type(x)
+                    items = [[f(x), x.value] for x in snapshot]
+                    self.zeek.put("Tenzir::intel_snapshot_reply", items)
+                elif event.name() == "Tenzir::intel_sighting":
+                    pass #TODO: implement sighting functionality
+            if misp in done:
+                # TODO: Support deletion of events
+                intel = misp.result()
+                misp = None
+                if not intel:
+                    continue
+                if self.vast:
+                    expr = self.vast.make_expression(intel)
+                    results = await self.vast.export(expr)
+                    self.logger.info(f"reporting {len(results)} sightings")
+                    for result in results:
+                        self.logger.debug(result)
+                        record = json.loads(result)
+                        if "ts" not in record:
+                            self.logger.critical("no 'ts' column in Zeek log")
+                        timestamp = int(record["ts"])
+                        await self.misp.report(intel, timestamp)
+                if self.zeek:
+                    self.zeek.add(intel)
 
 # -- main ---------------------------------------------------------------------
 
@@ -293,7 +368,10 @@ template = {
             'url': str,
             'ssl': bool,
             'api_key': str,
-        }
+        },
+        'snapshot': {
+            'query': dict,
+        },
     },
     'zeek': {
         'host': str,
@@ -416,10 +494,11 @@ async def main():
             logger.debug(f"launching Kafka with {config.misp.kafka.config}")
             consumer = Consumer(config.misp.kafka.config)
             consumer.subscribe([config.misp.kafka.attribute_topic])
-            async def generate():
+            @asyncify
+            def generate():
                 try:
                     while True:
-                        msg = consumer.poll(0)
+                        msg = consumer.poll(POLL_INTERVAL)
                         if msg is None:
                             continue
                         if msg.error():
@@ -450,14 +529,7 @@ async def main():
     if not (vast or zeek):
         logger.critical("no intel consumer provided; enable VAST or Zeek")
     controller = Controller(vast, misp, zeek)
-    logger.info("waiting for new intel")
     await controller.run()
 
 if __name__ == '__main__':
-    if sys.version_info == (3, 6):
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(main())
-        loop.close()
-    else:
-        assert sys.version_info >= (3, 7)
-        asyncio.run(main())
+    async_run(main)
