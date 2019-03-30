@@ -61,6 +61,28 @@ class Intelligence(NamedTuple):
     value: str      # The value of the item.
     data: str       # The raw data as given by the source
     source: str     # The origin of the intelligence.
+    def __repr__(self):
+        return f"({self.id}, {self.type}, {self.value}, {self.source})"
+
+def misp_to_zeek_intel_type(intel_type):
+    """Translates type names of internal intel to names in Zeek's intel
+    framework."""
+    # TODO: complete mapping MISP types to Zeek types.
+    table = {
+        "ip-src": "ADDR",
+        "ip-dst": "ADDR",
+        "domain": "DOMAIN",
+        "email-dst": "EMAIL",
+        "email-src": "EMAIL",
+        "email-reply-to": "EMAIL",
+        "hostname": "DOMAIN",
+        "url": "URL",
+        "uri": "URL",
+        "x509-fingerprint-md5": "CERT_HASH",
+        "x509-fingerprint-sha1": "CERT_HASH",
+        "x509-fingerprint-sha256": "CERT_HASH",
+    }
+    return table[intel_type]
 
 class MISP:
     def __init__(self, config, generator):
@@ -92,10 +114,7 @@ class MISP:
             assert data
             attr = data["Attribute"]
             action = data["action"]
-            if action not in ["add", "edit"]:
-                self.logger.debug(f"ignoring '{action}' of attribute {attr['id']}")
-                continue
-            return MISP.make_intel_from_attribute(attr)
+            return (action, MISP.make_intel_from_attribute(attr))
 
     async def report(self, intel, time_seen):
         """Reports intelligence as (true-positive) sighting."""
@@ -244,7 +263,7 @@ class Zeek:
         self.logger.debug(f"forwarding intel to Zeek: {intel}")
         event = broker.bro.Event(
             "Tenzir::add_intel",
-            Zeek.misp_to_intel_framework_type(intel),
+            misp_to_zeek_intel_type(intel.type),
             intel.value,
             intel.source)
         self.endpoint.publish(self.config.topic, event)
@@ -254,7 +273,7 @@ class Zeek:
         self.logger.debug(f"deleting intel from Zeek: {intel}")
         event = broker.bro.Event(
             "Tenzir::remove_intel",
-            Zeek.misp_to_intel_framework_type(intel),
+            misp_to_zeek_intel_type(intel.type),
             intel.value)
         self.endpoint.publish(self.config.topic, event)
 
@@ -278,28 +297,6 @@ class Zeek:
         """Sends an event to Zeek"""
         event = broker.bro.Event(event_name, *args)
         self.endpoint.publish(self.config.topic, event)
-
-    @staticmethod
-    def misp_to_intel_framework_type(intel):
-        """Translates type names of internal intel to names in Zeek's intel
-        framework."""
-        # TODO: complete mapping MISP types to Zeek types.
-        table = {
-            "ip-src": "ADDR",
-            "ip-dst": "ADDR",
-            "domain": "DOMAIN",
-            "email-dst": "EMAIL",
-            "email-src": "EMAIL",
-            "email-reply-to": "EMAIL",
-            "hostname": "DOMAIN",
-            "url": "URL",
-            "uri": "URL",
-            "x509-fingerprint-md5": "CERT_HASH",
-            "x509-fingerprint-sha1": "CERT_HASH",
-            "x509-fingerprint-sha256": "CERT_HASH",
-        }
-        return table[intel.type]
-
 
 class Controller:
     def __init__(self, vast, misp, zeek):
@@ -331,30 +328,34 @@ class Controller:
                     snapshot = await self.misp.snapshot()
                     self.logger.debug("sending Zeek snapshot from MISP with "
                                       f"{len(snapshot)} intel items")
-                    f = lambda x: Zeek.misp_to_intel_framework_type(x)
+                    f = lambda x: misp_to_zeek_intel_type(x.type)
                     items = [[f(x), x.value] for x in snapshot]
                     self.zeek.put("Tenzir::intel_snapshot_reply", items)
                 elif event.name() == "Tenzir::intel_sighting":
                     pass #TODO: implement sighting functionality
             if misp in done:
-                # TODO: Support deletion of events
-                intel = misp.result()
+                action, intel = misp.result()
+                self.logger.debug(f"got '{action}' for {intel}")
                 misp = None
-                if not intel:
+                if action in ["add", "edit"]:
                     continue
-                if self.vast:
-                    expr = self.vast.make_expression(intel)
-                    results = await self.vast.export(expr)
-                    self.logger.info(f"reporting {len(results)} sightings")
-                    for result in results:
-                        self.logger.debug(result)
-                        record = json.loads(result)
-                        if "ts" not in record:
-                            self.logger.critical("no 'ts' column in Zeek log")
-                        timestamp = int(record["ts"])
-                        await self.misp.report(intel, timestamp)
-                if self.zeek:
-                    self.zeek.add(intel)
+                    if self.vast:
+                        expr = self.vast.make_expression(intel)
+                        results = await self.vast.export(expr)
+                        self.logger.info(f"reporting {len(results)} sightings")
+                        for result in results:
+                            self.logger.debug(result)
+                            record = json.loads(result)
+                            if "ts" not in record:
+                                self.logger.critical(
+                                    "no 'ts' column in Zeek log")
+                            timestamp = int(record["ts"])
+                            await self.misp.report(intel, timestamp)
+                    if self.zeek:
+                        self.zeek.add(intel)
+                elif action == "delete":
+                    if self.zeek:
+                        self.zeek.remove(intel)
 
 # -- main ---------------------------------------------------------------------
 
