@@ -6,79 +6,70 @@ logger:
   file_verbosity: "DEBUG"
   filename: "robo.log"
 
-# The enabled intelligence producers.
-# Available values: "misp"
-producers: ["misp"]
+producers:
+  misp:
+    rest:
+      api_key: "iVse3nJ1M6UMuBR3s8zCZYDjyAF6n9M4bKvI43RU"
+      url: "http://localhost:80"
+      ssl: false
+    zmq:
+      host: "192.168.168.140"
+      port: 50000
+    #kafka:
+    #  # The topic name for attributes, as configured in the MISP Kafka plugin.
+    #  attribute_topic: "misp_attribute"
+    #  # The Kafka configuration parameters, as librdkafka defines them here:
+    #  # https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
+    #  config:
+    #    bootstrap.servers: "192.168.168.13"
+    #    group.id: "robo"
+    #    auto.offset.reset: "earliest"
+    snapshot:
+      # If true, then the search parameters will be interpreted as a raw REST
+      # query. If false, then valid parameters are those that the MISP python
+      # bindings expose. You can find a list of valid parameters here:
+      # https://pymisp.readthedocs.io/modules.html#pymisp.PyMISP.search
+      # The raw query allows for more flexibility when formulating complex
+      # queries when the default key-value based is not powerful enough.
+      raw: false
+      search:
+        to_ids: true
+        last: "30d"
+        # values: ["6.6.6.6"]
+        # not_values: ["8.8.8.8", "8.8.4.4"]
+        # type_attribute: "ip-src"
+        # category: "Network activity"
+        # org: "organization"
+        # tags: ["foo"]
+        # not_tags: ["bar", "baz"]
+        # date_from: "2018-01-01"
+        # date_to: "2019-01-01"
+        # eventid: ["id0", "id1"]
+        # uuid: "5c496564-b4d0-49aa-9738-437e574aec6f"
+        # searchall: true
+        # published: true
+        # deleted: true
+        # includeProposals: true
+      # An example for a raw query via the REST API. Note the absence of the
+      # returnFormat key, which is implicitly set to "json".
+      # search:
+      #   limit: 10
+      #   type:
+      #     OR:
+      #     - "ip-src"
+      #     - "ip-dst"
+      #   tags:
+      #     NOT:
+      #     - "tlp:red"
+      #     OR:
+      #     - "tlp:%"
 
-# The enabled intelligence consumers.
-# Available values: "zeek", "vast"
-consumers: ["vast", "zeek"]
-
-# MISP settings
-misp:
-  # The channel to use for acquiring intelligence.
-  channel: "zmq" # either "zmq" or "kafka"
-  zmq:
-    host: "192.168.168.140"
-    port: 50000
-  kafka:
-    attribute_topic: "misp_attribute"
-    # All configuration options from this configuration file are supported: 
-    # https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
-    config:
-      bootstrap.servers: "192.168.168.13"
-      group.id: "robo"
-      auto.offset.reset: "earliest"
-  rest:
-    api_key: "iVse3nJ1M6UMuBR3s8zCZYDjyAF6n9M4bKvI43RU"
-    url: "http://localhost:80"
-    ssl: false
-  snapshot:
-    # For a list of valid query parameters, please consult consult the
-    # documentation for the PyMISP search function:
-    # https://pymisp.readthedocs.io/modules.html#pymisp.PyMISP.search
-    # If null, then 'query' below must be specified.
-    search:
-      last: "30d"
-      to_ids: true
-      # values: ["6.6.6.6"]
-      # not_values: ["8.8.8.8", "8.8.4.4"]
-      # type_attribute: "ip-src"
-      # category: "Network activity"
-      # org: "organization"
-      # tags: ["foo"]
-      # not_tags: ["bar", "baz"]
-      # date_from: "2018-01-01"
-      # date_to: "2019-01-01"
-      # eventid: ["id0", "id1"]
-      # uuid: "5c496564-b4d0-49aa-9738-437e574aec6f"
-      # searchall: true
-      # published: true
-      # deleted: true
-      # includeProposals: true
-    # Raw query via the REST API. If not null, it will always take precedence
-    # over the search defined above.
-    # query:
-    #   limit: 10
-    #   type:
-    #     OR:
-    #     - "ip-src"
-    #     - "ip-dst"
-    #   tags:
-    #     NOT:
-    #     - "tlp:red"
-    #     OR:
-    #     - "tlp:%"
-    query: null
-
-# Zeek settings
-zeek:
-  host: "localhost"
-  port: 54321
-  topic: "tenzir/robo"
-
-# VAST settings
-vast:
-  executable: "vast"
-  max_results: 100
-  time_window: "1 year"
+consumers:
+  zeek:
+    host: "localhost"
+    port: 54321
+    topic: "tenzir/robo"
+  vast:
+    executable: "vast"
+    max_results: 100
+    time_window: "1 year"

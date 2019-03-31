@@ -102,10 +102,10 @@ class MISP:
         self.logger.info(f"connecting to MISP REST API at {config.rest.url}")
         try:
             self.misp = pymisp.PyMISP(config.rest.url, config.rest.api_key,
-                               ssl=config.rest.ssl)
+                                      ssl=config.rest.ssl)
         except pymisp.PyMISPError:
             self.logger.critical("connection refused while trying to connect "
-                                 f"to {api_url}")
+                                 f"to {config.rest.url}")
 
     async def intel(self):
         """Generates the next intelligence item."""
@@ -127,14 +127,12 @@ class MISP:
 
     async def snapshot(self):
         data = None
-        if self.config.snapshot.query:
-            format = { "returnFormat": "json" }
-            params = self.config.snapshot.query
-            data = await self.__query({**format, **params})
-        elif self.config.snapshot.search:
-            data = await self.__search(**self.config.snapshot.search)
+        if self.config.snapshot.raw:
+            return_format = { "returnFormat": "json" }
+            params = self.config.snapshot.search
+            data = await self.__query({**return_format, **params})
         else:
-            self.logger.critical("missing config key: search or query")
+            data = await self.__search(**self.config.snapshot.search)
         assert data
         attrs = data["response"]["Attribute"]
         return [MISP.make_intel_from_attribute(x) for x in attrs]
@@ -369,46 +367,70 @@ class Controller:
 # -- main ---------------------------------------------------------------------
 
 # The valid schema for the configuration.
-log_levels = confuse.Choice(['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG'])
+log_levels = ['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG']
+
+# Allows a config field to be optional. For details, see the discussion at:
+# https://github.com/sampsyo/confuse/issues/45
+class OptionalMappingTemplate(confuse.MappingTemplate):
+    def __init__(self, mapping):
+        subtemplates = {}
+        for key, typ in mapping.items():
+            template = confuse.as_template(typ)
+            template.default = None
+            subtemplates[key] = template
+        self.subtemplates = subtemplates
+        self.default = None
+    def value(self, view, template=None):
+        out = confuse.AttrDict()
+        for key, typ in self.subtemplates.items():
+            x = typ.value(view[key], self)
+            if x:
+                out[key] = x
+        return out if out else None
+
+def optional(xs):
+    return OptionalMappingTemplate(xs)
+
 template = {
     'logger': {
         'console': bool,
         'file': bool,
         'filename': str,
-        'console_verbosity': log_levels,
-        'file_verbosity': log_levels,
+        'console_verbosity': confuse.Choice(log_levels),
+        'file_verbosity': confuse.Choice(log_levels),
     },
-    'consumers': confuse.StrSeq(),
-    'producers': confuse.StrSeq(),
-    'misp': {
-        'channel': confuse.OneOf(['zmq', 'kafka']),
-        'zmq': {
+    'producers': {
+        'misp': {
+            'rest': {
+                'url': str,
+                'ssl': bool,
+                'api_key': str,
+            },
+            'zmq': optional({
+                'host': str,
+                'port': int,
+            }),
+            'kafka': optional({
+                'attribute_topic': str,
+                'config': dict,
+            }),
+            'snapshot': {
+                'raw': bool,
+                'search': dict,
+            },
+        },
+    },
+    'consumers': {
+        'zeek': optional({
             'host': str,
             'port': int,
-        },
-        'kafka': {
-            'attribute_topic': str,
-            'config': dict,
-        },
-        'rest': {
-            'url': str,
-            'ssl': bool,
-            'api_key': str,
-        },
-        'snapshot': {
-            'search': confuse.OneOf([None, dict]),
-            'query': confuse.OneOf([None, dict]),
-        },
-    },
-    'zeek': {
-        'host': str,
-        'port': int,
-        'topic': str,
-    },
-    'vast': {
-        'executable': str,
-        'max_results': int,
-        'time_window': str,
+            'topic': str,
+        }),
+        'vast': optional({
+            'executable': str,
+            'max_results': int,
+            'time_window': str,
+        }),
     },
 }
 
@@ -431,17 +453,17 @@ async def main():
     parser.add_argument(
         "--misp-rest-uri",
         "-m",
-        dest="misp.rest.url",
+        dest="producers.misp.rest.url",
         help="The REST API host of the MISP instance")
     parser.add_argument(
         "--misp-zmq-host",
         "-0",
-        dest="misp.zmq.host",
+        dest="producers.misp.zmq.host",
         help="The ZMQ host configured with MISP")
     parser.add_argument(
         "--zeek-host",
         "-z",
-        dest="zeek.host",
+        dest="consumers.zeek.host",
         help="The Zeek host running the integration scripts")
     args = parser.parse_args()
     if args.config:
@@ -471,23 +493,33 @@ async def main():
     sh = ShutdownHandler(level=50)
     sh.setFormatter(colored_formatter)
     logger.addHandler(sh)
+    # Sanity check configuration. This should ideally move into the template
+    # itself.
+    if not config.producers.misp:
+        logger.critical("MISP intel producer not configured")
+    if not (config.consumers.vast or config.consumers.zeek):
+        logger.critical("no intel consumer provided; configure VAST or Zeek")
     # Setup VAST
     vast = None
-    if "vast" in config.consumers:
-        if not config.vast.executable:
-            logger.critical(f"could not find VAST at {config.vast.executable}")
-        vast = VAST(config.vast)
+    if config.consumers.vast:
+        executable = config.consumers.vast.executable
+        if not executable:
+            logger.critical(f"could not find VAST at {executable}")
+        vast = VAST(config.consumers.vast)
         vast_status = await vast.status()
         vast_threads = vast_status['system']['worker-threads']
         logger.info(f"found VAST running with {vast_threads} threads")
     # Setup MISP.
     misp = None
-    if "misp" in config.producers:
+    if config.producers.misp:
+        misp_config = config.producers.misp
         generator = None
-        if config.misp.channel == "zmq":
+        if misp_config.zmq and misp_config.kafka:
+            logger.critical("cannot have both 0mq and Kafka configured")
+        if misp_config.zmq:
             import zmq
             from zmq.asyncio import Context
-            zmq_url = f"tcp://{config.misp.zmq.host}:{config.misp.zmq.port}"
+            zmq_url = f"tcp://{misp_config.zmq.host}:{misp_config.zmq.port}"
             logger.info(f"connecting to MISP 0mq socket at {zmq_url}")
             context = Context.instance()
             socket = context.socket(zmq.SUB)
@@ -515,13 +547,13 @@ async def main():
                     socket.disconnect(zmq_url)
                     raise
             generator = generate
-        elif config.misp.channel == "kafka":
+        elif misp_config.kafka:
             from confluent_kafka import Consumer, KafkaError
             logger.info("subscribing to MISP Kafka at topic "
-                        f"{config.misp.kafka.attribute_topic}")
-            logger.debug(f"launching Kafka with {config.misp.kafka.config}")
-            consumer = Consumer(config.misp.kafka.config)
-            consumer.subscribe([config.misp.kafka.attribute_topic])
+                        f"{misp_config.kafka.attribute_topic}")
+            logger.debug(f"launching Kafka with {misp_config.kafka.config}")
+            consumer = Consumer(misp_config.kafka.config)
+            consumer.subscribe([misp_config.kafka.attribute_topic])
             @asyncify
             def generate():
                 try:
@@ -544,18 +576,14 @@ async def main():
         else:
             logger.critical("need an intel subscription either via Kafka or 0mq")
         globals()["pymisp"] = __import__("pymisp")
-        misp = MISP(config.misp, generator)
+        misp = MISP(misp_config, generator)
     # Connect to Zeek.
     zeek = None
-    if "zeek" in config.consumers:
+    if config.consumers.zeek:
         globals()["broker"] = __import__("broker")
         globals()["broker.bro"] = __import__("broker.bro")
-        zeek = Zeek(config.zeek)
+        zeek = Zeek(config.consumers.zeek)
     # Create controller.
-    if not misp:
-        logger.critical("MISP intel producer not provided") # currently mandatory
-    if not (vast or zeek):
-        logger.critical("no intel consumer provided; enable VAST or Zeek")
     controller = Controller(vast, misp, zeek)
     await controller.run()
 
