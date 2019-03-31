@@ -22,20 +22,25 @@ def str_escape(x):
     return '"' + x.replace('"','\\"') + '"'
 
 def async_loop():
-    if sys.version_info == PYTHON_3_6:
+    if sys.version_info <= PYTHON_3_6:
         return asyncio.get_event_loop()
     else:
         assert sys.version_info >= PYTHON_3_7
         return asyncio.get_running_loop()
 
 def async_run(f):
-    if sys.version_info == PYTHON_3_6:
+    if sys.version_info <= PYTHON_3_6:
         loop = asyncio.get_event_loop()
         loop.run_until_complete(f())
         loop.close()
     else:
-        assert sys.version_info >= PYTHON_3_7
         asyncio.run(f())
+
+def async_create_task(f):
+    if sys.version_info <= PYTHON_3_6:
+        return asyncio.ensure_future(f)
+    else:
+        return asyncio.create_task(f)
 
 def asyncify(f):
     @functools.wraps(f)
@@ -310,10 +315,10 @@ class Controller:
         while True:
             if not zeek:
                 self.logger.debug("scheduling Zeek task")
-                zeek = asyncio.create_task(self.zeek.get())
+                zeek = async_create_task(self.zeek.get())
             if not misp:
                 self.logger.debug("scheduling MISP task")
-                misp = asyncio.create_task(self.misp.intel())
+                misp = async_create_task(self.misp.intel())
             done, pending = await asyncio.wait(
                 [zeek, misp],
                 timeout=1,
