@@ -116,13 +116,13 @@ class MISP:
             action = data["action"]
             return (action, MISP.make_intel_from_attribute(attr))
 
-    async def report(self, intel, time_seen):
+    async def report(self, id, time_seen):
         """Reports intelligence as (true-positive) sighting."""
         x = pymisp.MISPSighting()
-        x.from_dict(id=intel.id, source="VAST", type="0", timestamp=time_seen)
+        x.from_dict(id=id, source="VAST", type="0", timestamp=time_seen)
         ts = datetime.datetime.utcfromtimestamp(time_seen)
-        self.logger.debug(f"reporting intel seen at",
-                          ts.strftime('%Y-%m-%d %H:%M:%S'))
+        self.logger.debug(f"reporting intel {id} seen at "
+                          f"{ts.strftime('%Y-%m-%d %H:%M:%S')}")
         self.misp.set_sightings(x)
 
     async def snapshot(self):
@@ -258,17 +258,17 @@ class Zeek:
         self.endpoint.peer(config.host, config.port)
         self.logger.debug("established peering succesfully")
 
-    def add(self, intel):
+    def add_intel(self, intel):
         """Forwards intelligence to Zeek"""
         self.logger.debug(f"forwarding intel to Zeek: {intel}")
         event = broker.bro.Event(
             "Tenzir::add_intel",
             misp_to_zeek_intel_type(intel.type),
             intel.value,
-            intel.source)
+            intel.id)
         self.endpoint.publish(self.config.topic, event)
 
-    def remove(self, intel):
+    def remove_intel(self, intel):
         """Forwards intelligence to Zeek"""
         self.logger.debug(f"deleting intel from Zeek: {intel}")
         event = broker.bro.Event(
@@ -278,7 +278,7 @@ class Zeek:
         self.endpoint.publish(self.config.topic, event)
 
     async def get(self):
-        """Retrieves an event from Zeek"""
+        """Retrieves an event from Zeek via Broker"""
         while True:
             if self.subscriber.available():
                 topic, data = self.subscriber.get()
@@ -294,7 +294,7 @@ class Zeek:
                 await asyncio.sleep(POLL_INTERVAL)
 
     def put(self, event_name, *args):
-        """Sends an event to Zeek"""
+        """Sends an event to Zeek via Broker"""
         event = broker.bro.Event(event_name, *args)
         self.endpoint.publish(self.config.topic, event)
 
@@ -329,10 +329,18 @@ class Controller:
                     self.logger.debug("sending Zeek snapshot from MISP with "
                                       f"{len(snapshot)} intel items")
                     f = lambda x: misp_to_zeek_intel_type(x.type)
-                    items = [[f(x), x.value] for x in snapshot]
+                    items = [[x.id, f(x), x.value] for x in snapshot]
                     self.zeek.put("Tenzir::intel_snapshot_reply", items)
-                elif event.name() == "Tenzir::intel_sighting":
-                    pass #TODO: implement sighting functionality
+                elif event.name() == "Tenzir::intel_report":
+                    timestamp, ids = event.args()
+                    assert ids
+                    self.logger.info(f"Zeek saw intel {ids} at {timestamp}")
+                    if self.misp:
+                        self.logger.debug(f"reporting {len(ids)} sightings "
+                                          "from Zeek to MISP")
+                        ts = int(timestamp.timestamp())
+                        for id in ids:
+                            await self.misp.report(id, ts)
             if misp in done:
                 action, intel = misp.result()
                 self.logger.debug(f"got '{action}' for {intel}")
@@ -342,7 +350,8 @@ class Controller:
                     if self.vast:
                         expr = self.vast.make_expression(intel)
                         results = await self.vast.export(expr)
-                        self.logger.info(f"reporting {len(results)} sightings")
+                        self.logger.debug(f"reporting {len(results)} sightings "
+                                          "from VAST to MISP")
                         for result in results:
                             self.logger.debug(result)
                             record = json.loads(result)
@@ -350,12 +359,12 @@ class Controller:
                                 self.logger.critical(
                                     "no 'ts' column in Zeek log")
                             timestamp = int(record["ts"])
-                            await self.misp.report(intel, timestamp)
+                            await self.misp.report(intel.id, timestamp)
                     if self.zeek:
-                        self.zeek.add(intel)
+                        self.zeek.add_intel(intel)
                 elif action == "delete":
                     if self.zeek:
-                        self.zeek.remove(intel)
+                        self.zeek.remove_intel(intel)
 
 # -- main ---------------------------------------------------------------------
 
