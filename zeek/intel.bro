@@ -224,7 +224,8 @@ event Intel::match(seen: Intel::Seen, items: set[Intel::Item])
       add ids[item$meta$desc];
   if ( |ids| == 0 )
     return;
-  local now = current_time();
+  local e = Broker::make_event(intel_report, current_time(), ids);
+  Broker::publish(robo_investigator_topic, e);
   if ( log_operations )
     {
     local value: string;
@@ -234,8 +235,6 @@ event Intel::match(seen: Intel::Seen, items: set[Intel::Item])
       value = cat(seen$host);
     Reporter::info(fmt("reporting %s intel match(es) for %s", |ids|, value));
     }
-  local e = Broker::make_event(intel_report, now, ids);
-  Broker::publish(robo_investigator_topic, e);
   }
 @endif
 
