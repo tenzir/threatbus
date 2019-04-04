@@ -155,6 +155,8 @@ class MISP:
 
     async def snapshot(self):
         data = None
+        self.logger.debug("requesting for snapshot with search: "
+                          f"{self.config.snapshot.search.items()}")
         if self.config.snapshot.raw:
             return_format = { "returnFormat": "json" }
             params = self.config.snapshot.search
@@ -303,6 +305,12 @@ class Zeek:
             intel.value)
         self.endpoint.publish(self.config.topic, event)
 
+    def dump_intel(self, source):
+        """Retrieves an intel snapshot from Zeek"""
+        self.logger.debug(f"requesting intel snapshot from Zeek")
+        request = broker.bro.Event("Tenzir::intel_snapshot_request", source)
+        self.endpoint.publish(self.config.topic, request)
+
     async def get(self):
         """Retrieves an event from Zeek via Broker"""
         while True:
@@ -367,6 +375,17 @@ class Controller:
                         ts = int(timestamp.timestamp())
                         for id in ids:
                             await self.misp.report(id, ts)
+                elif event.name() == "Tenzir::intel_snapshot_reply":
+                    assert len(event.args()) == 1
+                    def make_intel(xs):
+                        return {
+                            "id": int(xs[0]),
+                            "type": xs[1],
+                            "value": xs[2]
+                        }
+                    snapshot = [make_intel(xs) for xs in event.args()[0]]
+                    print(json.dumps(snapshot))
+                    sys.exit(0)
             if misp in done:
                 action, intel = misp.result()
                 self.logger.debug(f"got '{action.name}' for {intel}")
@@ -476,7 +495,6 @@ async def main():
         dest='logger.console',
         action='store_false',
         help='do not log to console')
-    # MISP
     parser.add_argument(
         "--misp-rest-uri",
         "-m",
@@ -492,6 +510,10 @@ async def main():
         "-z",
         dest="consumers.zeek.host",
         help="The Zeek host running the integration scripts")
+    parser.add_argument(
+        "--dump-zeek-intel",
+        action='store_true',
+        help="connects to Zeek and dumps all intel")
     args = parser.parse_args()
     if args.config:
         lazy_config.set_file(args.config)
@@ -610,6 +632,8 @@ async def main():
         globals()["broker"] = __import__("broker")
         globals()["broker.bro"] = __import__("broker.bro")
         zeek = Zeek(config.consumers.zeek)
+        if args.dump_zeek_intel:
+            zeek.dump_intel("tenzir")
     # Create controller.
     controller = Controller(vast, misp, zeek)
     await controller.run()
