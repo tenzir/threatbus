@@ -213,6 +213,10 @@ class MISP:
                           f"{ts.strftime('%Y-%m-%d %H:%M:%S')}")
         self.misp.set_sightings(x)
 
+    def remove_ids_flag(self, attr_id):
+        """Removes the IDS flag from noisy attributes."""
+        self.misp.update_attribute(attr_id, {"id": attr_id, "to_ids": False})
+
     async def snapshot(self):
         data = None
         self.logger.debug("requesting for snapshot with search: "
@@ -362,7 +366,8 @@ class Zeek:
         event = broker.bro.Event(
             "Tenzir::remove_intel",
             misp_to_zeek_intel_type(intel.type),
-            intel.value)
+            intel.value,
+            intel.id)
         self.endpoint.publish(self.config.topic, event)
 
     def dump_intel(self, source):
@@ -447,6 +452,12 @@ class Controller:
                         ts = int(timestamp.timestamp())
                         for id in ids:
                             await self.misp.report(id, ts)
+                elif event.name() == "Tenzir::noisy_intel_report":
+                    assert len(event.args()) == 2
+                    attr_id, n = event.args()
+                    self.logger.info("removing IDS flag from noisy attribute "
+                                     f"{attr_id} with {n} matches/sec")
+                    self.misp.remove_ids_flag(attr_id)
             if misp in done:
                 action, intel = misp.result()
                 self.logger.debug(f"got '{action.name}' for {intel}")
