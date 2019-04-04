@@ -104,11 +104,71 @@ def misp_to_zeek_intel_type(intel_type):
     return table[intel_type]
 
 class MISP:
-    def __init__(self, config, generator):
-        assert generator
+    def __init__(self, config):
         self.config = config
         self.logger = logging.getLogger("robo.misp")
-        self.generator = generator
+        if config.zmq and config.kafka:
+            self.logger.critical("cannot have both 0mq and Kafka configured")
+        elif not config.zmq and not config.kafka:
+            self.logger.critical("need intel either from Kafka or 0mq")
+        if config.zmq:
+            import zmq
+            from zmq.asyncio import Context
+            zmq_url = f"tcp://{config.zmq.host}:{config.zmq.port}"
+            self.logger.info(f"connecting to MISP 0mq socket at {zmq_url}")
+            context = Context.instance()
+            socket = context.socket(zmq.SUB)
+            socket.connect(zmq_url)
+            socket.setsockopt(zmq.SUBSCRIBE, b"")
+            async def generate():
+                try:
+                    while True:
+                        msg = await socket.recv()
+                        topic, _, payload = msg.decode("utf-8").partition(" ")
+                        # Filter out heartbeats.
+                        if topic == "misp_json_self":
+                            uptime = int(json.loads(payload)["uptime"])
+                            delta = datetime.timedelta(seconds=uptime)
+                            self.logger.debug("received 0mq keep-alive (uptime "
+                                         "{:0>8})".format(str(delta)))
+                            continue
+                        if topic != "misp_json_attribute":
+                            continue
+                        # Parse the payload.
+                        data = json.loads(payload)
+                        self.logger.debug(f"got attribute via 0mq: {data}")
+                        return data
+                except:
+                    socket.disconnect(zmq_url)
+                    raise
+            self.generator = generate
+        elif config.kafka:
+            from confluent_kafka import Consumer, KafkaError
+            self.logger.info("subscribing to MISP Kafka at topic "
+                        f"{config.kafka.attribute_topic}")
+            self.logger.debug(f"launching Kafka with {config.kafka.config}")
+            consumer = Consumer(config.kafka.config)
+            consumer.subscribe([config.kafka.attribute_topic])
+            @asyncify
+            def generate():
+                try:
+                    while True:
+                        msg = consumer.poll(POLL_INTERVAL)
+                        if msg is None:
+                            continue
+                        if msg.error():
+                            if msg.error().code() != KafkaError._PARTITION_EOF:
+                                self.logger.error(f"got Kafka error: {msg.error()}")
+                            continue
+                        data  = json.loads(msg.value())
+                        self.logger.debug(f"got Kafka message: {data}")
+                        return data
+                except:
+                    self.logger.debug("leaving Kafka group and committing offsets")
+                    consumer.close()
+                    raise
+            self.generator = generate
+        assert self.generator
         # Connect to MISP instance via API.
         api_key = None
         if "MISP_API_KEY" in os.environ:
@@ -561,71 +621,8 @@ async def main():
     # Setup MISP.
     misp = None
     if config.producers.misp:
-        misp_config = config.producers.misp
-        generator = None
-        if misp_config.zmq and misp_config.kafka:
-            logger.critical("cannot have both 0mq and Kafka configured")
-        if misp_config.zmq:
-            import zmq
-            from zmq.asyncio import Context
-            zmq_url = f"tcp://{misp_config.zmq.host}:{misp_config.zmq.port}"
-            logger.info(f"connecting to MISP 0mq socket at {zmq_url}")
-            context = Context.instance()
-            socket = context.socket(zmq.SUB)
-            socket.connect(zmq_url)
-            socket.setsockopt(zmq.SUBSCRIBE, b"")
-            async def generate():
-                try:
-                    while True:
-                        msg = await socket.recv()
-                        topic, _, payload = msg.decode("utf-8").partition(" ")
-                        # Filter out heartbeats.
-                        if topic == "misp_json_self":
-                            uptime = int(json.loads(payload)["uptime"])
-                            delta = datetime.timedelta(seconds=uptime)
-                            logger.debug("received 0mq keep-alive (uptime "
-                                         "{:0>8})".format(str(delta)))
-                            continue
-                        if topic != "misp_json_attribute":
-                            continue
-                        # Parse the payload.
-                        data = json.loads(payload)
-                        logger.debug(f"got attribute via 0mq: {data}")
-                        return data
-                except:
-                    socket.disconnect(zmq_url)
-                    raise
-            generator = generate
-        elif misp_config.kafka:
-            from confluent_kafka import Consumer, KafkaError
-            logger.info("subscribing to MISP Kafka at topic "
-                        f"{misp_config.kafka.attribute_topic}")
-            logger.debug(f"launching Kafka with {misp_config.kafka.config}")
-            consumer = Consumer(misp_config.kafka.config)
-            consumer.subscribe([misp_config.kafka.attribute_topic])
-            @asyncify
-            def generate():
-                try:
-                    while True:
-                        msg = consumer.poll(POLL_INTERVAL)
-                        if msg is None:
-                            continue
-                        if msg.error():
-                            if msg.error().code() != KafkaError._PARTITION_EOF:
-                                logger.error(f"got Kafka error: {msg.error()}")
-                            continue
-                        data  = json.loads(msg.value())
-                        logger.debug(f"got Kafka message: {data}")
-                        return data
-                except:
-                    logger.debug("leaving Kafka group and committing offsets")
-                    consumer.close()
-                    raise
-            generator = generate
-        else:
-            logger.critical("need an intel subscription either via Kafka or 0mq")
         globals()["pymisp"] = __import__("pymisp")
-        misp = MISP(misp_config, generator)
+        misp = MISP(config.producers.misp)
     # Connect to Zeek.
     zeek = None
     if config.consumers.zeek:
