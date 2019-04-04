@@ -186,11 +186,11 @@ module Tenzir;
 
 event intel_snapshot_reply(items: vector of Intelligence)
   {
+  intel_snapshot_received = T;
   if ( log_operations )
-    intel_snapshot_received = T;
     Reporter::info(fmt("got intel snapshot with %d items", |items|));
-    for ( i in items )
-      insert(items[i]);
+  for ( i in items )
+    insert(items[i]);
   }
 
 event Broker::peer_added(endpoint: Broker::EndpointInfo, msg: string)
