@@ -425,16 +425,6 @@ class Controller:
                     f = lambda x: misp_to_zeek_intel_type(x.type)
                     items = [[x.id, f(x), x.value] for x in snapshot]
                     self.zeek.put("Tenzir::intel_snapshot_reply", items)
-                elif event.name() == "Tenzir::intel_report":
-                    timestamp, ids = event.args()
-                    assert ids
-                    self.logger.info(f"Zeek saw intel {ids} at {timestamp}")
-                    if self.misp:
-                        self.logger.debug(f"reporting {len(ids)} sightings "
-                                          "from Zeek to MISP")
-                        ts = int(timestamp.timestamp())
-                        for id in ids:
-                            await self.misp.report(id, ts)
                 elif event.name() == "Tenzir::intel_snapshot_reply":
                     assert len(event.args()) == 1
                     def make_intel(xs):
@@ -447,6 +437,16 @@ class Controller:
                     snapshot = [make_intel(xs) for xs in event.args()[0]]
                     print(json.dumps(snapshot))
                     sys.exit(0)
+                elif event.name() == "Tenzir::intel_report":
+                    timestamp, ids = event.args()
+                    assert ids
+                    self.logger.info(f"Zeek saw intel {ids} at {timestamp}")
+                    if self.misp:
+                        self.logger.debug(f"reporting {len(ids)} sightings "
+                                          "from Zeek to MISP")
+                        ts = int(timestamp.timestamp())
+                        for id in ids:
+                            await self.misp.report(id, ts)
             if misp in done:
                 action, intel = misp.result()
                 self.logger.debug(f"got '{action.name}' for {intel}")
