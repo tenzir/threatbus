@@ -64,10 +64,14 @@ export {
   ##
   ## items: The intel items in the snapshot.
   global intel_snapshot_reply: event(items: vector of Intelligence);
-}
 
-# Flag to avoid duplicate requests of intel snapshots.
-global intel_snapshot_received = F;
+  ## PRIVATE
+
+  # Flag to avoid duplicate requests of intel snapshots.
+  # It is only exported because we need to access to the internal state of the
+  # Intel framework. Do not modify this value.
+  global intel_snapshot_received = F;
+}
 
 # Maps string to their corresponding Intel framework types. Because Broker
 # cannot send enums, we must use this mapping table to obtain a native intel
@@ -135,13 +139,22 @@ event remove_intel(kind: string, value: string)
   remove([$id="", $kind=kind, $value=value]);
   }
 
+export {
+}
+
 module Intel;
 
-# FIXME: there is currently race condition when we have just started up and not
-# received a response to our initial snapshot request. Then this request will
-# return an empty set.
 event Tenzir::intel_snapshot_request(source: string)
   {
+  # There exists a race condition when we have just started up and not received
+  # a response to our initial snapshot request. Then this request will return
+  # an empty set. To prevent this, we postpone the execution of this event
+  # until the snapshot has arrived.
+  if ( Tenzir::request_snapshot && ! Tenzir::intel_snapshot_received )
+    {
+    schedule 1sec { Tenzir::intel_snapshot_request(source) };
+    return;
+    }
   if ( Tenzir::log_operations )
     Reporter::info(fmt("got request for snapshot for source %s", source));
   local result: vector of Tenzir::Intelligence = vector();
