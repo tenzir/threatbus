@@ -133,6 +133,10 @@ class MISP:
             assert data
             attr = data["Attribute"]
             action = make_action(data["action"])
+            if action == Action.ADD and not attr["to_ids"]:
+                self.logger.debug(f"ignoring new attribute {attr['id']} "
+                                  "without IDS flag")
+                continue
             return (action, MISP.make_intel_from_attribute(attr))
 
     async def report(self, id, time_seen):
