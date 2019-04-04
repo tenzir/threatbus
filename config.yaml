@@ -13,7 +13,7 @@ producers:
       url: "http://localhost:80"
       ssl: false
     zmq:
-      host: "192.168.168.140"
+      host: "localhost"
       port: 50000
     #kafka:
     #  # The topic name for attributes, as configured in the MISP Kafka plugin.
@@ -21,7 +21,7 @@ producers:
     #  # The Kafka configuration parameters, as librdkafka defines them here:
     #  # https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
     #  config:
-    #    bootstrap.servers: "192.168.168.13"
+    #    bootstrap.servers: "localhost"
     #    group.id: "robo"
     #    auto.offset.reset: "earliest"
     snapshot:
