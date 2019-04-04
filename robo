@@ -349,7 +349,6 @@ class Controller:
                 self.logger.debug(f"got '{action}' for {intel}")
                 misp = None
                 if action in ["add", "edit"]:
-                    continue
                     if self.vast:
                         expr = self.vast.make_expression(intel)
                         results = await self.vast.export(expr)
