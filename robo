@@ -438,6 +438,7 @@ class Controller:
                 elif event.name() == "Tenzir::intel_snapshot_reply":
                     assert len(event.args()) == 1
                     def make_intel(xs):
+                        assert len(xs) == 3
                         return {
                             "id": int(xs[0]),
                             "type": xs[1],
