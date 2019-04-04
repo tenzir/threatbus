@@ -37,6 +37,9 @@ export {
   ## Topic to subscribe to for receiving intel.
   const robo_investigator_topic = "tenzir/robo" &redef;
 
+  ## The source name for the Intel framework for intel coming from the robo.
+  const intel_source_name = "tenzir";
+
   ## Event to raise for intel item insertion.
   ##
   ## kind: The intel type in
@@ -53,7 +56,9 @@ export {
   global intel_report: event(ts: time, ids: set[string]);
 
   ## Event to raise when requesting a full snapshot of intel.
-  global intel_snapshot_request: event();
+  ##
+  ## source: The source of the intel as recorded in the Intel framework.
+  global intel_snapshot_request: event(source: string);
 
   ## Response event to :bro:id:`intel_snapshot_request`.
   ##
@@ -92,7 +97,7 @@ function make_intel(kind: string, value: string,
     $indicator_type = type_map[kind],
     $meta = record(
       $desc = id,
-      $source = "tenzir"
+      $source = intel_source_name
     )
   ];
   return result;
@@ -130,6 +135,42 @@ event remove_intel(kind: string, value: string)
   remove([$id="", $kind=kind, $value=value]);
   }
 
+module Intel;
+
+# FIXME: there is currently race condition when we have just started up and not
+# received a response to our initial snapshot request. Then this request will
+# return an empty set.
+event Tenzir::intel_snapshot_request(source: string)
+  {
+  if ( Tenzir::log_operations )
+    Reporter::info(fmt("got request for snapshot for source %s", source));
+  local result: vector of Tenzir::Intelligence = vector();
+  for ( x in data_store$host_data )
+    result += Tenzir::Intelligence(
+      $id=data_store$host_data[x][source]$desc,
+      $kind="ADDR",
+      $value=cat(x)
+    );
+  for ( y in data_store$subnet_data )
+    result += Tenzir::Intelligence(
+      $id=data_store$subnet_data[y][source]$desc,
+      $kind="SUBNET",
+      $value=cat(y)
+    );
+  for ( [z, kind] in data_store$string_data )
+    result += Tenzir::Intelligence(
+      $id=data_store$string_data[z, kind][source]$desc,
+      $kind=cat(kind),
+      $value=cat(z)
+    );
+  if ( Tenzir::log_operations )
+    Reporter::info(fmt("sending snapshot with %d intel items", |result|));
+  Broker::publish(Tenzir::robo_investigator_topic,
+                  Tenzir::intel_snapshot_reply, result);
+  }
+
+module Tenzir;
+
 event intel_snapshot_reply(items: vector of Intelligence)
   {
   if ( log_operations )
@@ -147,7 +188,9 @@ event Broker::peer_added(endpoint: Broker::EndpointInfo, msg: string)
     {
     if ( log_operations )
       Reporter::info("requesting current snapshot of intel");
-    Broker::publish(robo_investigator_topic, intel_snapshot_request);
+    Broker::publish(robo_investigator_topic,
+                    intel_snapshot_request,
+                    intel_source_name);
     }
   }
 
@@ -164,7 +207,7 @@ event Intel::match(seen: Intel::Seen, items: set[Intel::Item])
   local ids: set[string];
   ids = set();
   for ( item in items )
-    if ( item$meta?$desc && item$meta$source == "tenzir" )
+    if ( item$meta?$desc && item$meta$source == intel_source_name )
       add ids[item$meta$desc];
   if ( |ids| == 0 )
     return;
