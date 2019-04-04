@@ -1,3 +1,4 @@
 *.sw?
 env
+robo.log
 vast
