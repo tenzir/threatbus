@@ -403,6 +403,12 @@ class Controller:
         self.vast = vast
         self.misp = misp
         self.zeek = zeek
+        # List of intel IDs that we have received from Zeek and forwarded to
+        # MISP for IDS flag removal. Once MISP removes the IDS flag, we will
+        # receive an updated attribute without IDS flag. We ignore such an
+        # update because Zeek already deleted the intel item along with
+        # reporting it as noisy.
+        self.noisy_intel = []
 
     async def run(self):
         self.logger.debug("starting main loop")
@@ -458,6 +464,7 @@ class Controller:
                     self.logger.info("removing IDS flag from noisy attribute "
                                      f"{attr_id} with {n.value} matches/sec")
                     self.misp.remove_ids_flag(attr_id)
+                    self.noisy_intel.append(attr_id)
             if misp in done:
                 action, intel = misp.result()
                 self.logger.debug(f"got '{action.name}' for {intel}")
@@ -480,7 +487,11 @@ class Controller:
                         self.zeek.add_intel(intel)
                 elif action == Action.REMOVE:
                     if self.zeek:
-                        self.zeek.remove_intel(intel)
+                        if intel.id in self.noisy_intel:
+                            self.logger.debug(f"ignorying noisy intel update")
+                            self.noisy_intel.remove(intel.id)
+                        else:
+                            self.zeek.remove_intel(intel)
 
 # -- main ---------------------------------------------------------------------
 
