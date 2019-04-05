@@ -31,6 +31,12 @@ export {
   ## Flag to control whether intel that matches should be reported back.
   const report_intel = T &redef;
 
+  ## The number of matches per second an intel item must exceed before we
+  ## report it as "noisy.
+  ##
+  ## If 0, the computation of noisy intel will not take place.
+  const noisy_intel_threshold = 10 &redef;
+
   ## Flag that indicates whether to log intel operations via reporter.log
   const log_operations = T &redef;
 
@@ -46,7 +52,7 @@ export {
   global add_intel: event(kind: string, value: string, id: string);
 
   ## Event to raise for intel item removal.
-  global remove_intel: event(kind: string, value: string);
+  global remove_intel: event(kind: string, value: string, id: string);
 
   ## Event to report back sightings of (previously added) intel.
   ##
@@ -54,6 +60,13 @@ export {
   ##
   ## ids: The set of IDs that identify the intel items.
   global intel_report: event(ts: time, ids: set[string]);
+
+  ## Event to report back when intel matches exceed `noisy_intel_threshold`.
+  ##
+  ## id: The ID of the intel item.
+  ##
+  ## n: The number of matches per second of this item.
+  global noisy_intel_report: event(id: string, n: count);
 
   ## Event to raise when requesting a full snapshot of intel.
   ##
@@ -88,13 +101,15 @@ global type_map: table[string] of Intel::Type = {
   ["PUBKEY_HASH"] = Intel::PUBKEY_HASH,
 };
 
+# Counts the number of matches of an intel item, identified by its ID.
+global intel_matches: table[string] of count &default=0 &create_expire=1sec;
+
 function is_valid_intel_type(kind: string): bool
   {
   return kind in type_map;
   }
 
-function make_intel(kind: string, value: string,
-                    id: string &default=""): Intel::Item
+function make_intel(kind: string, value: string, id: string): Intel::Item
   {
   local result: Intel::Item = [
     $indicator = value,
@@ -122,7 +137,7 @@ function remove(item: Intelligence)
     Reporter::fatal(fmt("got invalid intel type: %s", item$kind));
   if ( log_operations )
     Reporter::info(fmt("removing intel of type %s: %s", item$kind, item$value));
-  Intel::remove(make_intel(item$kind, item$value), T);
+  Intel::remove(make_intel(item$kind, item$value, item$id), T);
   }
 
 event add_intel(kind: string, value: string, id: string)
@@ -130,13 +145,9 @@ event add_intel(kind: string, value: string, id: string)
   insert([$id=id, $kind=kind, $value=value]);
   }
 
-event remove_intel(kind: string, value: string)
+event remove_intel(kind: string, value: string, id: string)
   {
-  # The intel framework doesn't index intelligence by what we define as ID,
-  # which is why we don't need it here. If we were to try to remove by ID, we'd
-  # have to perform an O(n) search where n is the number of items that Zeek
-  # keeps track of. Consequently, we identify intel by type and value.
-  remove([$id="", $kind=kind, $value=value]);
+  remove([$id=id, $kind=kind, $value=value]);
   }
 
 export {
@@ -217,11 +228,33 @@ event Broker::peer_lost(endpoint: Broker::EndpointInfo, msg: string)
 event Intel::match(seen: Intel::Seen, items: set[Intel::Item])
   {
   # We only report intel that we have previously added ourselves.
-  local ids: set[string];
-  ids = set();
+  local ids: set[string] = set();
   for ( item in items )
     if ( item$meta?$desc && item$meta$source == intel_source_name )
-      add ids[item$meta$desc];
+      {
+      local id = item$meta$desc;
+      if ( noisy_intel_threshold == 0 )
+        {
+        add ids[id];
+        }
+      else
+        {
+        local n = ++intel_matches[id];
+        if ( n < noisy_intel_threshold )
+          {
+          add ids[id];
+          }
+        else
+          {
+          if ( log_operations )
+            Reporter::info(fmt("reporting noisy intel ID %s", id));
+          Broker::publish(robo_investigator_topic, Tenzir::noisy_intel_report,
+                          id, n);
+          Intel::remove(item, T);
+          delete intel_matches[id];
+          }
+        }
+      }
   if ( |ids| == 0 )
     return;
   local e = Broker::make_event(intel_report, current_time(), ids);
@@ -240,6 +273,14 @@ event Intel::match(seen: Intel::Seen, items: set[Intel::Item])
 
 event bro_init()
   {
+  if ( log_operations )
+    {
+    Reporter::info(fmt("subscribing to topic %s", robo_investigator_topic));
+    Reporter::info(fmt("listening at %s:%s for robo investigator",
+                       broker_host, broker_port));
+    Reporter::info(fmt("reporting noisy intel at %d matches/sec",
+                       noisy_intel_threshold));
+    }
   Broker::subscribe(robo_investigator_topic);
   Broker::listen(broker_host, broker_port);
   }
