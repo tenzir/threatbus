@@ -99,6 +99,8 @@ global type_map: table[string] of Intel::Type = {
   ["USER_NAME"] = Intel::USER_NAME,
   ["CERT_HASH"] = Intel::CERT_HASH,
   ["PUBKEY_HASH"] = Intel::PUBKEY_HASH,
+  ["FILE_NAME"] = Intel::FILE_NAME,
+  ["FILE_HASH"] = Intel::FILE_HASH,
 };
 
 # Counts the number of matches of an intel item, identified by its ID.
