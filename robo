@@ -456,7 +456,7 @@ class Controller:
                     assert len(event.args()) == 2
                     attr_id, n = event.args()
                     self.logger.info("removing IDS flag from noisy attribute "
-                                     f"{attr_id} with {n} matches/sec")
+                                     f"{attr_id} with {n.value} matches/sec")
                     self.misp.remove_ids_flag(attr_id)
             if misp in done:
                 action, intel = misp.result()

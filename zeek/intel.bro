@@ -101,34 +101,15 @@ global type_map: table[string] of Intel::Type = {
   ["PUBKEY_HASH"] = Intel::PUBKEY_HASH,
 };
 
-# Keeps track of noisy intel that is scheduled for deletion.
-global noisy_intel_blacklist: set[count];
-
-# Checks if expired intel matches exceed the threshold for noisy intel.
-function expire_intel_match(xs: table[count] of count, id: count): interval
-  {
-  local n = xs[id];
-  if ( n <= noisy_intel_threshold )
-    return 0secs;
-  if ( log_operations )
-    Reporter::info(fmt("reporting noisy intel ID %d with %d matches", id, n));
-  Broker::publish(robo_investigator_topic, Tenzir::noisy_intel_report,
-                  cat(id), n);
-  add noisy_intel_blacklist[id];
-  return 0secs;
-  }
-
 # Counts the number of matches of an intel item, identified by its ID.
-global intel_matches: table[count] of count
-  &default=0 &create_expire=1sec &expire_func=expire_intel_match;
+global intel_matches: table[string] of count &default=0 &create_expire=1sec;
 
 function is_valid_intel_type(kind: string): bool
   {
   return kind in type_map;
   }
 
-function make_intel(kind: string, value: string,
-                    id: string &default=""): Intel::Item
+function make_intel(kind: string, value: string, id: string): Intel::Item
   {
   local result: Intel::Item = [
     $indicator = value,
@@ -156,10 +137,7 @@ function remove(item: Intelligence)
     Reporter::fatal(fmt("got invalid intel type: %s", item$kind));
   if ( log_operations )
     Reporter::info(fmt("removing intel of type %s: %s", item$kind, item$value));
-  Intel::remove(make_intel(item$kind, item$value), T);
-  local uid = to_count(item$id);
-  if ( uid in noisy_intel_blacklist )
-    delete noisy_intel_blacklist[uid];
+  Intel::remove(make_intel(item$kind, item$value, item$id), T);
   }
 
 event add_intel(kind: string, value: string, id: string)
@@ -250,17 +228,31 @@ event Broker::peer_lost(endpoint: Broker::EndpointInfo, msg: string)
 event Intel::match(seen: Intel::Seen, items: set[Intel::Item])
   {
   # We only report intel that we have previously added ourselves.
-  local ids: set[string];
-  ids = set();
+  local ids: set[string] = set();
   for ( item in items )
     if ( item$meta?$desc && item$meta$source == intel_source_name )
       {
-      local id = to_count(item$meta$desc);
-      if ( id !in noisy_intel_blacklist )
+      local id = item$meta$desc;
+      if ( noisy_intel_threshold == 0 )
         {
-        add ids[cat(id)];
-        if ( noisy_intel_threshold > 0 )
-          intel_matches[id] += 1;
+        add ids[id];
+        }
+      else
+        {
+        local n = ++intel_matches[id];
+        if ( n < noisy_intel_threshold )
+          {
+          add ids[id];
+          }
+        else
+          {
+          if ( log_operations )
+            Reporter::info(fmt("reporting noisy intel ID %s", id));
+          Broker::publish(robo_investigator_topic, Tenzir::noisy_intel_report,
+                          id, n);
+          Intel::remove(item, T);
+          delete intel_matches[id];
+          }
         }
       }
   if ( |ids| == 0 )
