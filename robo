@@ -525,7 +525,7 @@ class Controller:
                         }
                     snapshot = [make_intel(xs) for xs in event.args()[0]]
                     print(json.dumps(snapshot))
-                    sys.exit(0)
+                    return
                 elif event.name() == "Tenzir::intel_report":
                     timestamp, ids = event.args()
                     assert ids
