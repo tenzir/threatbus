@@ -19,6 +19,12 @@ POLL_INTERVAL = 0.05
 PYTHON_3_6 = (3, 6, 6, 'final', 0)
 PYTHON_3_7 = (3, 7)
 
+def make_excerpt(string, max_len=300):
+    result = string[:max_len]
+    if len(string) > max_len:
+        result += "..."
+    return result
+
 def str_escape(x):
     return '"' + x.replace('"','\\"') + '"'
 
@@ -136,7 +142,8 @@ class MISP:
                             continue
                         # Parse the payload.
                         data = json.loads(payload)
-                        self.logger.debug(f"got attribute via 0mq: {data}")
+                        excerpt = make_excerpt(json.dumps(data))
+                        self.logger.debug(f"got attribute via 0mq: {excerpt}")
                         return data
                 except:
                     socket.disconnect(zmq_url)
@@ -161,7 +168,8 @@ class MISP:
                                 self.logger.error(f"got Kafka error: {msg.error()}")
                             continue
                         data  = json.loads(msg.value())
-                        self.logger.debug(f"got Kafka message: {data}")
+                        excerpt = make_excerpt(json.dumps(data))
+                        self.logger.debug(f"got Kafka message: {excerpt}")
                         return data
                 except:
                     self.logger.debug("leaving Kafka group and committing offsets")
@@ -202,6 +210,8 @@ class MISP:
                 self.logger.debug(f"translating edit of attribute {attr['id']} "
                                   "without IDS flag into removal")
                 action = Action.REMOVE
+
+            self.logger.debug(f"got {action.name} for intel {attr['id']}")
             return (action, MISP.make_intel_from_attribute(attr))
 
     async def report(self, id, time_seen):
@@ -467,7 +477,6 @@ class Controller:
                     self.noisy_intel.append(attr_id)
             if misp in done:
                 action, intel = misp.result()
-                self.logger.debug(f"got '{action.name}' for {intel}")
                 misp = None
                 if action in [Action.ADD, Action.EDIT]:
                     if self.vast:
