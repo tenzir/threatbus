@@ -10,6 +10,7 @@ import functools
 import json
 import logging
 import os
+import re
 from shutil import which
 import sys
 from typing import NamedTuple
@@ -89,25 +90,99 @@ def make_action(x):
     if x == "delete" or x == "remove":
         return Action.REMOVE
 
-def misp_to_zeek_intel_type(intel_type):
-    """Translates type names of internal intel to names in Zeek's intel
-    framework."""
-    # TODO: complete mapping MISP types to Zeek types.
-    table = {
-        "ip-src": "ADDR",
-        "ip-dst": "ADDR",
-        "domain": "DOMAIN",
-        "email-dst": "EMAIL",
-        "email-src": "EMAIL",
-        "email-reply-to": "EMAIL",
-        "hostname": "DOMAIN",
-        "url": "URL",
-        "uri": "URL",
-        "x509-fingerprint-md5": "CERT_HASH",
-        "x509-fingerprint-sha1": "CERT_HASH",
-        "x509-fingerprint-sha256": "CERT_HASH",
-    }
-    return table[intel_type]
+def to_zeek(intel):
+    """Translates intel into Zeek intel"""
+    def normalize(t, x):
+        if t == "URL":
+            # Normalize URLs
+            return (t, re.sub(r"^https?://", "", x))
+        if t == "ADDR":
+            # Elevate ADDR to SUBNET if possible.
+            return ("SUBNET", x) if re.match(".+/.+", x) else (t, x)
+        return (t, x)
+    zeek_type = to_zeek.mapping[intel.type]
+    if isinstance(zeek_type, str):
+        return normalize(zeek_type, intel.value)
+    if isinstance(zeek_type, tuple):
+        if len(zeek_type) != 2:
+            raise AssertionError("composite type tuples must have two elements")
+        values = intel.value.split("|")
+        if len(values) != 2:
+            raise ValueError("expected '|'-separated composite values")
+        t0, x0 = normalize(zeek_type[0], values[0])
+        t1, x1 = normalize(zeek_type[1], values[1])
+        # Sanity check the expected format.
+        if t0 == "FILE_HASH":
+            raise AssertionError("FILE_HASH does not occur as first type")
+        if not (t0 or t1):
+            raise AssertionError("at least one type must be defined")
+        if not t0:
+            return (t1, x1)
+        if not t1:
+            return (t0, x0)
+        # Prefer file hashes over names because they are more robust. (Unlike a
+        # file name, the hash remains the same.)
+        if t0 == "FILE_HASH":
+            return (t0, x0)
+        if t1 == "FILE_HASH":
+            return (t1, x1)
+        # TODO: we may consider returning a list of Zeek intel instead to
+        # indicate that a single intel can result in multiple Zeek intel items.
+        # For now, if we can still choose between two types, we simply choose
+        # the second type.
+        return (t1, x1)
+    raise AssertionError("type must be 'str' or 'tuple'")
+
+# See https://github.com/MISP/MISP/blob/2.4/app/Lib/Export/BroExport.php
+# for the baseline.
+to_zeek.mapping = {
+    "ip-src": "ADDR",
+    "ip-dst": "ADDR",
+    "ip-src|port": ("ADDR", None),
+    "ip-dst|port": ("ADDR", None),
+    "email-src": "EMAIL",
+    "email-dst": "EMAIL",
+    "target-email": "EMAIL",
+    "email-attachment": "FILE_NAME",
+    "filename": "FILE_NAME",
+    "hostname": "DOMAIN",
+    "domain": "DOMAIN",
+    "domain|ip": ("DOMAIN", "ADDR"),
+    "url": "URL",
+    "user-agent": "SOFTWARE",
+    "md5": "FILE_HASH",
+    "malware-sample": ("FILE_NAME", "FILE_HASH"),
+    "filename|md5": ("FILE_NAME", "FILE_HASH"),
+    "sha1": "FILE_HASH",
+    "filename|sha1": ("FILE_NAME", "FILE_HASH"),
+    "sha256": "FILE_HASH",
+    "filename|sha256": ("FILE_NAME", "FILE_HASH"),
+    "x509-fingerprint-sha1": "CERT_HASH",
+    "pdb": "FILE_NAME",
+    "authentihash": "FILE_HASH",
+    "ssdeep": "FILE_HASH",
+    "imphash": "FILE_HASH",
+    "pehash": "FILE_HASH",
+    "impfuzzy": "FILE_HASH",
+    "sha224": "FILE_HASH",
+    "sha384": "FILE_HASH",
+    "sha512": "FILE_HASH",
+    "sha512/224": "FILE_HASH",
+    "sha512/256": "FILE_HASH",
+    "tlsh": "FILE_HASH",
+    "cdhash": "FILE_HASH",
+    "filename|authentihash": ("FILE_NAME", "FILE_HASH"),
+    "filename|ssdeep": ("FILE_NAME", "FILE_HASH"),
+    "filename|imphash": ("FILE_NAME", "FILE_HASH"),
+    "filename|pehash": ("FILE_NAME", "FILE_HASH"),
+    "filename|impfuzzy": ("FILE_NAME", "FILE_HASH"),
+    "filename|sha224": ("FILE_NAME", "FILE_HASH"),
+    "filename|sha384": ("FILE_NAME", "FILE_HASH"),
+    "filename|sha512": ("FILE_NAME", "FILE_HASH"),
+    "filename|sha512/224": ("FILE_NAME", "FILE_HASH"),
+    "filename|sha512/256": ("FILE_NAME", "FILE_HASH"),
+    "filename|tlsh": ("FILE_NAME", "FILE_HASH"),
+}
 
 class MISP:
     def __init__(self, config):
@@ -363,21 +438,15 @@ class Zeek:
     def add_intel(self, intel):
         """Forwards intelligence to Zeek"""
         self.logger.debug(f"forwarding intel to Zeek: {intel}")
-        event = broker.bro.Event(
-            "Tenzir::add_intel",
-            misp_to_zeek_intel_type(intel.type),
-            intel.value,
-            intel.id)
+        t, v = to_zeek(intel)
+        event = broker.bro.Event("Tenzir::add_intel", t, v, intel.id)
         self.endpoint.publish(self.config.topic, event)
 
     def remove_intel(self, intel):
         """Forwards intelligence to Zeek"""
         self.logger.debug(f"deleting intel from Zeek: {intel}")
-        event = broker.bro.Event(
-            "Tenzir::remove_intel",
-            misp_to_zeek_intel_type(intel.type),
-            intel.value,
-            intel.id)
+        t, v = to_zeek(intel)
+        event = broker.bro.Event("Tenzir::remove_intel", t, v, intel.id)
         self.endpoint.publish(self.config.topic, event)
 
     def dump_intel(self, source):
@@ -443,8 +512,7 @@ class Controller:
                     snapshot = await self.misp.snapshot()
                     self.logger.debug("sending Zeek snapshot from MISP with "
                                       f"{len(snapshot)} intel items")
-                    f = lambda x: misp_to_zeek_intel_type(x.type)
-                    items = [[x.id, f(x), x.value] for x in snapshot]
+                    items = [[x.id, *to_zeek(x)] for x in snapshot]
                     self.zeek.put("Tenzir::intel_snapshot_reply", items)
                 elif event.name() == "Tenzir::intel_snapshot_reply":
                     assert len(event.args()) == 1
