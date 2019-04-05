@@ -35,7 +35,7 @@ export {
   ## report it as "noisy.
   ##
   ## If 0, the computation of noisy intel will not take place.
-  const noisy_intel_threshold = 10 &redef;
+  const noisy_intel_threshold = 100 &redef;
 
   ## Flag that indicates whether to log intel operations via reporter.log
   const log_operations = T &redef;
