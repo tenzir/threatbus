@@ -39,10 +39,10 @@ def async_loop():
 def async_run(f):
     if sys.version_info <= PYTHON_3_6:
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(f())
+        loop.run_until_complete(f)
         loop.close()
     else:
-        asyncio.run(f())
+        asyncio.run(f)
 
 def async_create_task(f):
     if sys.version_info <= PYTHON_3_6:
@@ -736,4 +736,4 @@ async def main():
     await controller.run()
 
 if __name__ == '__main__':
-    async_run(main)
+    async_run(main())
