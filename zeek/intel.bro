@@ -155,9 +155,6 @@ event remove_intel(kind: string, value: string, id: string)
   remove([$id=id, $kind=kind, $value=value]);
   }
 
-export {
-}
-
 module Intel;
 
 event Tenzir::intel_snapshot_request(source: string)
