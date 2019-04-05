@@ -77,13 +77,6 @@ export {
   ##
   ## items: The intel items in the snapshot.
   global intel_snapshot_reply: event(items: vector of Intelligence);
-
-  ## PRIVATE
-
-  # Flag to avoid duplicate requests of intel snapshots.
-  # It is only exported because we need to access to the internal state of the
-  # Intel framework. Do not modify this value.
-  global intel_snapshot_received = F;
 }
 
 # Maps string to their corresponding Intel framework types. Because Broker
@@ -154,6 +147,11 @@ event remove_intel(kind: string, value: string, id: string)
   {
   remove([$id=id, $kind=kind, $value=value]);
   }
+
+export {
+  # Only exported because we need to access it below from the Intel module.
+  global intel_snapshot_received = F;
+}
 
 module Intel;
 
