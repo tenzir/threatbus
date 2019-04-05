@@ -106,7 +106,10 @@ global intel_matches: table[string] of count &default=0 &create_expire=1sec;
 
 function is_valid_intel_type(kind: string): bool
   {
-  return kind in type_map;
+  if ( kind in type_map )
+    return T;
+  Reporter::warning(fmt("ignoring invalid intel type: %s", kind));
+  return F;
   }
 
 function make_intel(kind: string, value: string, id: string): Intel::Item
@@ -125,7 +128,7 @@ function make_intel(kind: string, value: string, id: string): Intel::Item
 function insert(item: Intelligence)
   {
   if ( !is_valid_intel_type(item$kind) )
-    Reporter::fatal(fmt("got invalid intel type: %s", item$kind));
+    return;
   if ( log_operations )
     Reporter::info(fmt("adding intel of type %s: %s", item$kind, item$value));
   Intel::insert(make_intel(item$kind, item$value, item$id));
@@ -134,7 +137,7 @@ function insert(item: Intelligence)
 function remove(item: Intelligence)
   {
   if ( !is_valid_intel_type(item$kind) )
-    Reporter::fatal(fmt("got invalid intel type: %s", item$kind));
+    return;
   if ( log_operations )
     Reporter::info(fmt("removing intel of type %s: %s", item$kind, item$value));
   Intel::remove(make_intel(item$kind, item$value, item$id), T);
