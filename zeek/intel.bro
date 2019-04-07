@@ -50,12 +50,13 @@ export {
 
   ## Event to raise for intel item insertion.
   ##
-  ## kind: The intel type in
-  global add_intel: event(id: string, kind: string, value: string,
-                          source: string);
+  ## item: The intel type to add.
+  global add_intel: event(item: Intelligence);
 
   ## Event to raise for intel item removal.
-  global remove_intel: event(id: string, kind: string, value: string);
+  ##
+  ## item: The intel type to remove.
+  global remove_intel: event(item: Intelligence);
 
   ## Event to report back sightings of (previously added) intel.
   ##
@@ -138,18 +139,18 @@ function remove(item: Intelligence)
   if ( !is_valid_intel_type(item$kind) )
     return;
   if ( log_operations )
-    Reporter::info(fmt("removing intel of type %s: %s", item$kind, item$value));
+    Reporter::info(fmt("removing intel %s", item));
   Intel::remove(make_intel(item), T);
   }
 
-event add_intel(id: string, kind: string, value: string, source: string)
+event add_intel(item: Intelligence)
   {
-  insert(Intelligence($id=id, $kind=kind, $value=value, $source=source));
+  insert(item);
   }
 
-event remove_intel(id: string, kind: string, value: string)
+event remove_intel(item: Intelligence)
   {
-  remove(Intelligence($id=id, $kind=kind, $value=value, $source=""));
+  remove(item);
   }
 
 export {
