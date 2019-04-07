@@ -230,7 +230,8 @@ class MISP:
             from confluent_kafka import Consumer, KafkaError
             self.logger.info("subscribing to MISP Kafka at topic "
                         f"{config.kafka.attribute_topic}")
-            self.logger.debug(f"launching Kafka with {config.kafka.config}")
+            self.logger.debug("launching Kafka with "
+                              f"{json.dumps(config.kafka.config)}")
             consumer = Consumer(config.kafka.config)
             consumer.subscribe([config.kafka.attribute_topic])
             @asyncify
