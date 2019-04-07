@@ -82,6 +82,11 @@ export {
   ##
   ## items: The intel items in the snapshot.
   global intel_snapshot_reply: event(items: vector of Intelligence);
+
+  ## Response event to :bro:id:`intel_snapshot_request`.
+  ##
+  ## node_id: The node ID of the robo investigator.
+  global hello: event(node_id: string);
 }
 
 # Maps string to their corresponding Intel framework types. Because Broker
@@ -100,6 +105,10 @@ global type_map: table[string] of Intel::Type = {
   ["FILE_NAME"] = Intel::FILE_NAME,
   ["FILE_HASH"] = Intel::FILE_HASH,
 };
+
+# The hello event from robo assigns this variable. When not empty, it means
+# there exists a connection to robo.
+global robo_investigator_node_id = "";
 
 # Counts the number of matches of an intel item, identified by its ID.
 global intel_matches: table[string] of count &default=0 &create_expire=1sec;
@@ -240,25 +249,6 @@ event intel_snapshot_reply(items: vector of Intelligence)
     insert(items[i]);
   }
 
-event Broker::peer_added(endpoint: Broker::EndpointInfo, msg: string)
-  {
-  if ( log_operations )
-    Reporter::info(fmt("robo investigator connected: %s", endpoint));
-  if ( request_snapshot && ! intel_snapshot_received )
-    {
-    if ( log_operations )
-      Reporter::info("requesting current snapshot of intel");
-    local source = ""; # We want all intel
-    Broker::publish(robo_investigator_topic, intel_snapshot_request, source);
-    }
-  }
-
-event Broker::peer_lost(endpoint: Broker::EndpointInfo, msg: string)
-  {
-  if ( log_operations )
-    Reporter::info(fmt("robo investigator disconnected: %s", endpoint));
-  }
-
 @if ( report_intel )
 event Intel::match(seen: Intel::Seen, items: set[Intel::Item])
   {
@@ -309,8 +299,31 @@ event Intel::match(seen: Intel::Seen, items: set[Intel::Item])
   }
 @endif
 
+event hello(node_id: string)
+  {
+  robo_investigator_node_id = node_id;
+  if ( log_operations )
+    Reporter::info(fmt("robo investigator connected from node %s", node_id));
+  if ( request_snapshot && ! intel_snapshot_received )
+    {
+    if ( log_operations )
+      Reporter::info("requesting current snapshot of intel");
+    local source = ""; # We want all intel
+    Broker::publish(robo_investigator_topic, intel_snapshot_request, source);
+    }
+  }
+
+event Broker::peer_lost(endpoint: Broker::EndpointInfo, msg: string)
+  {
+  if ( endpoint$id != robo_investigator_node_id )
+    return;
+  if ( log_operations )
+    Reporter::info("robo investigator disconnected");
+  robo_investigator_node_id = "";
+  }
+
 # Only the manager communicates with Robo.
-@if ( ! Cluster::is_enabled() 
+@if ( ! Cluster::is_enabled()
       || Cluster::local_node_type() == Cluster::MANAGER )
 event bro_init() &priority=1
   {
