@@ -170,23 +170,26 @@ event Tenzir::intel_snapshot_request(source: string)
     Reporter::info(fmt("got request for snapshot for source %s", source));
   local result: vector of Tenzir::Intelligence = vector();
   for ( x in data_store$host_data )
-    result += Tenzir::Intelligence(
-      $id=data_store$host_data[x][source]$desc,
-      $kind="ADDR",
-      $value=cat(x)
-    );
+    if ( source == "" || source in data_store$host_data[x] )
+      result += Tenzir::Intelligence(
+        $id=data_store$host_data[x][source]$desc,
+        $kind="ADDR",
+        $value=cat(x)
+      );
   for ( y in data_store$subnet_data )
-    result += Tenzir::Intelligence(
-      $id=data_store$subnet_data[y][source]$desc,
-      $kind="SUBNET",
-      $value=cat(y)
-    );
+    if ( source == "" || source in data_store$subnet_data[y] )
+      result += Tenzir::Intelligence(
+        $id=data_store$subnet_data[y][source]$desc,
+        $kind="SUBNET",
+        $value=cat(y)
+      );
   for ( [z, kind] in data_store$string_data )
-    result += Tenzir::Intelligence(
-      $id=data_store$string_data[z, kind][source]$desc,
-      $kind=cat(kind),
-      $value=cat(z)
-    );
+    if ( source == "" || source in data_store$string_data[z, kind] )
+      result += Tenzir::Intelligence(
+        $id=data_store$string_data[z, kind][source]$desc,
+        $kind=cat(kind),
+        $value=cat(z)
+      );
   if ( Tenzir::log_operations )
     Reporter::info(fmt("sending snapshot with %d intel items", |result|));
   Broker::publish(Tenzir::robo_investigator_topic,
