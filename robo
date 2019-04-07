@@ -462,7 +462,7 @@ class Zeek:
         event = broker.bro.Event("Tenzir::remove_intel", to_zeek(intel))
         self.endpoint.publish(self.config.topic, event)
 
-    def dump_intel(self, source):
+    def dump_intel(self, source=""):
         """Retrieves an intel snapshot from Zeek"""
         self.logger.debug(f"requesting intel snapshot from Zeek")
         request = broker.bro.Event("Tenzir::intel_snapshot_request", source)
@@ -686,8 +686,12 @@ async def main():
         dest="consumers.zeek.host",
         help="The Zeek host running the integration scripts")
     parser.add_argument(
-        "--dump-zeek-intel",
+        "--dump-all-zeek-intel",
+        action='store_true',
         help="connects to Zeek and dumps all intel")
+    parser.add_argument(
+        "--dump-zeek-intel",
+        help="connects to Zeek and dumps intel from a given source")
     args = parser.parse_args()
     if args.config:
         lazy_config.set_file(args.config)
@@ -743,6 +747,8 @@ async def main():
         globals()["broker"] = __import__("broker")
         globals()["broker.bro"] = __import__("broker.bro")
         zeek = Zeek(config.consumers.zeek)
+        if args.dump_all_zeek_intel:
+            zeek.dump_intel()
         if args.dump_zeek_intel:
             zeek.dump_intel(args.dump_zeek_intel)
     # Create controller.

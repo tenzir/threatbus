@@ -175,7 +175,15 @@ event Tenzir::intel_snapshot_request(source: string)
     Reporter::info(fmt("got request for snapshot for source %s", source));
   local result: vector of Tenzir::Intelligence = vector();
   for ( x in data_store$host_data )
-    if ( source == "" || source in data_store$host_data[x] )
+    if ( source == "" )
+      for ( src in data_store$host_data[x] )
+        result += Tenzir::Intelligence(
+          $id=data_store$host_data[x][src]$desc,
+          $kind="ADDR",
+          $value=cat(x),
+          $source=src
+        );
+    else if ( source in data_store$host_data[x] )
       result += Tenzir::Intelligence(
         $id=data_store$host_data[x][source]$desc,
         $kind="ADDR",
@@ -183,7 +191,15 @@ event Tenzir::intel_snapshot_request(source: string)
         $source=source
       );
   for ( y in data_store$subnet_data )
-    if ( source == "" || source in data_store$subnet_data[y] )
+    if ( source == "" )
+      for ( src in data_store$host_data[x] )
+        result += Tenzir::Intelligence(
+          $id=data_store$subnet_data[y][src]$desc,
+          $kind="SUBNET",
+          $value=cat(y),
+          $source=src
+        );
+    else if ( source in data_store$subnet_data[y] )
       result += Tenzir::Intelligence(
         $id=data_store$subnet_data[y][source]$desc,
         $kind="SUBNET",
@@ -191,7 +207,15 @@ event Tenzir::intel_snapshot_request(source: string)
         $source=source
       );
   for ( [z, kind] in data_store$string_data )
-    if ( source == "" || source in data_store$string_data[z, kind] )
+    if ( source == "" )
+      for ( src in data_store$host_data[x] )
+        result += Tenzir::Intelligence(
+          $id=data_store$string_data[z, kind][src]$desc,
+          $kind=cat(kind),
+          $value=cat(z),
+          $source=src
+        );
+    else if ( source in data_store$string_data[z, kind] )
       result += Tenzir::Intelligence(
         $id=data_store$string_data[z, kind][source]$desc,
         $kind=cat(kind),
