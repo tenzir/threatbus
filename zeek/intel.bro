@@ -25,7 +25,7 @@ export {
   const broker_host = "localhost" &redef;
 
   ## Broker port.
-  const broker_port = 54321/tcp &redef;
+  const broker_port = 47761/tcp &redef;
 
   ## Flag to control whether to request an intel snapshot upon successfully
   ## establishing a peering.
