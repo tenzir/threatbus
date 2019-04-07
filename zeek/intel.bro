@@ -1,4 +1,5 @@
 @load base/frameworks/broker
+@load base/frameworks/cluster
 @load base/frameworks/intel
 @load base/frameworks/notice
 @load base/frameworks/reporter
@@ -308,6 +309,9 @@ event Intel::match(seen: Intel::Seen, items: set[Intel::Item])
   }
 @endif
 
+# Only the manager talks to Robo.
+@if ( ! Cluster::is_enabled() 
+      || Cluster::local_node_type() == Cluster::MANAGER )
 event bro_init()
   {
   if ( log_operations )
@@ -321,3 +325,4 @@ event bro_init()
   Broker::subscribe(robo_investigator_topic);
   Broker::listen(broker_host, broker_port);
   }
+@endif
