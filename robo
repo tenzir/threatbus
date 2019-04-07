@@ -92,46 +92,48 @@ def make_action(x):
 
 def to_zeek(intel):
     """Translates intel into Zeek intel"""
-    def normalize(t, x):
-        if t == "URL":
-            # Normalize URLs
-            return (t, re.sub(r"^https?://", "", x))
-        if t == "ADDR":
-            # Elevate ADDR to SUBNET if possible.
-            return ("SUBNET", x) if re.match(".+/.+", x) else (t, x)
-        return (t, x)
-    zeek_type = to_zeek.mapping[intel.type]
-    if isinstance(zeek_type, str):
-        return normalize(zeek_type, intel.value)
-    if isinstance(zeek_type, tuple):
-        if len(zeek_type) != 2:
-            raise AssertionError("composite type tuples must have two elements")
-        values = intel.value.split("|")
-        if len(values) != 2:
-            raise ValueError("expected '|'-separated composite values")
-        t0, x0 = normalize(zeek_type[0], values[0])
-        t1, x1 = normalize(zeek_type[1], values[1])
-        # Sanity check the expected format.
-        if t0 == "FILE_HASH":
-            raise AssertionError("FILE_HASH does not occur as first type")
-        if not (t0 or t1):
-            raise AssertionError("at least one type must be defined")
-        if not t0:
+    def translate(intel_type, intel_value):
+        def normalize(t, x):
+            if t == "URL":
+                # Normalize URLs
+                return (t, re.sub(r"^https?://", "", x))
+            if t == "ADDR":
+                # Elevate ADDR to SUBNET if possible.
+                return ("SUBNET", x) if re.match(".+/.+", x) else (t, x)
+            return (t, x)
+        zeek_type = to_zeek.mapping[intel_type]
+        if isinstance(zeek_type, str):
+            return normalize(zeek_type, intel_value)
+        if isinstance(zeek_type, tuple):
+            if len(zeek_type) != 2:
+                raise AssertionError("composite type must have two elements")
+            values = intel_value.split("|")
+            if len(values) != 2:
+                raise ValueError("expected '|'-separated composite values")
+            t0, x0 = normalize(zeek_type[0], values[0])
+            t1, x1 = normalize(zeek_type[1], values[1])
+            # Sanity check the expected format.
+            if t0 == "FILE_HASH":
+                raise AssertionError("FILE_HASH does not occur as first type")
+            if not (t0 or t1):
+                raise AssertionError("at least one type must be defined")
+            if not t0:
+                return (t1, x1)
+            if not t1:
+                return (t0, x0)
+            # Prefer file hashes over names because they are more robust.
+            # (Unlike a file name, the hash remains the same.)
+            if t0 == "FILE_HASH":
+                return (t0, x0)
+            if t1 == "FILE_HASH":
+                return (t1, x1)
+            # TODO: we may consider returning a list of Zeek intel instead to
+            # indicate that a single intel can result in multiple Zeek intel
+            # items. For now, if we can still choose between two types, we
+            # simply choose the second type.
             return (t1, x1)
-        if not t1:
-            return (t0, x0)
-        # Prefer file hashes over names because they are more robust. (Unlike a
-        # file name, the hash remains the same.)
-        if t0 == "FILE_HASH":
-            return (t0, x0)
-        if t1 == "FILE_HASH":
-            return (t1, x1)
-        # TODO: we may consider returning a list of Zeek intel instead to
-        # indicate that a single intel can result in multiple Zeek intel items.
-        # For now, if we can still choose between two types, we simply choose
-        # the second type.
-        return (t1, x1)
-    raise AssertionError("type must be 'str' or 'tuple'")
+        raise AssertionError("zeek type must be 'str' or 'tuple'")
+    return [intel.id, *translate(intel.type, intel.value), intel.source]
 
 # See https://github.com/MISP/MISP/blob/2.4/app/Lib/Export/BroExport.php
 # for the baseline.
@@ -451,18 +453,16 @@ class Zeek:
     def add_intel(self, intel):
         """Forwards intelligence to Zeek"""
         self.logger.debug(f"forwarding intel to Zeek: {intel}")
-        t, v = to_zeek(intel)
-        event = broker.bro.Event("Tenzir::add_intel", t, v, intel.id)
+        event = broker.bro.Event("Tenzir::add_intel", to_zeek(intel))
         self.endpoint.publish(self.config.topic, event)
 
     def remove_intel(self, intel):
         """Forwards intelligence to Zeek"""
         self.logger.debug(f"deleting intel from Zeek: {intel}")
-        t, v = to_zeek(intel)
-        event = broker.bro.Event("Tenzir::remove_intel", t, v, intel.id)
+        event = broker.bro.Event("Tenzir::remove_intel", to_zeek(intel))
         self.endpoint.publish(self.config.topic, event)
 
-    def dump_intel(self, source):
+    def dump_intel(self, source=""):
         """Retrieves an intel snapshot from Zeek"""
         self.logger.debug(f"requesting intel snapshot from Zeek")
         request = broker.bro.Event("Tenzir::intel_snapshot_request", source)
@@ -519,28 +519,30 @@ class Controller:
                 return_when=asyncio.FIRST_COMPLETED)
             if zeek in done:
                 event = zeek.result()
+                args = event.args()
                 zeek = None
                 if event.name() == "Tenzir::intel_snapshot_request":
                     self.logger.debug("retrieving snapshot from MISP")
                     snapshot = await self.misp.snapshot()
                     self.logger.debug("sending Zeek snapshot from MISP with "
                                       f"{len(snapshot)} intel items")
-                    items = [[x.id, *to_zeek(x)] for x in snapshot]
+                    items = [to_zeek(x) for x in snapshot]
                     self.zeek.put("Tenzir::intel_snapshot_reply", items)
                 elif event.name() == "Tenzir::intel_snapshot_reply":
-                    assert len(event.args()) == 1
+                    assert len(args) == 1
                     def make_intel(xs):
-                        assert len(xs) == 3
+                        assert len(xs) == 4
                         return {
                             "id": int(xs[0]),
                             "type": xs[1],
-                            "value": xs[2]
+                            "value": xs[2],
+                            "source": xs[3],
                         }
-                    snapshot = [make_intel(xs) for xs in event.args()[0]]
+                    snapshot = [make_intel(xs) for xs in args[0]]
                     print(json.dumps(snapshot))
                     return
                 elif event.name() == "Tenzir::intel_report":
-                    timestamp, ids = event.args()
+                    timestamp, ids = args
                     assert ids
                     self.logger.info(f"Zeek saw intel {ids} at {timestamp}")
                     if self.misp:
@@ -550,8 +552,8 @@ class Controller:
                         for id in ids:
                             await self.misp.report(id, ts)
                 elif event.name() == "Tenzir::noisy_intel_report":
-                    assert len(event.args()) == 2
-                    attr_id, n = event.args()
+                    assert len(args) == 2
+                    attr_id, n = args
                     self.logger.info("got report of noisy attribute "
                                      f"{attr_id} with {n.value} matches/sec")
                     self.misp.propose_removal_of_ids_flag(attr_id)
@@ -684,9 +686,12 @@ async def main():
         dest="consumers.zeek.host",
         help="The Zeek host running the integration scripts")
     parser.add_argument(
-        "--dump-zeek-intel",
+        "--dump-all-zeek-intel",
         action='store_true',
         help="connects to Zeek and dumps all intel")
+    parser.add_argument(
+        "--dump-zeek-intel",
+        help="connects to Zeek and dumps intel from a given source")
     args = parser.parse_args()
     if args.config:
         lazy_config.set_file(args.config)
@@ -742,8 +747,10 @@ async def main():
         globals()["broker"] = __import__("broker")
         globals()["broker.bro"] = __import__("broker.bro")
         zeek = Zeek(config.consumers.zeek)
+        if args.dump_all_zeek_intel:
+            zeek.dump_intel()
         if args.dump_zeek_intel:
-            zeek.dump_intel("tenzir")
+            zeek.dump_intel(args.dump_zeek_intel)
     # Create controller.
     controller = Controller(vast, misp, zeek)
     await controller.run()
