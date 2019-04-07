@@ -309,20 +309,32 @@ event Intel::match(seen: Intel::Seen, items: set[Intel::Item])
   }
 @endif
 
-# Only the manager talks to Robo.
+# Only the manager communicates with Robo.
 @if ( ! Cluster::is_enabled() 
       || Cluster::local_node_type() == Cluster::MANAGER )
-event bro_init()
+event bro_init() &priority=1
   {
   if ( log_operations )
     {
     Reporter::info(fmt("subscribing to topic %s", robo_investigator_topic));
-    Reporter::info(fmt("listening at %s:%s for robo investigator",
-                       broker_host, broker_port));
     Reporter::info(fmt("reporting noisy intel at %d matches/sec",
                        noisy_intel_threshold));
     }
   Broker::subscribe(robo_investigator_topic);
+  }
+@endif
+
+# If we operate in a cluster setting, we do not need to open another socket but
+# instead communicate over the already existing one. The endpoint for that is
+# Broker::default_listen_address and Broker::default_port
+@if ( ! Cluster::is_enabled() )
+event bro_init() &priority=0
+  {
+  if ( log_operations )
+    {
+    Reporter::info(fmt("listening at %s:%s for robo investigator",
+                       broker_host, broker_port));
+    }
   Broker::listen(broker_host, broker_port);
   }
 @endif
