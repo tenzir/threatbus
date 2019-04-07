@@ -443,12 +443,14 @@ class Zeek:
         self.logger = logging.getLogger("robo.zeek")
         self.config = config
         self.endpoint = broker.Endpoint()
+        self.logger.debug(f"created endpoint {self.endpoint.node_id()}")
         self.subscriber = self.endpoint.make_subscriber([config.topic])
         self.logger.debug(f"creating subscriber for topic '{config.topic}'")
         self.logger.info("establishing peering with Zeek at "
                          f"{config.host}:{config.port}")
         self.endpoint.peer(config.host, config.port)
-        self.logger.debug("established peering succesfully")
+        self.logger.debug("established peering succesfully, sending hello")
+        self.put("Tenzir::hello", self.endpoint.node_id())
 
     def add_intel(self, intel):
         """Forwards intelligence to Zeek"""

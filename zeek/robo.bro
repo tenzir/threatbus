@@ -1,4 +1,5 @@
 @load base/frameworks/broker
+@load base/frameworks/cluster
 @load base/frameworks/intel
 @load base/frameworks/notice
 @load base/frameworks/reporter
@@ -24,7 +25,7 @@ export {
   const broker_host = "localhost" &redef;
 
   ## Broker port.
-  const broker_port = 54321/tcp &redef;
+  const broker_port = 47761/tcp &redef;
 
   ## Flag to control whether to request an intel snapshot upon successfully
   ## establishing a peering.
@@ -81,6 +82,11 @@ export {
   ##
   ## items: The intel items in the snapshot.
   global intel_snapshot_reply: event(items: vector of Intelligence);
+
+  ## Response event to :bro:id:`intel_snapshot_request`.
+  ##
+  ## node_id: The node ID of the robo investigator.
+  global hello: event(node_id: string);
 }
 
 # Maps string to their corresponding Intel framework types. Because Broker
@@ -99,6 +105,10 @@ global type_map: table[string] of Intel::Type = {
   ["FILE_NAME"] = Intel::FILE_NAME,
   ["FILE_HASH"] = Intel::FILE_HASH,
 };
+
+# The hello event from robo assigns this variable. When not empty, it means
+# there exists a connection to robo.
+global robo_investigator_node_id = "";
 
 # Counts the number of matches of an intel item, identified by its ID.
 global intel_matches: table[string] of count &default=0 &create_expire=1sec;
@@ -239,25 +249,6 @@ event intel_snapshot_reply(items: vector of Intelligence)
     insert(items[i]);
   }
 
-event Broker::peer_added(endpoint: Broker::EndpointInfo, msg: string)
-  {
-  if ( log_operations )
-    Reporter::info(fmt("robo investigator connected: %s", endpoint));
-  if ( request_snapshot && ! intel_snapshot_received )
-    {
-    if ( log_operations )
-      Reporter::info("requesting current snapshot of intel");
-    local source = ""; # We want all intel
-    Broker::publish(robo_investigator_topic, intel_snapshot_request, source);
-    }
-  }
-
-event Broker::peer_lost(endpoint: Broker::EndpointInfo, msg: string)
-  {
-  if ( log_operations )
-    Reporter::info(fmt("robo investigator disconnected: %s", endpoint));
-  }
-
 @if ( report_intel )
 event Intel::match(seen: Intel::Seen, items: set[Intel::Item])
   {
@@ -308,16 +299,55 @@ event Intel::match(seen: Intel::Seen, items: set[Intel::Item])
   }
 @endif
 
-event bro_init()
+event hello(node_id: string)
+  {
+  robo_investigator_node_id = node_id;
+  if ( log_operations )
+    Reporter::info(fmt("robo investigator connected from node %s", node_id));
+  if ( request_snapshot && ! intel_snapshot_received )
+    {
+    if ( log_operations )
+      Reporter::info("requesting current snapshot of intel");
+    local source = ""; # We want all intel
+    Broker::publish(robo_investigator_topic, intel_snapshot_request, source);
+    }
+  }
+
+event Broker::peer_lost(endpoint: Broker::EndpointInfo, msg: string)
+  {
+  if ( endpoint$id != robo_investigator_node_id )
+    return;
+  if ( log_operations )
+    Reporter::info("robo investigator disconnected");
+  robo_investigator_node_id = "";
+  }
+
+# Only the manager communicates with Robo.
+@if ( ! Cluster::is_enabled()
+      || Cluster::local_node_type() == Cluster::MANAGER )
+event bro_init() &priority=1
   {
   if ( log_operations )
     {
     Reporter::info(fmt("subscribing to topic %s", robo_investigator_topic));
-    Reporter::info(fmt("listening at %s:%s for robo investigator",
-                       broker_host, broker_port));
     Reporter::info(fmt("reporting noisy intel at %d matches/sec",
                        noisy_intel_threshold));
     }
   Broker::subscribe(robo_investigator_topic);
+  }
+@endif
+
+# If we operate in a cluster setting, we do not need to open another socket but
+# instead communicate over the already existing one. The endpoint for that is
+# Broker::default_listen_address and Broker::default_port
+@if ( ! Cluster::is_enabled() )
+event bro_init() &priority=0
+  {
+  if ( log_operations )
+    {
+    Reporter::info(fmt("listening at %s:%s for robo investigator",
+                       broker_host, broker_port));
+    }
   Broker::listen(broker_host, broker_port);
   }
+@endif

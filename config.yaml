@@ -67,7 +67,7 @@ producers:
 consumers:
   zeek:
     host: "localhost"
-    port: 54321
+    port: 47761
     topic: "tenzir/robo"
   vast:
     executable: "vast"
