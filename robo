@@ -452,14 +452,15 @@ class Zeek:
         """Forwards intelligence to Zeek"""
         self.logger.debug(f"forwarding intel to Zeek: {intel}")
         t, v = to_zeek(intel)
-        event = broker.bro.Event("Tenzir::add_intel", t, v, intel.id)
+        event = broker.bro.Event("Tenzir::add_intel", intel.id, t, v,
+                                 intel.source)
         self.endpoint.publish(self.config.topic, event)
 
     def remove_intel(self, intel):
         """Forwards intelligence to Zeek"""
         self.logger.debug(f"deleting intel from Zeek: {intel}")
         t, v = to_zeek(intel)
-        event = broker.bro.Event("Tenzir::remove_intel", t, v, intel.id)
+        event = broker.bro.Event("Tenzir::remove_intel", intel.id, t, v)
         self.endpoint.publish(self.config.topic, event)
 
     def dump_intel(self, source):
@@ -519,28 +520,30 @@ class Controller:
                 return_when=asyncio.FIRST_COMPLETED)
             if zeek in done:
                 event = zeek.result()
+                args = event.args()
                 zeek = None
                 if event.name() == "Tenzir::intel_snapshot_request":
                     self.logger.debug("retrieving snapshot from MISP")
                     snapshot = await self.misp.snapshot()
                     self.logger.debug("sending Zeek snapshot from MISP with "
                                       f"{len(snapshot)} intel items")
-                    items = [[x.id, *to_zeek(x)] for x in snapshot]
+                    items = [[x.id, *to_zeek(x), x.source] for x in snapshot]
                     self.zeek.put("Tenzir::intel_snapshot_reply", items)
                 elif event.name() == "Tenzir::intel_snapshot_reply":
-                    assert len(event.args()) == 1
+                    assert len(args) == 1
                     def make_intel(xs):
-                        assert len(xs) == 3
+                        assert len(xs) == 4
                         return {
                             "id": int(xs[0]),
                             "type": xs[1],
-                            "value": xs[2]
+                            "value": xs[2],
+                            "source": xs[3],
                         }
-                    snapshot = [make_intel(xs) for xs in event.args()[0]]
+                    snapshot = [make_intel(xs) for xs in args[0]]
                     print(json.dumps(snapshot))
                     return
                 elif event.name() == "Tenzir::intel_report":
-                    timestamp, ids = event.args()
+                    timestamp, ids = args
                     assert ids
                     self.logger.info(f"Zeek saw intel {ids} at {timestamp}")
                     if self.misp:
@@ -550,8 +553,8 @@ class Controller:
                         for id in ids:
                             await self.misp.report(id, ts)
                 elif event.name() == "Tenzir::noisy_intel_report":
-                    assert len(event.args()) == 2
-                    attr_id, n = event.args()
+                    assert len(args) == 2
+                    attr_id, n = args
                     self.logger.info("got report of noisy attribute "
                                      f"{attr_id} with {n.value} matches/sec")
                     self.misp.propose_removal_of_ids_flag(attr_id)
@@ -685,7 +688,6 @@ async def main():
         help="The Zeek host running the integration scripts")
     parser.add_argument(
         "--dump-zeek-intel",
-        action='store_true',
         help="connects to Zeek and dumps all intel")
     args = parser.parse_args()
     if args.config:
@@ -743,7 +745,7 @@ async def main():
         globals()["broker.bro"] = __import__("broker.bro")
         zeek = Zeek(config.consumers.zeek)
         if args.dump_zeek_intel:
-            zeek.dump_intel("tenzir")
+            zeek.dump_intel(args.dump_zeek_intel)
     # Create controller.
     controller = Controller(vast, misp, zeek)
     await controller.run()
