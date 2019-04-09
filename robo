@@ -551,7 +551,7 @@ class Controller:
                     def make_intel(xs):
                         assert len(xs) == 4
                         return {
-                            "id": int(xs[0]),
+                            "desc": xs[0],
                             "type": xs[1],
                             "value": xs[2],
                             "source": xs[3],
