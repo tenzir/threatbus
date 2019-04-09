@@ -3,23 +3,27 @@
 The **Robo Investigor** (`robo`) autonomously performs routine task of an
 incident response team.
 
-In particular, `robo` performs live correlation of threat intelligence with
-historical data by hooking into [MISP][misp]'s intelligence feeds and
-dispatching new intelligence into to downstream consumers. We support the
-following consumers:
+In abstract terms, `robo` implements threat intelligence *producers* and
+*consumers* that can interact with each other bidirectionally. This enables
+novel use cases, e.g., to correlation indicators of compromise in real time or
+to perform historical intelligence lookups.
 
-- [VAST][vast] (or [Tenzir][tenzir]): perform historical queries
-- [Zeek][zeek]: convert MISP intel into Zeek intel
+Currently, `robo` supports the following producers:
+
+- [MISP][misp]: export attributes
+
+The following consumers exist:
+
+- [VAST][vast] (or [Tenzir][tenzir]): for historical intel queries
+- [Zeek][zeek]: ship intel into Zeek
 
 ## Installation
 
-You need a running [MISP][misp] instance and at least one intel consumer.
-
 ### Python Setup
 
-The Python module depedencies are listed in the file
-[requirements.txt](requirements.txt). An easy way to get started is to setup a
-virtual environment:
+Robo Investigator requires the Python module listed in
+[requirements.txt](requirements.txt). We recommend to get started with a Python
+virtual environment until you have working deployment:
 
 
 ```sh
@@ -28,7 +32,7 @@ source env/bin/activate
 pip install -r requirements.txt
 ```
 
-### MISP Setup
+### MISP Producer
 
 First, you need to setup a MISP instance with [0mq][misp-zmq-config] or
 [Kafka][kafka] support. In the diagnostic section, make sure that the the
@@ -50,13 +54,13 @@ export MISP_API_KEY=qrtyJV9VMwo2immC8S4cZEaqFEK4m13UrlTvoSGl
 Alternatively, you can place the API key in the configuration file. An existing
 environment variable will always take precedence to the configuration file.
 
-### VAST/Tenzir Integration
+### VAST/Tenzir Consumer
 
 For the VAST/Tenzir consumer, you only need to ensure that the `vast` or
 `tenzir` binary is found in the `PATH` environment variable. Alternatively, you
 can specify a custom location in the configuration file.
 
-### Zeek/Broker Integration
+### Zeek/Broker Consumer
 
 We use [Broker][broker] for the Zeek consumer. The easist solution is to
 install Broker into a Python virtual environment:
