@@ -29,22 +29,22 @@ export {
 
   ## Flag to control whether to request an intel snapshot upon successfully
   ## establishing a peering.
-  const request_snapshot = T &redef;
+  option request_snapshot = T &redef;
 
   ## Flag to control whether intel that matches should be reported back.
-  const report_intel = T &redef;
+  option report_intel = T &redef;
 
   ## The number of matches per second an intel item must exceed before we
   ## report it as "noisy.
   ##
   ## If 0, the computation of noisy intel will not take place.
-  const noisy_intel_threshold = 100 &redef;
+  option noisy_intel_threshold = 100 &redef;
 
   ## Flag that indicates whether to log intel operations via reporter.log
-  const log_operations = T &redef;
+  option log_operations = T &redef;
 
   ## Topic to subscribe to for receiving intel.
-  const robo_investigator_topic = "tenzir/robo" &redef;
+  option robo_investigator_topic = "tenzir/robo" &redef;
 
   ## The source name for the Intel framework for intel coming from the robo.
   const robo_intel_tag = "Tenzir Robo Investigator";
