@@ -310,16 +310,9 @@ class MISP:
 
     def propose_removal_of_ids_flag(self, attr_id):
         """Add a proposal to remove the IDS flag from an attribute."""
-        x = self.misp.get_attribute(attr_id)
-        attr = x["Attribute"]
-        event_id = attr["event_id"]
-        if not attr["to_ids"]:
-            self.logger.error("cannot propose removal of absent IDS flag")
-            return
         self.logger.debug("proposing to remove IDS flag "
                           f"from attribute {attr_id}")
-        attr["to_ids"] = False
-        self.misp.proposal_add(event_id, attr)
+        self.misp.proposal_edit(attr_id, {"to_ids": False})
 
     async def snapshot(self):
         data = None
