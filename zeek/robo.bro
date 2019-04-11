@@ -137,7 +137,7 @@ function make_intel(x: Intelligence): Intel::Item
 
 function insert(item: Intelligence)
   {
-  if ( !is_valid_intel_type(item$kind) )
+  if ( ! is_valid_intel_type(item$kind) )
     return;
   if ( log_operations )
     Reporter::info(fmt("adding intel %s", item));
@@ -146,7 +146,7 @@ function insert(item: Intelligence)
 
 function remove(item: Intelligence)
   {
-  if ( !is_valid_intel_type(item$kind) )
+  if ( ! is_valid_intel_type(item$kind) )
     return;
   if ( log_operations )
     Reporter::info(fmt("removing intel %s", item));
