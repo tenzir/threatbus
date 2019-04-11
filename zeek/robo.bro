@@ -249,9 +249,10 @@ event intel_snapshot_reply(items: vector of Intelligence)
     insert(items[i]);
   }
 
-@if ( report_intel )
 event Intel::match(seen: Intel::Seen, items: set[Intel::Item])
   {
+  if ( ! report_intel )
+    return;
   # We only report intel that we have previously added ourselves. These intel
   # items all have a custom URL as meta data and a description with an ID.
   local ids: set[string] = set();
@@ -297,7 +298,6 @@ event Intel::match(seen: Intel::Seen, items: set[Intel::Item])
     Reporter::info(fmt("reporting %s intel match(es) for %s", |ids|, value));
     }
   }
-@endif
 
 event hello(node_id: string)
   {
