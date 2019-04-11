@@ -455,7 +455,7 @@ class Zeek:
         if not zeek_intel:
             self.logger.warning(f"ignoring incompatible intel: {intel}")
             return
-        self.logger.warning(f"adding intel to Zeek: {intel}")
+        self.logger.debug(f"adding intel to Zeek: {intel}")
         event = broker.bro.Event("Tenzir::add_intel", zeek_intel)
         self.endpoint.publish(self.config.topic, event)
 
