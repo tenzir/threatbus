@@ -44,10 +44,11 @@ export {
   option log_operations = T &redef;
 
   ## Topic to subscribe to for receiving intel.
-  option robo_investigator_topic = "tenzir/robo" &redef;
+  option threat_bus_topic = "tenzir/threatbus" &redef;
 
-  ## The source name for the Intel framework for intel coming from the robo.
-  const robo_intel_tag = "Tenzir Robo Investigator";
+  ## The source name for the Intel framework for intel coming from the threat
+  ## bus.
+  const tb_intel_tag = "Tenzir threat bus";
 
   ## Event to raise for intel item insertion.
   ##
@@ -78,14 +79,14 @@ export {
   ## source: The source of the intel as recorded in the Intel framework.
   global intel_snapshot_request: event(source: string);
 
-  ## Response event to :bro:id:`intel_snapshot_request`.
+  ## Response event to :zeek:id:`intel_snapshot_request`.
   ##
   ## items: The intel items in the snapshot.
   global intel_snapshot_reply: event(items: vector of Intelligence);
 
-  ## Response event to :bro:id:`intel_snapshot_request`.
+  ## Response event to :zeek:id:`intel_snapshot_request`.
   ##
-  ## node_id: The node ID of the robo investigator.
+  ## node_id: The node ID of the threat bus.
   global hello: event(node_id: string);
 }
 
@@ -106,9 +107,9 @@ global type_map: table[string] of Intel::Type = {
   ["FILE_HASH"] = Intel::FILE_HASH,
 };
 
-# The hello event from robo assigns this variable. When not empty, it means
-# there exists a connection to robo.
-global robo_investigator_node_id = "";
+# The hello event from threat bus assigns this variable. When not empty, it
+# means there exists a connection to threat bus.
+global threat_bus_node_id = "";
 
 # Counts the number of matches of an intel item, identified by its ID.
 global intel_matches: table[string] of count &default=0 &create_expire=1sec;
@@ -129,7 +130,7 @@ function make_intel(x: Intelligence): Intel::Item
     $meta = record(
       $source = x$source,
       $desc = x$id,
-      $url = robo_intel_tag
+      $url = tb_intel_tag
     )
   ];
   return result;
@@ -234,7 +235,7 @@ event Tenzir::intel_snapshot_request(source: string)
       );
   if ( Tenzir::log_operations )
     Reporter::info(fmt("sending snapshot with %d intel items", |result|));
-  Broker::publish(Tenzir::robo_investigator_topic,
+  Broker::publish(Tenzir::threat_bus_topic,
                   Tenzir::intel_snapshot_reply, result);
   }
 
@@ -257,10 +258,10 @@ event Intel::match(seen: Intel::Seen, items: set[Intel::Item])
   # items all have a custom URL as meta data and a description with an ID.
   local ids: set[string] = set();
   for ( item in items )
-    if ( item$meta?$url && item$meta$url == robo_intel_tag )
+    if ( item$meta?$url && item$meta$url == tb_intel_tag )
       {
       if ( ! item$meta?$desc )
-        Reporter::fatal("description must be present for robo intel");
+        Reporter::fatal("description must be present for threat bus intel");
       local id = item$meta$desc;
       if ( noisy_intel_threshold == 0 )
         {
@@ -277,7 +278,7 @@ event Intel::match(seen: Intel::Seen, items: set[Intel::Item])
           {
           if ( log_operations )
             Reporter::info(fmt("reporting noisy intel ID %s", id));
-          Broker::publish(robo_investigator_topic, Tenzir::noisy_intel_report,
+          Broker::publish(threat_bus_topic, Tenzir::noisy_intel_report,
                           id, n);
           Intel::remove(item, T);
           delete intel_matches[id];
@@ -287,7 +288,7 @@ event Intel::match(seen: Intel::Seen, items: set[Intel::Item])
   if ( |ids| == 0 )
     return;
   local e = Broker::make_event(intel_report, current_time(), ids);
-  Broker::publish(robo_investigator_topic, e);
+  Broker::publish(threat_bus_topic, e);
   if ( log_operations )
     {
     local value: string;
@@ -301,39 +302,39 @@ event Intel::match(seen: Intel::Seen, items: set[Intel::Item])
 
 event hello(node_id: string)
   {
-  robo_investigator_node_id = node_id;
+  threat_bus_node_id = node_id;
   if ( log_operations )
-    Reporter::info(fmt("robo investigator connected from node %s", node_id));
+    Reporter::info(fmt("threat bus connected from node %s", node_id));
   if ( request_snapshot && ! intel_snapshot_received )
     {
     if ( log_operations )
       Reporter::info("requesting current snapshot of intel");
     local source = ""; # We want all intel
-    Broker::publish(robo_investigator_topic, intel_snapshot_request, source);
+    Broker::publish(threat_bus_topic, intel_snapshot_request, source);
     }
   }
 
 event Broker::peer_lost(endpoint: Broker::EndpointInfo, msg: string)
   {
-  if ( endpoint$id != robo_investigator_node_id )
+  if ( endpoint$id != threat_bus_node_id )
     return;
   if ( log_operations )
-    Reporter::info("robo investigator disconnected");
-  robo_investigator_node_id = "";
+    Reporter::info("threat bus disconnected");
+  threat_bus_node_id = "";
   }
 
-# Only the manager communicates with Robo.
+# Only the manager communicates with Threat bus.
 @if ( ! Cluster::is_enabled()
       || Cluster::local_node_type() == Cluster::MANAGER )
-event bro_init() &priority=1
+event zeek_init() &priority=1
   {
   if ( log_operations )
     {
-    Reporter::info(fmt("subscribing to topic %s", robo_investigator_topic));
+    Reporter::info(fmt("subscribing to topic %s", threat_bus_topic));
     Reporter::info(fmt("reporting noisy intel at %d matches/sec",
                        noisy_intel_threshold));
     }
-  Broker::subscribe(robo_investigator_topic);
+  Broker::subscribe(threat_bus_topic);
   }
 @endif
 
@@ -341,11 +342,11 @@ event bro_init() &priority=1
 # instead communicate over the already existing one. The endpoint for that is
 # Broker::default_listen_address and Broker::default_port
 @if ( ! Cluster::is_enabled() )
-event bro_init() &priority=0
+event zeek_init() &priority=0
   {
   if ( log_operations )
     {
-    Reporter::info(fmt("listening at %s:%s for robo investigator",
+    Reporter::info(fmt("listening at %s:%s for threat bus",
                        broker_host, broker_port));
     }
   Broker::listen(broker_host, broker_port);
