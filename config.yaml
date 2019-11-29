@@ -10,7 +10,7 @@ producers:
   misp:
     rest:
       api_key: "iVse3nJ1M6UMuBR3s8zCZYDjyAF6n9M4bKvI43RU"
-      url: "http://localhost:80"
+      url: "https://localhost"
       ssl: false
     zmq:
       host: "localhost"

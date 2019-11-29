@@ -269,7 +269,7 @@ class MISP:
                                  "environment variable or config file")
         self.logger.info(f"connecting to MISP REST API at {config.rest.url}")
         try:
-            self.misp = pymisp.PyMISP(config.rest.url, config.rest.api_key,
+            self.misp = pymisp.ExpandedPyMISP(config.rest.url, config.rest.api_key,
                                       ssl=config.rest.ssl)
         except pymisp.PyMISPError:
             self.logger.critical("connection refused while trying to connect "
@@ -325,8 +325,7 @@ class MISP:
         else:
             data = await self.__search(**self.config.snapshot.search)
         assert data
-        attrs = data["response"]["Attribute"]
-        return [MISP.make_intel_from_attribute(x) for x in attrs]
+        return [MISP.make_intel_from_attribute(x) for x in data["Attribute"]]
 
     @asyncify
     def __search(self, **kwargs):
