@@ -27,16 +27,27 @@ tools locally for the python bindings link against those packages.
 
 ### Python Setup
 
+#### Package Installation
+
 Threat Bus requires the Python modules listed in
 [requirements.txt](requirements.txt). We recommend to get started with a Python
 virtual environment until you have working deployment:
-
 
 ```sh
 python3 -m venv env
 source env/bin/activate
 pip install -r requirements.txt
 ```
+
+#### Python Path
+
+Threat Bus comes as a python module, all sources are to be found in the
+`threatbus` folder (whitout hyphen, because python modules don't have hyphens).
+
+In order to make the development with relative imports possible, and without
+having to install the project, you must export your PYTHONPATH:
+
+  $ export PYTHONPATH=$PYTHONPATH:/home/<you>/code/threat-bus/threatbus
 
 ### MISP Producer
 
