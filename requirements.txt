@@ -1,5 +1,5 @@
-coloredlogs
-confluent-kafka
-confuse
-pymisp
-zmq
+coloredlogs>=10.0
+confluent-kafka>=1.2.0
+confuse>=1.0
+pymisp>=2.4
+pyzmq>=18.1

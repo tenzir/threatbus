@@ -1,16 +1,16 @@
-# Robo Investigator configuration file
+# Threat Bus configuration file
 logger:
   console: true
   console_verbosity: "DEBUG"
   file: false
   file_verbosity: "DEBUG"
-  filename: "robo.log"
+  filename: "threat-bus.log"
 
 producers:
   misp:
     rest:
       api_key: "iVse3nJ1M6UMuBR3s8zCZYDjyAF6n9M4bKvI43RU"
-      url: "http://localhost:80"
+      url: "https://localhost"
       ssl: false
     zmq:
       host: "localhost"
@@ -22,7 +22,7 @@ producers:
     #  # https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
     #  config:
     #    bootstrap.servers: "localhost"
-    #    group.id: "robo"
+    #    group.id: "threat-bus"
     #    auto.offset.reset: "earliest"
     snapshot:
       # If true, then the search parameters will be interpreted as a raw REST
@@ -68,7 +68,7 @@ consumers:
   zeek:
     host: "localhost"
     port: 47761
-    topic: "tenzir/robo"
+    topic: "tenzir/threat-bus"
   vast:
     executable: "vast"
     max_results: 100

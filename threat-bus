@@ -64,7 +64,7 @@ async def spawn(*args):
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE)
     stdout, stderr = await proc.communicate()
-    logger = logging.getLogger("robo")
+    logger = logging.getLogger("threat-bus")
     logger.debug(stderr.decode().strip())
     return stdout.decode().strip()
 
@@ -192,7 +192,7 @@ to_zeek.mapping = {
 class MISP:
     def __init__(self, config):
         self.config = config
-        self.logger = logging.getLogger("robo.misp")
+        self.logger = logging.getLogger("threat-bus.misp")
         if config.zmq and config.kafka:
             self.logger.critical("cannot have both 0mq and Kafka configured")
         elif not config.zmq and not config.kafka:
@@ -325,8 +325,7 @@ class MISP:
         else:
             data = await self.__search(**self.config.snapshot.search)
         assert data
-        attrs = data["response"]["Attribute"]
-        return [MISP.make_intel_from_attribute(x) for x in attrs]
+        return [MISP.make_intel_from_attribute(x) for x in data["Attribute"]]
 
     @asyncify
     def __search(self, **kwargs):
@@ -350,7 +349,7 @@ class MISP:
 
 class VAST:
     def __init__(self, config):
-        self.logger = logging.getLogger("robo.vast")
+        self.logger = logging.getLogger("threat-bus.vast")
         self.app = config.executable
         self.window = config.time_window
         self.max_results = config.max_results
@@ -437,7 +436,7 @@ class VAST:
 
 class Zeek:
     def __init__(self, config):
-        self.logger = logging.getLogger("robo.zeek")
+        self.logger = logging.getLogger("threat-bus.zeek")
         self.config = config
         self.endpoint = broker.Endpoint()
         self.logger.debug(f"created endpoint {self.endpoint.node_id()}")
@@ -456,7 +455,7 @@ class Zeek:
             self.logger.warning(f"ignoring incompatible intel: {intel}")
             return
         self.logger.debug(f"adding intel to Zeek: {intel}")
-        event = broker.bro.Event("Tenzir::add_intel", zeek_intel)
+        event = broker.zeek.Event("Tenzir::add_intel", zeek_intel)
         self.endpoint.publish(self.config.topic, event)
 
     def remove_intel(self, intel):
@@ -466,13 +465,13 @@ class Zeek:
             self.logger.warning(f"ignoring incompatible intel: {intel}")
             return
         self.logger.debug(f"deleting intel from Zeek: {intel}")
-        event = broker.bro.Event("Tenzir::remove_intel", zeek_intel)
+        event = broker.zeek.Event("Tenzir::remove_intel", zeek_intel)
         self.endpoint.publish(self.config.topic, event)
 
     def dump_intel(self, source=""):
         """Retrieves an intel snapshot from Zeek"""
         self.logger.debug(f"requesting intel snapshot from Zeek")
-        request = broker.bro.Event("Tenzir::intel_snapshot_request", source)
+        request = broker.zeek.Event("Tenzir::intel_snapshot_request", source)
         self.endpoint.publish(self.config.topic, request)
 
     async def get(self):
@@ -480,7 +479,7 @@ class Zeek:
         while True:
             if self.subscriber.available():
                 topic, data = self.subscriber.get()
-                event = broker.bro.Event(data)
+                event = broker.zeek.Event(data)
                 self.logger.debug(f"{topic} -> event {event.name()}{event.args()}")
                 return event
             else:
@@ -493,12 +492,12 @@ class Zeek:
 
     def put(self, event_name, *args):
         """Sends an event to Zeek via Broker"""
-        event = broker.bro.Event(event_name, *args)
+        event = broker.zeek.Event(event_name, *args)
         self.endpoint.publish(self.config.topic, event)
 
 class Controller:
     def __init__(self, vast, misp, zeek):
-        self.logger = logging.getLogger("robo.controller")
+        self.logger = logging.getLogger("threat-bus.controller")
         self.vast = vast
         self.misp = misp
         self.zeek = zeek
@@ -669,7 +668,7 @@ template = {
 async def main():
     """The main function"""
     # Setup configuration
-    lazy_config = confuse.LazyConfig('RoboInvestigator', __name__)
+    lazy_config = confuse.LazyConfig('ThreatBus', __name__)
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--config',
@@ -709,7 +708,7 @@ async def main():
     lazy_config.set_args(args, dots=True)
     config = lazy_config.get(template)
     # Setup logging.
-    logger = logging.getLogger('robo')
+    logger = logging.getLogger('threat-bus')
     logger.setLevel(logging.DEBUG) # FIXME: compute min(file, console)
     fmt = "%(asctime)s %(levelname)-8s [%(name)s] %(message)s"
     colored_formatter = coloredlogs.ColoredFormatter(fmt)
@@ -756,7 +755,7 @@ async def main():
     zeek = None
     if config.consumers.zeek:
         globals()["broker"] = __import__("broker")
-        globals()["broker.bro"] = __import__("broker.bro")
+        globals()["broker.zeek"] = __import__("broker.zeek")
         zeek = Zeek(config.consumers.zeek)
         if args.dump_all_zeek_intel:
             zeek.dump_intel()

@@ -1,14 +1,14 @@
-# Robo Investigator
+# Threat Bus
 
-The **Robo Investigor** (`robo`) autonomously performs routine task of an
+The **Threat Bus** (`threat-bus`) autonomously performs routine task of an
 incident response team.
 
-In abstract terms, `robo` implements threat intelligence *producers* and
+In abstract terms, `threat-bus` implements threat intelligence *producers* and
 *consumers* that can interact with each other bidirectionally. This enables
 novel use cases, e.g., to correlation indicators of compromise in real time or
 to perform historical intelligence lookups.
 
-Currently, `robo` supports the following producers:
+Currently, `threat-bus` supports the following producers:
 
 - [MISP][misp]: export attributes
 
@@ -19,9 +19,15 @@ The following consumers exist:
 
 ## Installation
 
+### OS Packages
+
+Threat Bus integrates with zeroMQ [0mq](https://zeromq.org/) and
+[confluent-kafka](https://www.confluent.io/). Hence you have to install these
+tools locally for the python bindings link against those packages.
+
 ### Python Setup
 
-Robo Investigator requires the Python module listed in
+Threat Bus requires the Python modules listed in
 [requirements.txt](requirements.txt). We recommend to get started with a Python
 virtual environment until you have working deployment:
 
@@ -54,11 +60,11 @@ export MISP_API_KEY=qrtyJV9VMwo2immC8S4cZEaqFEK4m13UrlTvoSGl
 Alternatively, you can place the API key in the configuration file. An existing
 environment variable will always take precedence to the configuration file.
 
-### VAST/Tenzir Consumer
+### VAST Consumer
 
-For the VAST/Tenzir consumer, you only need to ensure that the `vast` or
-`tenzir` binary is found in the `PATH` environment variable. Alternatively, you
-can specify a custom location in the configuration file.
+For the VAST consumer, you only need to ensure that the `vast` binary is found
+in the `PATH` environment variable. Alternatively, you can specify a custom
+location in the configuration file.
 
 ### Zeek/Broker Consumer
 
@@ -89,16 +95,16 @@ cp sitecustomize.py $site_packages
 
 ## Usage
 
-The general architecture of `robo` resembles a publish/subscribe system:
+The general architecture of `threat-bus` resembles a publish/subscribe system:
 subscriptions to intelligence producers generate a stream of indicators that
-`robo` translates for various intel consumers.
+`threat-bus` translates for various intel consumers.
 
 The [example configuration file](config.yaml) illustrates how to configure a
-deployment. After customizing the values to your environment, launch `robo`
+deployment. After customizing the values to your environment, launch `threat-bus`
 with a configuration:
 
 ```sh
-robo -c custom.yaml
+threat-bus -c custom.yaml
 ```
 
 For ease of use, a subset of the configuration values can be overriden on the
@@ -106,10 +112,10 @@ command line. For example, to override the MISP REST API URL and Zeek host, you
 can use:
 
 ```sh
-robo -m https://1.2.3.4:8080 -z 5.6.7.8
+threat-bus -m https://1.2.3.4:8080 -z 5.6.7.8
 ```
 
-The full list of overriding options is available via `robo -h`.
+The full list of overriding options is available via `threat-bus -h`.
 
 ## License
 
