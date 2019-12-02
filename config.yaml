@@ -22,7 +22,7 @@ producers:
     #  # https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
     #  config:
     #    bootstrap.servers: "localhost"
-    #    group.id: "threatbus"
+    #    group.id: "threat-bus"
     #    auto.offset.reset: "earliest"
     snapshot:
       # If true, then the search parameters will be interpreted as a raw REST
@@ -68,7 +68,7 @@ consumers:
   zeek:
     host: "localhost"
     port: 47761
-    topic: "tenzir/threatbus"
+    topic: "tenzir/threat-bus"
   vast:
     executable: "vast"
     max_results: 100

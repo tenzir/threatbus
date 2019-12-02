@@ -1,14 +1,14 @@
 # Threat Bus
 
-The **Threat Bus** (`tb`) autonomously performs routine task of an
+The **Threat Bus** (`threat-bus`) autonomously performs routine task of an
 incident response team.
 
-In abstract terms, `tb` implements threat intelligence *producers* and
+In abstract terms, `threat-bus` implements threat intelligence *producers* and
 *consumers* that can interact with each other bidirectionally. This enables
 novel use cases, e.g., to correlation indicators of compromise in real time or
 to perform historical intelligence lookups.
 
-Currently, `tb` supports the following producers:
+Currently, `threat-bus` supports the following producers:
 
 - [MISP][misp]: export attributes
 
@@ -21,7 +21,7 @@ The following consumers exist:
 
 ### OS Packages
 
-Threatbus integrates with zeroMQ [0mq](https://zeromq.org/) and
+Threat Bus integrates with zeroMQ [0mq](https://zeromq.org/) and
 [confluent-kafka](https://www.confluent.io/). Hence you have to install these
 tools locally for the python bindings link against those packages.
 
@@ -95,12 +95,12 @@ cp sitecustomize.py $site_packages
 
 ## Usage
 
-The general architecture of `tb` resembles a publish/subscribe system:
+The general architecture of `threat-bus` resembles a publish/subscribe system:
 subscriptions to intelligence producers generate a stream of indicators that
-`tb` translates for various intel consumers.
+`threat-bus` translates for various intel consumers.
 
 The [example configuration file](config.yaml) illustrates how to configure a
-deployment. After customizing the values to your environment, launch `tb`
+deployment. After customizing the values to your environment, launch `threat-bus`
 with a configuration:
 
 ```sh

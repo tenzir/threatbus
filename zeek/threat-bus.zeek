@@ -44,11 +44,11 @@ export {
   option log_operations = T &redef;
 
   ## Topic to subscribe to for receiving intel.
-  option threat_bus_topic = "tenzir/threatbus" &redef;
+  option threat_bus_topic = "tenzir/threat-bus" &redef;
 
   ## The source name for the Intel framework for intel coming from the threat
   ## bus.
-  const tb_intel_tag = "Tenzir threat bus";
+  const tb_intel_tag = "threat-bus";
 
   ## Event to raise for intel item insertion.
   ##
@@ -86,7 +86,7 @@ export {
 
   ## Response event to :zeek:id:`intel_snapshot_request`.
   ##
-  ## node_id: The node ID of the threat bus.
+  ## node_id: The node ID of Threat Bus.
   global hello: event(node_id: string);
 }
 
@@ -107,8 +107,8 @@ global type_map: table[string] of Intel::Type = {
   ["FILE_HASH"] = Intel::FILE_HASH,
 };
 
-# The hello event from threat bus assigns this variable. When not empty, it
-# means there exists a connection to threat bus.
+# The hello event from Threat Bus assigns this variable. When not empty, it
+# means there exists a connection to Threat Bus.
 global threat_bus_node_id = "";
 
 # Counts the number of matches of an intel item, identified by its ID.
@@ -261,7 +261,7 @@ event Intel::match(seen: Intel::Seen, items: set[Intel::Item])
     if ( item$meta?$url && item$meta$url == tb_intel_tag )
       {
       if ( ! item$meta?$desc )
-        Reporter::fatal("description must be present for threat bus intel");
+        Reporter::fatal("description must be present for threat-bus intel");
       local id = item$meta$desc;
       if ( noisy_intel_threshold == 0 )
         {
@@ -304,7 +304,7 @@ event hello(node_id: string)
   {
   threat_bus_node_id = node_id;
   if ( log_operations )
-    Reporter::info(fmt("threat bus connected from node %s", node_id));
+    Reporter::info(fmt("threat-bus connected from node %s", node_id));
   if ( request_snapshot && ! intel_snapshot_received )
     {
     if ( log_operations )
@@ -319,11 +319,11 @@ event Broker::peer_lost(endpoint: Broker::EndpointInfo, msg: string)
   if ( endpoint$id != threat_bus_node_id )
     return;
   if ( log_operations )
-    Reporter::info("threat bus disconnected");
+    Reporter::info("threat-bus disconnected");
   threat_bus_node_id = "";
   }
 
-# Only the manager communicates with Threat bus.
+# Only the manager communicates with Threat Bus.
 @if ( ! Cluster::is_enabled()
       || Cluster::local_node_type() == Cluster::MANAGER )
 event zeek_init() &priority=1
@@ -346,7 +346,7 @@ event zeek_init() &priority=0
   {
   if ( log_operations )
     {
-    Reporter::info(fmt("listening at %s:%s for threat bus",
+    Reporter::info(fmt("listening at %s:%s for threat-bus",
                        broker_host, broker_port));
     }
   Broker::listen(broker_host, broker_port);
