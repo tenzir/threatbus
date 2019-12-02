@@ -3,19 +3,21 @@ import json
 import logging
 import urllib.parse
 
+
 def str_escape(x):
-    return '"' + x.replace('"','\\"') + '"'
+    return '"' + x.replace('"', '\\"') + '"'
+
 
 async def spawn(*args):
     """Spawns a process asynchronously."""
     proc = await asyncio.create_subprocess_exec(
-        *args,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE)
+        *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+    )
     stdout, stderr = await proc.communicate()
     logger = logging.getLogger("threat-bus")
     logger.debug(stderr.decode().strip())
     return stdout.decode().strip()
+
 
 class VAST:
     def __init__(self, config):
@@ -28,11 +30,11 @@ class VAST:
     def make_expression(self, intel):
         """Creates a VAST expression from an intel item."""
         # FIXME: type queries currently prevent this from working.
-        #filter = '#type == "zeek::conn"'
-        #if self.window:
+        # filter = '#type == "zeek::conn"'
+        # if self.window:
         #    filter = f"#time > {self.window} ago && {filter}"
-        #pred = VAST.make_predicate(intel.type, [intel.value])
-        #return f'{filter} && {pred}'
+        # pred = VAST.make_predicate(intel.type, [intel.value])
+        # return f'{filter} && {pred}'
         return VAST.make_predicate(intel.type, [intel.value])
 
     async def status(self):
@@ -45,8 +47,9 @@ class VAST:
 
     async def export(self, expr, window=None):
         self.logger.debug(f"spawning {self.app} process for expression {expr}")
-        stdout = await spawn(self.app, "export", "-e", str(self.max_results),
-                             "json", expr)
+        stdout = await spawn(
+            self.app, "export", "-e", str(self.max_results), "json", expr
+        )
         return stdout.splitlines()
 
     def path(self):
@@ -70,11 +73,13 @@ class VAST:
                 return f"{lhs} == {rhs[0]}"
             else:
                 return f"{lhs} in {{{', '.join(rhs)}}}"
+
         # IP addresses
         if intel_type in ["ip-src", "ip-dst"]:
             return condense(":addr", values)
         # URLs
         elif intel_type in ["url", "uri"]:
+
             def make_http_log_expr(x):
                 result = urllib.parse.urlsplit(x)
                 host = result.hostname
@@ -84,7 +89,7 @@ class VAST:
                     # be prepended to "path". We're "fixing" this behavior by
                     # manually splitting at the first "/".
                     host, path = tuple(path.split("/", 1))
-                    path = "/" + path # bring back leading slash
+                    path = "/" + path  # bring back leading slash
                 host = f"host == {str_escape(host)}" if host else None
                 path = f"uri == {str_escape(path)}" if path else None
                 if host and path:
@@ -94,6 +99,7 @@ class VAST:
                 if path:
                     return path
                 return None
+
             return VAST.make_disjunction(map(make_http_log_expr, values))
         # Domains
         elif intel_type == "domain":

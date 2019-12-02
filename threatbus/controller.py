@@ -5,13 +5,15 @@ import sys
 from zeek import to_zeek
 from misp import Action
 
-PYTHON_3_6 = (3, 6, 6, 'final', 0)
+PYTHON_3_6 = (3, 6, 6, "final", 0)
+
 
 def async_create_task(f):
     if sys.version_info <= PYTHON_3_6:
         return asyncio.ensure_future(f)
     else:
         return asyncio.create_task(f)
+
 
 class Controller:
     def __init__(self, vast, misp, zeek):
@@ -38,9 +40,8 @@ class Controller:
                 self.logger.debug("scheduling MISP task")
                 misp = async_create_task(self.misp.intel())
             done, pending = await asyncio.wait(
-                [zeek, misp],
-                timeout=1,
-                return_when=asyncio.FIRST_COMPLETED)
+                [zeek, misp], timeout=1, return_when=asyncio.FIRST_COMPLETED
+            )
             if zeek in done:
                 event = zeek.result()
                 args = event.args()
@@ -51,13 +52,12 @@ class Controller:
                     items = [x for x in map(to_zeek, snapshot) if x]
                     incompatible = len(snapshot) - len(items)
                     if incompatible > 0:
-                        self.logger.warning(f"ignored {incompatible} "
-                                            "intel items")
-                    self.logger.debug(f"sending Zeek {len(items)} "
-                                      "intel items")
+                        self.logger.warning(f"ignored {incompatible} " "intel items")
+                    self.logger.debug(f"sending Zeek {len(items)} " "intel items")
                     self.zeek.put("Tenzir::intel_snapshot_reply", items)
                 elif event.name() == "Tenzir::intel_snapshot_reply":
                     assert len(args) == 1
+
                     def make_intel(xs):
                         assert len(xs) == 4
                         return {
@@ -66,6 +66,7 @@ class Controller:
                             "value": xs[2],
                             "source": xs[3],
                         }
+
                     snapshot = [make_intel(xs) for xs in args[0]]
                     print(json.dumps(snapshot))
                     return
@@ -74,16 +75,19 @@ class Controller:
                     assert ids
                     self.logger.info(f"Zeek saw intel {ids} at {timestamp}")
                     if self.misp:
-                        self.logger.debug(f"reporting {len(ids)} sightings "
-                                          "from Zeek to MISP")
+                        self.logger.debug(
+                            f"reporting {len(ids)} sightings " "from Zeek to MISP"
+                        )
                         ts = int(timestamp.timestamp())
                         for id in ids:
                             await self.misp.report(id, ts)
                 elif event.name() == "Tenzir::noisy_intel_report":
                     assert len(args) == 2
                     attr_id, n = args
-                    self.logger.info("got report of noisy attribute "
-                                     f"{attr_id} with {n.value} matches/sec")
+                    self.logger.info(
+                        "got report of noisy attribute "
+                        f"{attr_id} with {n.value} matches/sec"
+                    )
                     self.misp.propose_removal_of_ids_flag(attr_id)
                     self.noisy_intel.append(attr_id)
             if misp in done:
@@ -93,14 +97,14 @@ class Controller:
                     if self.vast:
                         expr = self.vast.make_expression(intel)
                         results = await self.vast.export(expr)
-                        self.logger.debug(f"reporting {len(results)} sightings "
-                                          "from VAST to MISP")
+                        self.logger.debug(
+                            f"reporting {len(results)} sightings " "from VAST to MISP"
+                        )
                         for result in results:
                             self.logger.debug(result)
                             record = json.loads(result)
                             if "ts" not in record:
-                                self.logger.critical(
-                                    "no 'ts' column in Zeek log")
+                                self.logger.critical("no 'ts' column in Zeek log")
                             timestamp = int(record["ts"])
                             await self.misp.report(intel.id, timestamp)
                     if self.zeek:

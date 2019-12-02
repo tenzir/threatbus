@@ -6,6 +6,7 @@ import re
 
 POLL_INTERVAL = 0.05
 
+
 class Zeek:
     def __init__(self, config):
         self.logger = logging.getLogger("threat-bus.zeek")
@@ -14,8 +15,9 @@ class Zeek:
         self.logger.debug(f"created endpoint {self.endpoint.node_id()}")
         self.subscriber = self.endpoint.make_subscriber([config.topic])
         self.logger.debug(f"creating subscriber for topic '{config.topic}'")
-        self.logger.info("establishing peering with Zeek at "
-                         f"{config.host}:{config.port}")
+        self.logger.info(
+            "establishing peering with Zeek at " f"{config.host}:{config.port}"
+        )
         self.endpoint.peer(config.host, config.port)
         self.logger.debug("established peering succesfully, sending hello")
         self.put("Tenzir::hello", self.endpoint.node_id())
@@ -67,8 +69,10 @@ class Zeek:
         event = broker.zeek.Event(event_name, *args)
         self.endpoint.publish(self.config.topic, event)
 
+
 def to_zeek(intel):
     """Translates intel into Zeek intel"""
+
     def translate(intel_type, intel_value):
         def normalize(t, x):
             if t == "URL":
@@ -78,6 +82,7 @@ def to_zeek(intel):
                 # Elevate ADDR to SUBNET if possible.
                 return ("SUBNET", x) if re.match(".+/.+", x) else (t, x)
             return (t, x)
+
         if intel_type not in to_zeek.mapping:
             return None
         zeek_type = to_zeek.mapping[intel_type]
@@ -112,8 +117,10 @@ def to_zeek(intel):
             # simply choose the second type.
             return (t1, x1)
         raise AssertionError("zeek type must be 'str' or 'tuple'")
+
     xs = translate(intel.type, intel.value)
     return [intel.id, *xs, intel.source] if xs else None
+
 
 # See https://github.com/MISP/MISP/blob/2.4/app/Lib/Export/BroExport.php
 # for the baseline.
