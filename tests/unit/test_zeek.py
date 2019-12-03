@@ -5,7 +5,7 @@ from threatbus import Zeek
 from threatbus.zeek import to_zeek
 from threatbus.misp import Intelligence
 
-from tests.util.dummy_config import DummyConfig
+from tests.util.dummy_config import ZeekConfig
 
 
 class TestToZeekMapping(unittest.TestCase):
@@ -31,7 +31,7 @@ class TestZeek(unittest.TestCase):
     @patch("threatbus.zeek.broker.Endpoint")
     @patch.object(Zeek, "put")
     def setUp(self, patched_put, patched_endpoint):
-        self.dummy_config = DummyConfig("host1234", 47761, "test/topic")
+        self.dummy_config = ZeekConfig("host1234", 47761, "test/topic")
         self.under_test = Zeek(self.dummy_config)
 
         patched_endpoint.assert_called_once()

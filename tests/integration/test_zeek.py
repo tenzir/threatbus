@@ -6,7 +6,7 @@ from unittest.mock import ANY
 
 from threatbus import Zeek
 from threatbus.misp import Intelligence
-from tests.util.dummy_config import DummyConfig
+from tests.util.dummy_config import ZeekConfig
 
 from tests.integration.components.simple_broker import receive, send
 
@@ -15,7 +15,7 @@ class TestZeekIntegration(unittest.TestCase):
     """Tests the functionality of the Zeek class in `threatbus` in an integrative setup."""
 
     def setUp(self):
-        self.dummy_config = DummyConfig("127.0.0.1", 55555, "test/integration")
+        self.dummy_config = ZeekConfig("127.0.0.1", 55555, "test/integration")
         self.under_test = Zeek(self.dummy_config)
 
         name, data = receive()
