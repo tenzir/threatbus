@@ -108,4 +108,5 @@ class VAST:
         elif intel_type == "http-method":
             return condense("method", list(map(str_escape, values)))
         else:
-            self.logger.critical("unsupported intel type:", intel_type)
+            logger = logging.getLogger("threat-bus")
+            logger.critical("unsupported intel type:", intel_type)
