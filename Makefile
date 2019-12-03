@@ -1,3 +1,7 @@
+TESTS=tests
+UNIT=${TESTS}/unit
+INTEGRATION=${TESTS}/integration
+
 .PHONY: all
 all: format test
 
@@ -5,10 +9,17 @@ all: format test
 install-dependencies:
 	python -m pip install -r requirements.txt
 
-.PHONY: test
-test:
-	python -m unittest discover -s tests
-
 .PHONY: format
 format:
 	python -m black .
+
+.PHONY: test
+test: unit integration
+
+.PHONY: unit
+unit:
+	python -m unittest discover -s ${UNIT}
+
+.PHONY: integration
+integration:
+	python -m unittest discover -s ${INTEGRATION}

@@ -5,14 +5,7 @@ from threatbus import Zeek
 from threatbus.zeek import to_zeek
 from threatbus.misp import Intelligence
 
-
-class DummyConfig:
-    """Helper to instruct objects under test with a configuration"""
-
-    def __init__(self, host, port, topic):
-        self.host = host
-        self.port = port
-        self.topic = topic
+from tests.util.dummy_config import DummyConfig
 
 
 class TestToZeekMapping(unittest.TestCase):
