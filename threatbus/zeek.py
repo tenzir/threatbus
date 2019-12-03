@@ -4,6 +4,8 @@ import broker.zeek
 import logging
 import re
 
+from misp import Intelligence
+
 POLL_INTERVAL = 0.05
 
 
@@ -22,7 +24,7 @@ class Zeek:
         self.logger.debug("established peering succesfully, sending hello")
         self.put("Tenzir::hello", self.endpoint.node_id())
 
-    def add_intel(self, intel):
+    def add_intel(self, intel: Intelligence):
         """Forwards intelligence to Zeek"""
         zeek_intel = to_zeek(intel)
         if not zeek_intel:
@@ -32,7 +34,7 @@ class Zeek:
         event = broker.zeek.Event("Tenzir::add_intel", zeek_intel)
         self.endpoint.publish(self.config.topic, event)
 
-    def remove_intel(self, intel):
+    def remove_intel(self, intel: Intelligence):
         """Forwards intelligence to Zeek"""
         zeek_intel = to_zeek(intel)
         if not zeek_intel:
