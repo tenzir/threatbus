@@ -17,6 +17,17 @@ The following consumers exist:
 - [VAST][vast] (or [Tenzir][tenzir]): for historical intel queries
 - [Zeek][zeek]: ship intel into Zeek
 
+## Test & Develop
+
+Use the `Makefile` to format the python code and execute tests.
+
+```sh
+$ make all
+$ make format
+$ make unit
+$ make integration
+```
+
 ## Installation
 
 ### OS Packages
