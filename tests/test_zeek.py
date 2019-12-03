@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import ANY, patch
+from unittest.mock import ANY, patch, create_autospec
 
 from threatbus import Zeek
 from threatbus.zeek import to_zeek
@@ -35,21 +35,58 @@ class TestToZeekMapping(unittest.TestCase):
 class TestZeek(unittest.TestCase):
     """Tests the functionality of the Zeek class in `threatbus`"""
 
-    def setUp(self):
+    @patch("threatbus.zeek.broker.Endpoint")
+    @patch.object(Zeek, "put")
+    def setUp(self, patched_put, patched_endpoint):
         self.dummy_config = DummyConfig("host1234", 47761, "test/topic")
-
-        # mock broker
-        self.endpoint_patcher = patch("threatbus.zeek.broker.Endpoint")
-        self.event_patcher = patch("threatbus.zeek.broker.zeek.Event")
-        self.endpoint_patcher.start()
-        self.event_patcher.start()
         self.under_test = Zeek(self.dummy_config)
 
-    def tearDown(self):
-        self.endpoint_patcher.stop()
-        self.event_patcher.stop()
+        patched_endpoint.assert_called_once()
+        self.under_test.endpoint.peer.assert_called_with(
+            self.dummy_config.host, self.dummy_config.port
+        )
+        self.under_test.endpoint.make_subscriber.assert_called_with(
+            [self.dummy_config.topic]
+        )
+        patched_put.assert_called_with("Tenzir::hello", ANY)
 
-    def test_init(self):
+    @patch("threatbus.zeek.broker.Endpoint")
+    @patch("threatbus.zeek.broker.zeek.Event", return_value="ZEEK_EVENT")
+    def test_add_intel(self, patched_event, patched_endpoint):
+        intel = Intelligence("ID", "ip-src", "127.0.0.1", "data", "source")
+        self.under_test.add_intel(intel)
+        patched_event.assert_called_with(ANY, ["ID", "ADDR", "127.0.0.1", "source"])
         self.under_test.endpoint.publish.assert_called_with(
-            self.dummy_config.topic, ANY
+            self.dummy_config.topic, patched_event.return_value
+        )
+
+    @patch("threatbus.zeek.broker.Endpoint")
+    @patch("threatbus.zeek.broker.zeek.Event", return_value="ZEEK_EVENT")
+    def test_remove_intel(self, patched_event, patched_endpoint):
+        intel = Intelligence("ID", "ip-dst", "6.6.6.6", "data", "dest")
+        self.under_test.remove_intel(intel)
+        patched_event.assert_called_with(ANY, ["ID", "ADDR", "6.6.6.6", "dest"])
+        self.under_test.endpoint.publish.assert_called_with(
+            self.dummy_config.topic, patched_event.return_value
+        )
+
+    @patch("threatbus.zeek.broker.Endpoint")
+    @patch("threatbus.zeek.broker.zeek.Event", return_value="ZEEK_EVENT")
+    def test_dump_intel(self, patched_event, patched_endpoint):
+        source = "Foo"
+        self.under_test.dump_intel(source)
+        patched_event.assert_called_with(ANY, source)
+        self.under_test.endpoint.publish.assert_called_with(
+            self.dummy_config.topic, patched_event.return_value
+        )
+
+    @patch("threatbus.zeek.broker.Endpoint")
+    @patch("threatbus.zeek.broker.zeek.Event", return_value="ZEEK_EVENT")
+    def test_put(self, patched_event, patched_endpoint):
+        event_name = "NAME"
+        data = "DATA"
+        self.under_test.put(event_name, data)
+        patched_event.assert_called_with(event_name, data)
+        self.under_test.endpoint.publish.assert_called_with(
+            self.dummy_config.topic, patched_event.return_value
         )
