@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import ANY, patch, create_autospec
+from unittest.mock import ANY, patch
 
 from threatbus import Zeek
 from threatbus.zeek import to_zeek
