@@ -7,6 +7,7 @@ from unittest.mock import ANY
 from threatbus import Zeek
 from threatbus.misp import Intelligence
 from tests.util.dummy_config import ZeekConfig
+from tests.util.async_util import run_await
 
 from tests.integration.components.simple_broker import receive, send
 
@@ -55,7 +56,7 @@ class TestZeekIntegration(unittest.TestCase):
 
         send(self.dummy_config.topic, name, content)
 
-        data = asyncio.run(self.under_test.get())
+        data = run_await(self.under_test.get())
         received_event = broker.zeek.Event(data)
 
         self.assertEqual(received_event.name(), name)
