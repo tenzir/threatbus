@@ -1,6 +1,5 @@
 import asyncio
 import broker
-import broker.zeek
 import logging
 import re
 

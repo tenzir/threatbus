@@ -8,7 +8,8 @@ import os
 import pymisp
 import sys
 from typing import NamedTuple
-
+import zmq
+from zmq.asyncio import Context
 
 PYTHON_3_6 = (3, 6, 6, "final", 0)
 PYTHON_3_7 = (3, 7)
@@ -49,12 +50,13 @@ class Intelligence(NamedTuple):
 
 
 def make_action(x):
-    if x == "add":
-        return Action.ADD
-    if x == "edit":
-        return Action.EDIT
-    if x == "delete" or x == "remove":
+    attr = x.get("Attribute", None)
+    if not attr or attr.get("deleted", None) == 1:
         return Action.REMOVE
+    if attr and x.get("Event", None):
+        return Action.EDIT
+    elif attr:
+        return Action.ADD
 
 
 def make_excerpt(string, max_len=300):
@@ -73,9 +75,6 @@ class MISP:
         elif not config.zmq and not config.kafka:
             self.logger.critical("need intel either from Kafka or 0mq")
         if config.zmq:
-            import zmq
-            from zmq.asyncio import Context
-
             zmq_url = f"tcp://{config.zmq.host}:{config.zmq.port}"
             self.logger.info(f"connecting to MISP 0mq socket at {zmq_url}")
             context = Context.instance()
@@ -156,8 +155,8 @@ class MISP:
             )
         self.logger.info(f"connecting to MISP REST API at {config.rest.url}")
         try:
-            self.misp = pymisp.PyMISP(
-                config.rest.url, config.rest.api_key, ssl=config.rest.ssl
+            self.misp = pymisp.ExpandedPyMISP(
+                url=config.rest.url, key=config.rest.api_key, ssl=config.rest.ssl
             )
         except pymisp.PyMISPError:
             self.logger.critical(
@@ -168,24 +167,28 @@ class MISP:
         """Generates the next intelligence item."""
         while True:
             data = await self.generator()
-            assert data
-            attr = data["Attribute"]
-            action = make_action(data["action"])
-            to_ids = attr["to_ids"]
-            if action == Action.ADD and not to_ids:
-                self.logger.debug(
-                    f"ignoring new attribute {attr['id']} " "without IDS flag"
-                )
-                continue
-            if action == Action.EDIT and not to_ids:
-                self.logger.debug(
-                    f"translating edit of attribute {attr['id']} "
-                    "without IDS flag into removal"
-                )
-                action = Action.REMOVE
+            return self.process_intel(data)
 
-            self.logger.debug(f"got {action.name} for intel {attr['id']}")
-            return (action, MISP.make_intel_from_attribute(attr))
+    def process_intel(self, data):
+        assert data
+        # https://www.circl.lu/doc/misp/misp-zmq/#misp_json_attribute---attribute-updated-or-created
+        attr = data["Attribute"]
+        action = make_action(data)
+        to_ids = attr.get("to_ids", None)
+        if action == Action.ADD and not to_ids:
+            self.logger.debug(
+                f"ignoring new attribute {attr['id']} " "without IDS flag"
+            )
+            return
+        if action == Action.EDIT and not to_ids:
+            self.logger.debug(
+                f"translating edit of attribute {attr['id']} "
+                "without IDS flag into removal"
+            )
+            action = Action.REMOVE
+
+        self.logger.debug(f"got {action.name} for intel {attr['id']}")
+        return (action, MISP.make_intel_from_attribute(attr))
 
     async def report(self, id, time_seen):
         """Reports intelligence as (true-positive) sighting."""
@@ -195,7 +198,7 @@ class MISP:
         self.logger.debug(
             f"reporting intel {id} seen at " f"{ts.strftime('%Y-%m-%d %H:%M:%S')}"
         )
-        self.misp.set_sightings(x)
+        self.misp.add_sighting(x)
 
     def remove_ids_flag(self, attr_id):
         """Removes the IDS flag from noisy attributes."""
@@ -219,10 +222,7 @@ class MISP:
         else:
             data = await self.__search(**self.config.snapshot.search)
         assert data
-        print(data)
-        return [
-            MISP.make_intel_from_attribute(x) for x in data["response"]["Attribute"]
-        ]
+        return [MISP.make_intel_from_attribute(x) for x in data["Attribute"]]
 
     @asyncify
     def __search(self, **kwargs):
