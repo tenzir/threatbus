@@ -1,9 +1,0 @@
-version: "3.0"
-services:
-  broker:
-    network_mode: host
-    build:
-      context: components
-      dockerfile: Dockerfile_broker
-    ports: 
-      - 55555:5555

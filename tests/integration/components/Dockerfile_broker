@@ -1,7 +1,0 @@
-FROM fixel/zeek:broker-latest
-#FROM fixel/broker:1.2.3
-
-COPY broker-receiver.py .
-
-EXPOSE 55555
-CMD python3 broker-receiver.py
