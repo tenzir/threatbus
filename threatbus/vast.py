@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-import urllib.parse
+from urllib.parse import urlsplit
 
 
 def str_escape(x):
@@ -57,12 +57,22 @@ class VAST:
         return self.app
 
     @staticmethod
-    def make_conjunction(xs):
-        return "({})".format(" && ".join(xs))
+    def make_conjunction(xs: list):
+        if not xs:
+            return ""
+        con = "{}".format(" && ".join(xs))
+        if len(xs) == 1:
+            return con
+        return "({})".format(con)
 
     @staticmethod
-    def make_disjunction(xs):
-        return "({})".format(" || ".join(xs))
+    def make_disjunction(xs: list):
+        if not xs:
+            return ""
+        dis = "{}".format(" || ".join(xs))
+        if len(xs) == 1:
+            return dis
+        return "({})".format(dis)
 
     @staticmethod
     def make_predicate(intel_type, values):
@@ -81,15 +91,20 @@ class VAST:
         elif intel_type in ["url", "uri"]:
 
             def make_http_log_expr(x):
-                result = urllib.parse.urlsplit(x)
-                host = result.hostname
-                path = result.path
-                if not host and path and path[0] != "/":
-                    # If there is no protocol in the URI, then the "host" part will
-                    # be prepended to "path". We're "fixing" this behavior by
-                    # manually splitting at the first "/".
-                    host, path = tuple(path.split("/", 1))
-                    path = "/" + path  # bring back leading slash
+                result = urlsplit(x)
+                host, path = result.hostname, result.path
+                # If there is no protocol in the URI, then the "host" part will
+                # be prepended to "path".
+                if path and not host:
+                    if "/" not in path:
+                        # The URI has neither protocol nor path (eg. 'example.com')
+                        host = path
+                        path = None
+                    elif path[0] != "/":
+                        # Manually split path into net-location (host) and URI
+                        host, path = tuple(path.split("/", 1))
+                        path = "/" + path
+
                 host = f"host == {str_escape(host)}" if host else None
                 path = f"uri == {str_escape(path)}" if path else None
                 if host and path:
@@ -100,7 +115,7 @@ class VAST:
                     return path
                 return None
 
-            return VAST.make_disjunction(map(make_http_log_expr, values))
+            return VAST.make_disjunction(list(map(make_http_log_expr, values)))
         # Domains
         elif intel_type == "domain":
             return condense("host", list(map(str_escape, values)))
