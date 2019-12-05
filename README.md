@@ -22,11 +22,42 @@ The following consumers exist:
 Use the `Makefile` to format the python code and execute tests.
 
 ```sh
-$ make all
 $ make format
 $ make unit
 $ make integration
+$ make all
 ```
+
+### Integration Tests
+
+For the integration tests to succeed, you require a running MISP instance. As
+for now, you can use [docker-misp](https://github.com/misp/docker-misp).
+
+Set up MISP:
+
+```sh
+git clone https://github.com/misp/docker-misp.git
+cd docker-misp
+docker build \
+    --rm=true --force-rm=true \
+    --build-arg MYSQL_MISP_PASSWORD=admin \
+    --build-arg POSTFIX_RELAY_HOST=localhost \
+    --build-arg MISP_FQDN=localhost \
+    --build-arg MISP_EMAIL=admin@admin.test \
+    --build-arg MISP_GPG_PASSWORD=admin \
+    -t integration-misp container
+
+mkdir <some/tmp/dir/for/data-base>
+
+## initialize db, mounted from <some/tmp/dir/for/data-base>
+docker run -t -p 443:443 -p 80:80 -p 3306:3306 -p 50000:50000 -v <some/tmp/dir/for/data-base>:/var/lib/mysql integration-misp:latest /init-db
+
+## run in foreground
+docker run -t -p 443:443 -p 80:80 -p 3306:3306 -p 50000:50000 -v <some/tmp/dir/for/data-base>:/var/lib/mysql integration-misp:latest
+```
+
+Execute integration tests for `threath-bus` via `make integration`. Afterwards
+you can stop / kill the MISP instance in docker again.
 
 ## Installation
 
