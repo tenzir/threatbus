@@ -7,7 +7,7 @@ import confuse
 import logging
 import sys
 
-from threatbus import Controller, MISP, VAST, Zeek
+from threatbus import Controller, MISP
 
 
 PYTHON_3_6 = (3, 6, 6, 'final', 0)
@@ -159,9 +159,14 @@ async def main():
         logger.critical("MISP intel producer not configured")
     if not (config.consumers.vast or config.consumers.zeek):
         logger.critical("no intel consumer provided; configure VAST or Zeek")
+
+    # Setup MISP.
+    misp = MISP(config.producers.misp)
+
     # Setup VAST
     vast = None
     if config.consumers.vast:
+        from threatbus import VAST
         executable = config.consumers.vast.executable
         if not executable:
             logger.critical(f"could not find VAST at {executable}")
@@ -169,24 +174,18 @@ async def main():
         vast_status = await vast.status()
         vast_threads = vast_status['system']['worker-threads']
         logger.info(f"found VAST running with {vast_threads} threads")
-    # Setup MISP.
-    misp = None
-    if config.producers.misp:
-        globals()["pymisp"] = __import__("pymisp")
-        misp = MISP(config.producers.misp)
-    # Connect to Zeek.
+
+    # Setup Zeek.
     zeek = None
     if config.consumers.zeek:
-        globals()["broker"] = __import__("broker")
-        globals()["broker.zeek"] = __import__("broker.zeek")
+        from threatbus import Zeek
         zeek = Zeek(config.consumers.zeek)
         if args.dump_all_zeek_intel:
             zeek.dump_intel()
         if args.dump_zeek_intel:
             zeek.dump_intel(args.dump_zeek_intel)
-    # Create controller.
-    controller = Controller(vast, misp, zeek)
-    await controller.run()
+
+    await Controller(vast, misp, zeek).run()
 
 if __name__ == '__main__':
     async_run(main())
