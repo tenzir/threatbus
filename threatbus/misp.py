@@ -176,9 +176,7 @@ class MISP:
         action = make_action(data)
         to_ids = attr.get("to_ids", None)
         if action == Action.ADD and not to_ids:
-            self.logger.debug(
-                f"ignoring new attribute {attr['id']} " "without IDS flag"
-            )
+            self.logger.debug(f"ignoring new attribute {attr['id']} without IDS flag")
             return
         if action == Action.EDIT and not to_ids:
             self.logger.debug(

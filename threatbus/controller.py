@@ -52,8 +52,8 @@ class Controller:
                     items = [x for x in map(to_zeek, snapshot) if x]
                     incompatible = len(snapshot) - len(items)
                     if incompatible > 0:
-                        self.logger.warning(f"ignored {incompatible} " "intel items")
-                    self.logger.debug(f"sending Zeek {len(items)} " "intel items")
+                        self.logger.warning(f"ignored {incompatible} intel items")
+                    self.logger.debug(f"sending Zeek {len(items)} intel items")
                     self.zeek.put("Tenzir::intel_snapshot_reply", items)
                 elif event.name() == "Tenzir::intel_snapshot_reply":
                     assert len(args) == 1
@@ -66,9 +66,7 @@ class Controller:
                             "value": xs[2],
                             "source": xs[3],
                         }
-
                     snapshot = [make_intel(xs) for xs in args[0]]
-                    print(json.dumps(snapshot))
                     return
                 elif event.name() == "Tenzir::intel_report":
                     timestamp, ids = args
@@ -76,7 +74,7 @@ class Controller:
                     self.logger.info(f"Zeek saw intel {ids} at {timestamp}")
                     if self.misp:
                         self.logger.debug(
-                            f"reporting {len(ids)} sightings " "from Zeek to MISP"
+                            f"reporting {len(ids)} sightings from Zeek to MISP"
                         )
                         ts = int(timestamp.timestamp())
                         for id in ids:
@@ -98,7 +96,7 @@ class Controller:
                         expr = self.vast.make_expression(intel)
                         results = await self.vast.export(expr)
                         self.logger.debug(
-                            f"reporting {len(results)} sightings " "from VAST to MISP"
+                            f"reporting {len(results)} sightings from VAST to MISP"
                         )
                         for result in results:
                             self.logger.debug(result)
