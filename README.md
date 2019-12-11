@@ -23,10 +23,11 @@ Use the `Makefile` to format the python code and execute tests.
 
 ```sh
 $ make format
-$ make unit
-$ make integration
-$ make all
+$ make unit-test
+$ make integration-test
 ```
+
+Or use `make all` to run all the above commands at once.
 
 ### Integration Tests
 
@@ -56,7 +57,7 @@ docker run -t -p 443:443 -p 80:80 -p 3306:3306 -p 50000:50000 -v <some/tmp/dir/f
 docker run -t -p 443:443 -p 80:80 -p 3306:3306 -p 50000:50000 -v <some/tmp/dir/for/data-base>:/var/lib/mysql integration-misp:latest
 ```
 
-Execute integration tests for `threath-bus` via `make integration`. Afterwards
+Execute integration tests for `threath-bus` via `make integration-tests`. Afterwards
 you can stop / kill the MISP instance in docker again.
 
 ## Installation

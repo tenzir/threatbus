@@ -14,12 +14,12 @@ format:
 	python -m black .
 
 .PHONY: test
-test: unit integration
+test: unit-tests integration-tests
 
-.PHONY: unit
-unit:
+.PHONY: unit-tests
+unit-tests:
 	python -m unittest discover -s ${UNIT}
 
-.PHONY: integration
-integration:
+.PHONY: integration-tests
+integration-tests:
 	python -m unittest discover -s ${INTEGRATION}
