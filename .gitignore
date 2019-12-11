@@ -2,3 +2,4 @@
 env
 robo.log
 vast
+**/__pycache__

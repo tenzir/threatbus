@@ -17,6 +17,49 @@ The following consumers exist:
 - [VAST][vast] (or [Tenzir][tenzir]): for historical intel queries
 - [Zeek][zeek]: ship intel into Zeek
 
+## Test & Develop
+
+Use the `Makefile` to format the python code and execute tests.
+
+```sh
+$ make format
+$ make unit-test
+$ make integration-test
+```
+
+Or use `make all` to run all the above commands at once.
+
+### Integration Tests
+
+For the integration tests to succeed, you require a running MISP instance. As
+for now, you can use [docker-misp](https://github.com/misp/docker-misp).
+
+Set up MISP:
+
+```sh
+git clone https://github.com/misp/docker-misp.git
+cd docker-misp
+docker build \
+    --rm=true --force-rm=true \
+    --build-arg MYSQL_MISP_PASSWORD=admin \
+    --build-arg POSTFIX_RELAY_HOST=localhost \
+    --build-arg MISP_FQDN=localhost \
+    --build-arg MISP_EMAIL=admin@admin.test \
+    --build-arg MISP_GPG_PASSWORD=admin \
+    -t integration-misp container
+
+mkdir <some/tmp/dir/for/data-base>
+
+## initialize db, mounted from <some/tmp/dir/for/data-base>
+docker run -t -p 443:443 -p 80:80 -p 3306:3306 -p 50000:50000 -v <some/tmp/dir/for/data-base>:/var/lib/mysql integration-misp:latest /init-db
+
+## run in foreground
+docker run -t -p 443:443 -p 80:80 -p 3306:3306 -p 50000:50000 -v <some/tmp/dir/for/data-base>:/var/lib/mysql integration-misp:latest
+```
+
+Execute integration tests for `threath-bus` via `make integration-tests`. Afterwards
+you can stop / kill the MISP instance in docker again.
+
 ## Installation
 
 ### OS Packages
@@ -27,16 +70,27 @@ tools locally for the python bindings link against those packages.
 
 ### Python Setup
 
+#### Package Installation
+
 Threat Bus requires the Python modules listed in
 [requirements.txt](requirements.txt). We recommend to get started with a Python
 virtual environment until you have working deployment:
-
 
 ```sh
 python3 -m venv env
 source env/bin/activate
 pip install -r requirements.txt
 ```
+
+#### Python Path
+
+Threat Bus comes as a python module, all sources are to be found in the
+`threatbus` folder (whitout hyphen, because python modules don't have hyphens).
+
+In order to make the development with relative imports possible, and without
+having to install the project, you must export your PYTHONPATH:
+
+  $ export PYTHONPATH=$PYTHONPATH:/home/<you>/code/threat-bus/threatbus
 
 ### MISP Producer
 
