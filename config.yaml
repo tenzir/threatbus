@@ -9,7 +9,7 @@ logger:
 producers:
   misp:
     rest:
-      api_key: "iVse3nJ1M6UMuBR3s8zCZYDjyAF6n9M4bKvI43RU"
+      api_key: "siTXeHOuP8ebLCoOcjxXhn5v4Ad2PL7W7gaFtWw8"
       url: "https://localhost"
       ssl: false
     zmq:
@@ -33,8 +33,7 @@ producers:
       # queries when the default key-value based is not powerful enough.
       raw: false
       search:
-        to_ids: true
-        last: "30d"
+        to_ids: false
         # values: ["6.6.6.6"]
         # not_values: ["8.8.8.8", "8.8.4.4"]
         # type_attribute: "ip-src"
@@ -68,7 +67,7 @@ consumers:
   zeek:
     host: "localhost"
     port: 47761
-    topic: "tenzir/threat-bus"
+    topics: "tenzir/threat-bus"
   vast:
     executable: "vast"
     max_results: 100

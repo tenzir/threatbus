@@ -1,0 +1,16 @@
+logging:
+  console: true
+  console_verbosity: DEBUG
+  file: false
+  file_verbosity: DEBUG
+  filename: threat-bus.log
+
+
+plugins:
+  backbones:
+    inmem:
+  apps:
+    zeek:
+      host: localhost
+      port: 47761
+      topic: tenzir/threat-bus

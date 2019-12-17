@@ -1,5 +1,6 @@
 *.sw?
 env
-robo.log
+venv
 vast
 **/__pycache__
+**/*.egg-info
