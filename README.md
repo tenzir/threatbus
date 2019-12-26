@@ -9,44 +9,49 @@ incident response team. The project is plugin-based and can be easily extended.
 virtualenv venv
 source venv/bin/activate
 pip install --editable .
+pip install --editable plugins/backbones/threatbus-inmem
 pip install --editable plugins/<desired-plugins>
 ```
 
 ## Plugin Configuration & Extension
 
-A plugin must define a `setup.py`. When the plugin is installed and should be
-used by `threatbus`, you must add a section to the `config.yaml`. That section
-is named after the name in the entrypoint declaration of the plugin's `setup.py`
-file. Furthermore, you should adhere to the [plugin naming conventions](https://pluggy.readthedocs.io/en/latest/#a-complete-example)
-and always prefix your plugin name with `threatbus-`.
+A plugin must define a `setup.py`. Whenever a plugin is installed, you have to add a corresponding configuration section to threat-bus's `config.yaml`. That section has to be named after the `name` in the entrypoint declaration of the plugin's `setup.py` file.
+
+Please adhere to the [plugin naming conventions](https://pluggy.readthedocs.io/en/latest/#a-complete-example) and always prefix your plugin name with `threatbus-`.
+
+Plugins can either be application plugins or backbones. Application plugins add new functionality to `threat-bus` and allow communication to a threat-intelligence app (e.g., Zeek or Suricata). Backbones plugins add a new storage & distribution backend to `threat-bus` (e.g., in-memory or Kafka).
 
 Example:
 
 - plugin folder structure:
   ```sh
   plugins
-  └──threatbus-myplugin
-     ├── setup.py
-     └── threatbus_myplugin.py
+  ├── apps
+  │   └── threatbus-zeek
+  │       ├── setup.py
+  │       └── threatbus_zeek.py
+  └── backbones
+      └── threatbus-inmem
+          ├── setup.py
+          └── threatbus_inmem.py
   ```
 - `setup.py`
   ```py
   from setuptools import setup
   setup(
-    name="threatbus-myplugin",
+    name="threatbus-myapp",
     install_requires="threatbus",
-    entry_points={"threatbus": ["myplugin = threatbus_myplugin"]},
-    py_modules=["threatbus_myplugin"],
+    entry_points={"threatbus.app": ["myapp = threatbus_myapp"]},
+    py_modules=["threatbus_myapp"],
   )
   ```
-- `config.yaml` entry for `threatbus`
+- `config.yaml` entry for `threat-bus`
   ```yaml
   ...
   plugins:
-    myplugin:
-      - this
-      - is
-      - plugin specific
+    apps:
+      myapp:
+      ...
   ```
 
 ## License

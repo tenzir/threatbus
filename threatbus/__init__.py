@@ -5,3 +5,7 @@ app = pluggy.HookimplMarker("threatbus.app")
 
 backbone = pluggy.HookimplMarker("threatbus.backbone")
 """Marker to be imported and used in backbone-plugins"""
+
+
+import threatbus.logger
+import threatbus.types

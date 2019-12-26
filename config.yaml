@@ -1,74 +1,15 @@
-# Threat Bus configuration file
-logger:
+logging:
   console: true
-  console_verbosity: "DEBUG"
+  console_verbosity: DEBUG
   file: false
-  file_verbosity: "DEBUG"
-  filename: "threat-bus.log"
+  file_verbosity: DEBUG
+  filename: threat-bus.log
 
-producers:
-  misp:
-    rest:
-      api_key: "siTXeHOuP8ebLCoOcjxXhn5v4Ad2PL7W7gaFtWw8"
-      url: "https://localhost"
-      ssl: false
-    zmq:
-      host: "localhost"
-      port: 50000
-    #kafka:
-    #  # The topic name for attributes, as configured in the MISP Kafka plugin.
-    #  attribute_topic: "misp_attribute"
-    #  # The Kafka configuration parameters, as librdkafka defines them here:
-    #  # https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
-    #  config:
-    #    bootstrap.servers: "localhost"
-    #    group.id: "threat-bus"
-    #    auto.offset.reset: "earliest"
-    snapshot:
-      # If true, then the search parameters will be interpreted as a raw REST
-      # query. If false, then valid parameters are those that the MISP python
-      # bindings expose. You can find a list of valid parameters here:
-      # https://pymisp.readthedocs.io/modules.html#pymisp.PyMISP.search
-      # The raw query allows for more flexibility when formulating complex
-      # queries when the default key-value based is not powerful enough.
-      raw: false
-      search:
-        to_ids: false
-        # values: ["6.6.6.6"]
-        # not_values: ["8.8.8.8", "8.8.4.4"]
-        # type_attribute: "ip-src"
-        # category: "Network activity"
-        # org: "organization"
-        # tags: ["foo"]
-        # not_tags: ["bar", "baz"]
-        # date_from: "2018-01-01"
-        # date_to: "2019-01-01"
-        # eventid: ["id0", "id1"]
-        # uuid: "5c496564-b4d0-49aa-9738-437e574aec6f"
-        # searchall: true
-        # published: true
-        # deleted: true
-        # includeProposals: true
-      # An example for a raw query via the REST API. Note the absence of the
-      # returnFormat key, which is implicitly set to "json".
-      # search:
-      #   limit: 10
-      #   type:
-      #     OR:
-      #     - "ip-src"
-      #     - "ip-dst"
-      #   tags:
-      #     NOT:
-      #     - "tlp:red"
-      #     OR:
-      #     - "tlp:%"
 
-consumers:
-  zeek:
-    host: "localhost"
-    port: 47761
-    topics: "tenzir/threat-bus"
-  vast:
-    executable: "vast"
-    max_results: 100
-    time_window: "1 year"
+plugins:
+  backbones:
+    inmem:
+  apps:
+    zeek:
+      host: "127.0.0.1"
+      port: 47761

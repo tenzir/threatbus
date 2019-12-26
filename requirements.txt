@@ -1,3 +1,4 @@
 coloredlogs>=10.0
 confuse>=1.0
 pluggy>=0.13
+black>=19.10b

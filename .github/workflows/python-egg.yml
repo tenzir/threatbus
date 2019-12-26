@@ -3,8 +3,8 @@ on: push
 env:
   DEBIAN_FRONTEND: noninteractive
 jobs:
-  egg-release:
-    name: egg-release
+  egg-install:
+    name: Egg Installation
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
@@ -17,5 +17,5 @@ jobs:
       run: |
         pip install --upgrade pip
         pip install .
-        pip install plugins/threatbus-zeek
-        pip install plugins/threatbus-backbone-inmem
+        pip install plugins/apps/threatbus-zeek
+        pip install plugins/backbones/threatbus-inmem

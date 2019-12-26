@@ -2,6 +2,8 @@ import argparse
 import confuse
 import logging
 import pluggy
+from queue import Queue
+import time
 from threatbus import appspecs, backbonespecs, logger
 
 
@@ -10,16 +12,31 @@ class ThreatBus:
         self.backbones, self.apps = backbones, apps
         self.config = config
         self.logger = logger.setup(config["logging"], "threatbus")
+        self.inq = Queue()
         self.run()
-        self.receive()
+
+    def subscribe(self, topics, q):
+        """Accepts a new subscription for a given topic and queue pointer. Forwards that subscription to all managed backbones."""
+        self.backbones.subscribe(topics=topics, q=q)
+
+    def unsubscribe(self, topics, q):
+        """Removes subscription for a given topic and queue pointer from all managed backbones."""
+        self.backbones.unsubscribe(topics=topics, q=q)
 
     def run(self):
-        self.backbones.run(config=self.config['plugins']['backbones'], logging=self.config['logging'])
-        self.apps.run(config=self.config['plugins']['apps'], logging=self.config['logging'])
-
-    def receive(self):
-        for msg in self.apps.threatbus_receive():
-            self.logger.info(msg)
+        logging = self.config["logging"]
+        self.apps.run(
+            config=self.config["plugins"]["apps"],
+            logging=logging,
+            inq=self.inq,
+            subscribe_callback=self.subscribe,
+            unsubscribe_callback=self.unsubscribe,
+        )
+        self.backbones.run(
+            config=self.config["plugins"]["backbones"], logging=logging, inq=self.inq
+        )
+        while True:
+            time.sleep(1)
 
 
 def validate_config(config):
