@@ -1,0 +1,23 @@
+name: "Style Check"
+on: push
+env:
+  DEBIAN_FRONTEND: noninteractive
+jobs:
+  black:
+    name: black
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        ref: ${{ github.ref }}
+    - uses: actions/setup-python@v1
+      with:
+        python-version: '3.8'
+    - name: Run Black
+      run: |
+        pip install --upgrade pip black
+        # Note: black fails when it doesn't have to do anything.
+        git diff --name-only --no-color --diff-filter=ACM $(git merge-base origin/master HEAD) |
+          grep -v '.json$' |
+          2>/dev/null xargs black || true
+        git diff --exit-code

@@ -1,4 +1,11 @@
-from controller import Controller
-from misp import MISP
-from vast import VAST
-from zeek import Zeek
+import pluggy
+
+app = pluggy.HookimplMarker("threatbus.app")
+"""Marker to be imported and used in app-plugins"""
+
+backbone = pluggy.HookimplMarker("threatbus.backbone")
+"""Marker to be imported and used in backbone-plugins"""
+
+
+import threatbus.logger
+import threatbus.data

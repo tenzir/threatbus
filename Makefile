@@ -1,7 +1,3 @@
-TESTS=tests
-UNIT=${TESTS}/unit
-INTEGRATION=${TESTS}/integration
-
 .PHONY: all
 all: format test
 
@@ -18,8 +14,11 @@ test: unit-tests integration-tests
 
 .PHONY: unit-tests
 unit-tests:
-	python -m unittest discover -s ${UNIT}
+	python -m unittest discover
 
 .PHONY: integration-tests
 integration-tests:
-	python -m unittest discover -s ${INTEGRATION}
+	docker build . -t threatbus-integration-test
+	docker run -td --name=tb-int --rm -p 47761:47761 threatbus-integration-test -c config_integration_test.yaml
+	python -m unittest tests/integration/test_zeek_inmem.py
+	docker kill tb-int

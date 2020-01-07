@@ -1,0 +1,21 @@
+name: "Python Egg"
+on: push
+env:
+  DEBIAN_FRONTEND: noninteractive
+jobs:
+  egg-install:
+    name: Egg Installation
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        ref: ${{ github.ref }}
+    - uses: actions/setup-python@v1
+      with:
+        python-version: '3.8'
+    - name: Install Application and Plugins
+      run: |
+        pip install --upgrade pip
+        pip install .
+        pip install plugins/apps/threatbus-zeek
+        pip install plugins/backbones/threatbus-inmem
