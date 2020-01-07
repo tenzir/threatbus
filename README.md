@@ -101,6 +101,6 @@ Threat-Bus comes with a [3-clause BSD license][license-url].
 [latest-release-badge]: https://img.shields.io/github/commits-since/tenzir/threat-bus/latest.svg?color=green
 [latest-release-url]: https://github.com/tenzir/threat-bus/releases
 [ci-url]: https://github.com/tenzir/threat-bus/actions?query=branch%3Amaster
-[ci-badge]: hhttps://github.com/tenzir/threat-bus/workflows/Python%20Egg/badge.svg?branch=master
+[ci-badge]: https://github.com/tenzir/threat-bus/workflows/Python%20Egg/badge.svg?branch=master
 [license-badge]: https://img.shields.io/badge/license-BSD-blue.svg
 [license-url]: https://github.com/tenzir/threat-bus/blob/master/COPYING
