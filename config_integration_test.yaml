@@ -1,0 +1,15 @@
+logging:
+  console: true
+  console_verbosity: DEBUG
+  file: false
+  file_verbosity: DEBUG
+  filename: threat-bus.log
+
+
+plugins:
+  backbones:
+    inmem:
+  apps:
+    zeek:
+      host: "0.0.0.0"
+      port: 47761

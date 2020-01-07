@@ -40,8 +40,8 @@ class ThreatBus:
 
 
 def validate_config(config):
-    c = config["logging"]["console"].get(bool)
-    f = config["logging"]["file"].get(bool)
+    config["logging"]["console"].get(bool)
+    config["logging"]["file"].get(bool)
     config["logging"]["console_verbosity"].get(str)
     config["logging"]["file_verbosity"].get(str)
     config["logging"]["filename"].get(str)

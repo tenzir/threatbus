@@ -8,4 +8,4 @@ backbone = pluggy.HookimplMarker("threatbus.backbone")
 
 
 import threatbus.logger
-import threatbus.types
+import threatbus.data

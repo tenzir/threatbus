@@ -14,11 +14,12 @@ subscribed_topics = set()
 
 
 def validate_config(config):
+    assert config, "config must not be None"
     config["host"].get(str)
     config["port"].get(int)
 
 
-def map_to_msg(broker_data):
+def map_to_internal(broker_data):
     """Maps a broker message to the internal format.
         @param broker_data The raw data that was received via broker
     """
@@ -26,10 +27,12 @@ def map_to_msg(broker_data):
     name, args = event.name(), event.args()
     if name == "sighting":
         # convert args to sighting
-        return threatbus.types.Sighting(datetime.now(), args[0], args[1])
+        return threatbus.data.Sighting(
+            datetime.fromtimestamp(args[0]), args[1], args[2]
+        )
     elif name == "intel":
         # convert args to intel
-        return threatbus.types.Intel(datetime.now(), args[0], args[1])
+        return threatbus.data.Intel(datetime.fromtimestamp(args[0]), args[1], args[2])
 
 
 def map_to_broker(msg):
@@ -39,10 +42,12 @@ def map_to_broker(msg):
     msg_type = type(msg).__name__.lower()
     if msg_type == "sighting":
         # convert sighting to zeek event
-        return broker.zeek.Event("sighting", msg.ts, msg.intel_id, msg.context)
+        return broker.zeek.Event(
+            "sighting", datetime.timestamp(msg.ts), msg.intel_id, msg.context
+        )
     elif msg_type == "intel":
         # convert intel to zeek event
-        return broker.zeek.Event("intel", msg.ts, msg.id, msg.data)
+        return broker.zeek.Event("intel", datetime.timestamp(msg.ts), msg.id, msg.data)
 
 
 def publish(logger, ep, outq):
@@ -78,8 +83,9 @@ def listen(logger, host, port, ep, inq):
         if not ready[0]:
             logger.critical("Broker subscriber filedescriptor error.")
         (topic, broker_data) = sub.get()
-        msg = map_to_msg(broker_data)
-        inq.put(msg)
+        msg = map_to_internal(broker_data)
+        if msg:
+            inq.put(msg)
 
 
 def status_update(config, logger, ep, outq, subscribe_callback, unsubscribe_callback):

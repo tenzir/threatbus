@@ -4,7 +4,7 @@
 </h1>
 <h4 align="center">
 
-The all-in-one community tool to connect open-source security applications.
+The missing tool to interconnect open-source security applications.
 
 [![Build Status][ci-badge]][ci-url]
 [![Latest Release][latest-release-badge]][latest-release-url]
@@ -40,17 +40,17 @@ pip install --editable plugins/<desired-plugins>
 ### Configuration & Extension
 
 A plugin must define a `setup.py`. Whenever a plugin is installed, you have to
-add a corresponding configuration section to threat-bus's `config.yaml`. That
+add a corresponding configuration section to threat-bus' `config.yaml`. That
 section has to be named after the `name` in the entrypoint declaration of the
 plugin's `setup.py` file.
 
 Please adhere to the [plugin naming conventions](https://pluggy.readthedocs.io/en/latest/#a-complete-example)
 and always prefix your plugin name with `threatbus-`.
 
-Plugins can either be application plugins or backbones. Application plugins add
-new functionality to `threat-bus` and allow communication to a
-threat-intelligence app (e.g., Zeek or Suricata). Backbones plugins add a new
-storage & distribution backend to `threat-bus` (e.g., in-memory or Kafka).
+Plugins can either be *apps* or *backbones*. Application plugins (apps) add new
+functionality to `threat-bus` and allow communication to a
+threat-intelligence-enabled app (e.g., Zeek or Suricata). Backbone plugins add a
+new storage and distribution backend to `threat-bus` (e.g., in-memory or Kafka).
 
 Example:
 
