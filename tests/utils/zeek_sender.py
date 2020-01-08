@@ -20,7 +20,10 @@ def send(items):
     for i in range(items):
 
         event = broker.zeek.Event("sighting", datetime.timestamp(datetime.now()), i, {})
-        ep.publish("foo", event)
+
+        # threat-bus will pickup the event type "sighting" and hence forward on
+        # a different topic.
+        ep.publish("tenzir/some-zeek-topic", event)
 
     ## apparently the receiver will not receive everything, if the sending process exits too early. Thus we wait here (just for the demo sake)
     time.sleep(1)

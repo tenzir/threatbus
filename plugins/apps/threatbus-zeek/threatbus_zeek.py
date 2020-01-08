@@ -19,6 +19,13 @@ def validate_config(config):
     config["port"].get(int)
 
 
+def map_to_string_set(topic_vector):
+    """Maps a zeek vector of topics to a python set of strings."""
+    if not topic_vector or type(topic_vector).__name__ != "VectorTopic":
+        return set()
+    return set(map(str, topic_vector))
+
+
 def map_to_internal(broker_data):
     """Maps a broker message to the internal format.
         @param broker_data The raw data that was received via broker
@@ -76,7 +83,7 @@ def listen(logger, host, port, ep, inq):
         @param outq The queue to forward messages to
     """
     ep.listen(host, port)
-    sub = ep.make_subscriber("")
+    sub = ep.make_subscriber("tenzir")
     logger.info(f"Broker: endpoint listening - {host}:{port}")
     while True:
         ready = select.select([sub.fd()], [], [])
@@ -104,19 +111,24 @@ def status_update(config, logger, ep, outq, subscribe_callback, unsubscribe_call
             )
             continue
         lock.acquire()
+        ep_subscriptions = map_to_string_set(ep.peer_subscriptions())
         if status.code() == broker.SC.PeerAdded:
-            topics = set(ep.peer_subscriptions()) - subscribed_topics
-            if topics:
-                subscribed_topics = set(ep.peer_subscriptions())
-                subscribe_callback(map(str, topics), outq)
+            logger.info("New peer added.")
+            added_topics = ep_subscriptions - subscribed_topics
+            if added_topics:
+                logger.info(f"New topics subscribed: {added_topics}")
+                subscribed_topics = ep_subscriptions
+                subscribe_callback(map(str, added_topics), outq)
         elif (
             status.code() == broker.SC.PeerRemoved
             or status.code() == broker.SC.PeerLost
         ):
-            topics = subscribed_topics - set(ep.peer_subscriptions())
-            if topics:
-                subscribed_topics = set(ep.peer_subscriptions())
-                unsubscribe_callback(map(str, topics), outq)
+            logger.info("Peer removed.")
+            removed_topics = subscribed_topics - ep_subscriptions
+            if removed_topics:
+                logger.info(f"Topic subscriptions removed: {removed_topics}")
+                subscribed_topics = ep_subscriptions
+                unsubscribe_callback(map(str, removed_topics), outq)
         lock.release()
 
 

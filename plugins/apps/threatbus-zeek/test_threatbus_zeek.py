@@ -3,7 +3,7 @@ from datetime import datetime
 import unittest
 
 import threatbus
-from threatbus_zeek import map_to_internal, map_to_broker, validate_config
+from threatbus_zeek import map_to_internal, map_to_broker, map_to_string_set
 
 
 class TestMessageMapping(unittest.TestCase):
@@ -51,3 +51,14 @@ class TestMessageMapping(unittest.TestCase):
         self.assertEqual(sighting.ts, ts)
         self.assertEqual(sighting.intel_id, intel_id)
         self.assertEqual(sighting.context, context)
+
+
+class TestTopicMapping(unittest.TestCase):
+    def test_invalid_inputs(self):
+        self.assertEqual(map_to_string_set(None), set())
+        self.assertEqual(map_to_string_set("Foo"), set())
+        self.assertEqual(map_to_string_set(object), set())
+
+    def test_valid_topics(self):
+        vt = broker._broker.VectorTopic([broker.Topic("foo"), broker.Topic("bar")])
+        self.assertEqual(map_to_string_set(vt), {"foo", "bar"})
