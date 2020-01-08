@@ -1,3 +1,4 @@
+from contextlib import suppress
 from datetime import datetime
 import broker
 from queue import Queue
@@ -5,6 +6,7 @@ import select
 import threading
 
 import threatbus
+from threatbus.data import Intel, Operation, Sighting
 
 """Zeek network monitor - plugin for Threat Bus"""
 
@@ -34,12 +36,13 @@ def map_to_internal(broker_data):
     name, args = event.name(), event.args()
     if name == "sighting":
         # convert args to sighting
-        return threatbus.data.Sighting(
-            datetime.fromtimestamp(args[0]), args[1], args[2]
-        )
+        return Sighting(args[0], str(args[1]), args[2])
     elif name == "intel":
         # convert args to intel
-        return threatbus.data.Intel(datetime.fromtimestamp(args[0]), args[1], args[2])
+        op = Operation.ADD
+        with suppress(Exception):
+            op = Operation(args[3])
+        return Intel(args[0], str(args[1]), args[2], op)
 
 
 def map_to_broker(msg):
@@ -50,11 +53,13 @@ def map_to_broker(msg):
     if msg_type == "sighting":
         # convert sighting to zeek event
         return broker.zeek.Event(
-            "sighting", datetime.timestamp(msg.ts), msg.intel_id, msg.context
+            "Tenzir::update_sighting", (msg.ts, str(msg.intel_id), msg.context),
         )
     elif msg_type == "intel":
         # convert intel to zeek event
-        return broker.zeek.Event("intel", datetime.timestamp(msg.ts), msg.id, msg.data)
+        return broker.zeek.Event(
+            "Tenzir::update_intel", (msg.ts, str(msg.id), msg.data, msg.operation.value)
+        )
 
 
 def publish(logger, ep, outq):

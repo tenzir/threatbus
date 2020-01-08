@@ -26,7 +26,7 @@ def forward(items, q):
 
 
 if __name__ == "__main__":
-    for (topic, received_event) in receive(10):
+    for (topic, received_event) in receive(200):
         print(
             "received on topic: {}    event name: {}    content: {}".format(
                 topic, received_event.name(), received_event.args()

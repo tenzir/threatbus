@@ -18,8 +18,11 @@ def send(items):
         sys.exit(1)
 
     for i in range(items):
-
-        event = broker.zeek.Event("sighting", datetime.timestamp(datetime.now()), i, {})
+        data = {
+            "indicator": "google.com",
+            "intel_type": "DOMAIN",
+        }
+        event = broker.zeek.Event("intel", datetime.now(), i, data, "ADD")
 
         # threat-bus will pickup the event type "sighting" and hence forward on
         # a different topic.
@@ -30,4 +33,4 @@ def send(items):
 
 
 if __name__ == "__main__":
-    send(10)
+    send(1)
