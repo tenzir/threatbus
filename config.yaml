@@ -13,3 +13,4 @@ plugins:
     zeek:
       host: "127.0.0.1"
       port: 47761
+      module_namespace: Tenzir

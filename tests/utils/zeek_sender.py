@@ -19,7 +19,7 @@ def send(items):
 
     for i in range(items):
         data = {
-            "indicator": "google.com",
+            "indicator": "example.com",
             "intel_type": "DOMAIN",
         }
         event = broker.zeek.Event("intel", datetime.now(), i, data, "ADD")

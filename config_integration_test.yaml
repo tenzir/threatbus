@@ -13,3 +13,4 @@ plugins:
     zeek:
       host: "0.0.0.0"
       port: 47761
+      module_namespace: Integration_Test

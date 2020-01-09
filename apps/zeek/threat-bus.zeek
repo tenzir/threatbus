@@ -3,7 +3,6 @@
 @load base/frameworks/intel
 @load base/frameworks/notice
 @load base/frameworks/reporter
-@load policy/frameworks/intel/do_notice
 
 @load policy/frameworks/intel/seen
 
@@ -140,8 +139,7 @@ function map_to_zeek_intel(item: Intelligence): Intel::Item
     $meta = record(
       $desc = item$id,
       $url = tb_intel_tag, # re-used to identify threat-bus as sending entity
-      $source = tb_intel_tag,
-      $do_notice = T
+      $source = tb_intel_tag
       # TODO
     )
   ];
@@ -194,8 +192,7 @@ event Intel::match(seen: Intel::Seen, items: set[Intel::Item])
     local noisy = noisy_intel_threshold != 0 && n > noisy_intel_threshold;
     local context: table[string] of any;
     context["noisy"] = noisy;
-    local s = Broker::make_event(sighting, current_time(), intel_id, context);
-    Broker::publish(sighting_topic, s);
+    Broker::publish(sighting_topic, sighting, current_time(), cat(intel_id), context);
     if ( noisy && log_operations )
       {
       Reporter::info(fmt("silencing noisy intel ID %s", intel_id));

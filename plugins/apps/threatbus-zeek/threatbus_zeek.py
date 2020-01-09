@@ -4,7 +4,7 @@ import broker
 from queue import Queue
 import select
 import threading
-
+import time
 import threatbus
 from threatbus.data import Intel, Operation, Sighting
 
@@ -19,6 +19,7 @@ def validate_config(config):
     assert config, "config must not be None"
     config["host"].get(str)
     config["port"].get(int)
+    config["module_namespace"].get(str)
 
 
 def map_to_string_set(topic_vector):
@@ -28,16 +29,19 @@ def map_to_string_set(topic_vector):
     return set(map(str, topic_vector))
 
 
-def map_to_internal(broker_data):
+def map_to_internal(broker_data, module_namespace):
     """Maps a broker message to the internal format.
         @param broker_data The raw data that was received via broker
+        @param module_namespace A Zeek namespace to accept events from
     """
     event = broker.zeek.Event(broker_data)
     name, args = event.name(), event.args()
-    if name == "sighting":
+    module_namespace = module_namespace + "::" if module_namespace else ""
+    name = name[name.startswith(module_namespace) and len(module_namespace) :]
+    if name == "sighting" and len(args) == 3:
         # convert args to sighting
         return Sighting(args[0], str(args[1]), args[2])
-    elif name == "intel":
+    elif name == "intel" and len(args) >= 3:
         # convert args to intel
         op = Operation.ADD
         with suppress(Exception):
@@ -45,33 +49,37 @@ def map_to_internal(broker_data):
         return Intel(args[0], str(args[1]), args[2], op)
 
 
-def map_to_broker(msg):
+def map_to_broker(msg, module_namespace):
     """Maps the internal message format to a broker message.
         @param msg The message that shall be converted
+        @param module_namespace A Zeek namespace to use for event sending
     """
     msg_type = type(msg).__name__.lower()
     if msg_type == "sighting":
         # convert sighting to zeek event
         return broker.zeek.Event(
-            "Tenzir::update_sighting", (msg.ts, str(msg.intel_id), msg.context),
+            f"{module_namespace}::update_sighting",
+            (msg.ts, str(msg.intel_id), msg.context),
         )
     elif msg_type == "intel":
         # convert intel to zeek event
         return broker.zeek.Event(
-            "Tenzir::update_intel", (msg.ts, str(msg.id), msg.data, msg.operation.value)
+            f"{module_namespace}::update_intel",
+            (msg.ts, str(msg.id), msg.data, msg.operation.value),
         )
 
 
-def publish(logger, ep, outq):
+def publish(logger, module_namespace, ep, outq):
     """Publishes all messages that arrive via the outq to all subscribed broker topics.
         @param logger A logging.logger object
+        @param module_namespace A Zeek namespace to use for event sending
         @param ep The broker endpoint used for publishing
         @param outq The queue to forward messages from
     """
     global subscribed_topics, lock
     while True:
         msg = outq.get(block=True)
-        event = map_to_broker(msg)
+        event = map_to_broker(msg, module_namespace)
         lock.acquire()
         for topic in subscribed_topics:
             ep.publish(topic, event)
@@ -79,11 +87,12 @@ def publish(logger, ep, outq):
         logger.debug(f"Zeek sent {msg}")
 
 
-def listen(logger, host, port, ep, inq):
+def listen(logger, host, port, module_namespace, ep, inq):
     """Binds a listener for the the given host/port to the broker ep. Forwards all received messages to the inq.
         @param logger A logging.logger object
         @param host The host (e.g., IP) to listen at
         @param port The port number to listen at
+        @param module_namespace A Zeek namespace to accept events from
         @param ep The broker endpoint used for listening
         @param outq The queue to forward messages to
     """
@@ -95,7 +104,7 @@ def listen(logger, host, port, ep, inq):
         if not ready[0]:
             logger.critical("Broker subscriber filedescriptor error.")
         (topic, broker_data) = sub.get()
-        msg = map_to_internal(broker_data)
+        msg = map_to_internal(broker_data, module_namespace)
         if msg:
             inq.put(msg)
 
@@ -145,15 +154,16 @@ def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
         validate_config(config)
     except Exception as e:
         raise ValueError("Invalid config for plugin {}: {}".format(plugin_name, str(e)))
-    host, port = (
+    host, port, namespace = (
         config["host"].get(),
         config["port"].get(),
+        config["module_namespace"].get(),
     )
     broker_opts = broker.BrokerOptions()
     broker_opts.forward = False
     ep = broker.Endpoint(broker.Configuration(broker_opts))
     threading.Thread(
-        target=listen, args=(logger, host, port, ep, inq), daemon=True
+        target=listen, args=(logger, host, port, namespace, ep, inq), daemon=True
     ).start()
     outq = Queue()  # Single global queue. We cannot distinguish better with broker.
     threading.Thread(
@@ -161,5 +171,7 @@ def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
         args=(config, logger, ep, outq, subscribe_callback, unsubscribe_callback),
         daemon=True,
     ).start()
-    threading.Thread(target=publish, args=(logger, ep, outq), daemon=True).start()
+    threading.Thread(
+        target=publish, args=(logger, namespace, ep, outq), daemon=True
+    ).start()
     logger.info("Zeek plugin started")
