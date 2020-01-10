@@ -5,7 +5,25 @@ import sys
 import time
 
 
-def send(items):
+def send(broker_event):
+    """Sends a single, user specified broker event"""
+    ep = broker.Endpoint()
+    status_subscriber = ep.make_status_subscriber(True)
+    ep.peer("127.0.0.1", 47761)
+
+    # blocking operation. wait until you get a status.
+    status = status_subscriber.get()
+
+    if type(status) != broker.Status or status.code() != broker.SC.PeerAdded:
+        print("peering with remote machine failed")
+        sys.exit(1)
+
+    ep.publish("tenzir", broker_event)
+
+    time.sleep(0.1)
+
+
+def send_generic(items):
     ep = broker.Endpoint()
     status_subscriber = ep.make_status_subscriber(True)
     ep.peer("127.0.0.1", 47761)
@@ -24,8 +42,8 @@ def send(items):
         }
         event = broker.zeek.Event("intel", datetime.now(), i, data, "ADD")
 
-        # threat-bus will pickup the event type "sighting" and hence forward on
-        # a different topic.
+        # threat-bus will pickup the event type and hence forward on a different
+        # topic.
         ep.publish("tenzir/some-zeek-topic", event)
 
     ## apparently the receiver will not receive everything, if the sending process exits too early. Thus we wait here (just for the demo sake)
@@ -33,4 +51,4 @@ def send(items):
 
 
 if __name__ == "__main__":
-    send(1)
+    send_generic(1)

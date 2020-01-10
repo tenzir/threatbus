@@ -20,5 +20,5 @@ class Intel:
 @dataclass()
 class Sighting:
     ts: datetime
-    intel_id: str
+    intel: str
     context: dict

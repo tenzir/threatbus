@@ -39,7 +39,7 @@ class TestMessageMapping(unittest.TestCase):
         op = Operation.REMOVE
         intel = Intel(self.ts, self.id, data, op)
         broker_msg = map_to_broker(intel, self.module_namespace)
-        self.assertEqual(broker_msg.name(), self.module_namespace + "::update_intel")
+        self.assertEqual(broker_msg.name(), self.module_namespace + "::intel")
         self.assertEqual(broker_msg.args(), [(self.ts, self.id, data, op.value)])
 
     def test_valid_zeek_intel(self):
@@ -65,7 +65,7 @@ class TestMessageMapping(unittest.TestCase):
         context = {"last_seen": 1234, "count": 13}
         sighting = Sighting(self.ts, self.id, context)
         broker_msg = map_to_broker(sighting, self.module_namespace)
-        self.assertEqual(broker_msg.name(), self.module_namespace + "::update_sighting")
+        self.assertEqual(broker_msg.name(), self.module_namespace + "::sighting")
         self.assertEqual(broker_msg.args(), [(self.ts, self.id, context)])
 
     def test_valid_zeek_sighting(self):
@@ -75,7 +75,7 @@ class TestMessageMapping(unittest.TestCase):
         sighting = map_to_internal(event, self.module_namespace)
         self.assertEqual(type(sighting), Sighting)
         self.assertEqual(sighting.ts, self.ts)
-        self.assertEqual(sighting.intel_id, self.id)
+        self.assertEqual(sighting.intel, self.id)
         self.assertEqual(sighting.context, context)
 
         # with namespace:

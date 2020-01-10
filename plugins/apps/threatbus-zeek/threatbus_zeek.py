@@ -30,7 +30,7 @@ def map_to_string_set(topic_vector):
 
 
 def map_to_internal(broker_data, module_namespace):
-    """Maps a broker message to the internal format.
+    """Maps a broker message, based on the event name, to the internal format.
         @param broker_data The raw data that was received via broker
         @param module_namespace A Zeek namespace to accept events from
     """
@@ -58,13 +58,12 @@ def map_to_broker(msg, module_namespace):
     if msg_type == "sighting":
         # convert sighting to zeek event
         return broker.zeek.Event(
-            f"{module_namespace}::update_sighting",
-            (msg.ts, str(msg.intel_id), msg.context),
+            f"{module_namespace}::sighting", (msg.ts, str(msg.intel), msg.context),
         )
     elif msg_type == "intel":
         # convert intel to zeek event
         return broker.zeek.Event(
-            f"{module_namespace}::update_intel",
+            f"{module_namespace}::intel",
             (msg.ts, str(msg.id), msg.data, msg.operation.value),
         )
 
@@ -79,10 +78,13 @@ def publish(logger, module_namespace, ep, outq):
     global subscribed_topics, lock
     while True:
         msg = outq.get(block=True)
+        msg_type = type(msg).__name__.lower()
+        msg_types = ["intel", "sighting"]
         event = map_to_broker(msg, module_namespace)
         lock.acquire()
         for topic in subscribed_topics:
-            ep.publish(topic, event)
+            if topic.endswith(msg_type) or all([t not in topic for t in msg_types]):
+                ep.publish(topic, event)
         lock.release()
         logger.debug(f"Zeek sent {msg}")
 

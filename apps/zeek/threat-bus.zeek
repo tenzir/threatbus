@@ -9,7 +9,7 @@
 module Tenzir;
 
 export {
-  ## A space-efficient represenattion of intelligence.
+  ## Threat Bus representation of intelligence.
   type Intelligence: record {
     ## A timestamp
     ts: time;
@@ -51,7 +51,7 @@ export {
   ## Event to raise for intel item insertion.
   ##
   ## item: The intel type to add.
-  global update_intel: event(item: Intelligence);
+  global intel: event(item: Intelligence);
 
   ## Event to report back sightings of (previously added) intel.
   ##
@@ -99,10 +99,8 @@ event zeek_init() &priority=1
 event zeek_init() &priority=0
   {
   if ( log_operations )
-    {
     Reporter::info(fmt("peering to threat-bus at %s:%s",
                        broker_host, broker_port));
-    }
   Broker::peer(broker_host, broker_port, 5sec);
   }
 @endif
@@ -133,7 +131,7 @@ global intel_type_map: table[string] of Intel::Type = {
 # framework
 function map_to_zeek_intel(item: Intelligence): Intel::Item
   {
-  local intel: Intel::Item = [
+  local intel_item: Intel::Item = [
     $indicator = item$data["indicator"],
     $indicator_type = intel_type_map[item$data["intel_type"]],
     $meta = record(
@@ -143,7 +141,7 @@ function map_to_zeek_intel(item: Intelligence): Intel::Item
       # TODO
     )
   ];
-  return intel;
+  return intel_item;
   }
 
 function is_mappable_intel(item: Intelligence): bool
@@ -152,20 +150,20 @@ function is_mappable_intel(item: Intelligence): bool
   }
 
 # Event sent by threat-bus to indicate a change of known intelligence to Zeek.
-event update_intel(item: Intelligence)
+event intel(item: Intelligence)
   {
   if ( ! is_mappable_intel(item) ) {
     Reporter::warning(fmt("ignoring unmappable intel item: %s", item));
     return;
   }
 
-  local intel = map_to_zeek_intel(item);
+  local mapped_intel = map_to_zeek_intel(item);
   if ( log_operations )
-    Reporter::info(fmt("%s intel: %s", item$operation, intel));
+    Reporter::info(fmt("%s intel: %s", item$operation, mapped_intel));
   if ( item$operation == "ADD" )
-    Intel::insert(intel);
+    Intel::insert(mapped_intel);
   else if ( item$operation == "REMOVE" )
-    Intel::remove(intel, T);
+    Intel::remove(mapped_intel, T);
   }
 
 

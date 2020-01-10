@@ -5,9 +5,9 @@ import select
 import sys
 
 
-def receive(items):
+def receive(items, topic="tenzir/threatbus/intel"):
     ep = broker.Endpoint()
-    subscriber = ep.make_subscriber("tenzir/threatbus")
+    subscriber = ep.make_subscriber(topic)
     ep.peer("127.0.0.1", 47761)
 
     for _ in range(items):
@@ -15,20 +15,20 @@ def receive(items):
         if not fd_sets[0]:
             print("boom. this is the end.")
             sys.exit(1)
-        (topic, data) = subscriber.get()
-        yield topic, broker.zeek.Event(data)
+        _, data = subscriber.get()
+        yield broker.zeek.Event(data)
 
 
-def forward(items, q):
+def forward(items, q, topic="tenzir/threatbus/intel"):
     """Receives the requested amount of items and forwards them to a queue.Queue"""
-    for item in receive(items):
+    for item in receive(items, topic):
         q.put(item)
 
 
 if __name__ == "__main__":
-    for (topic, received_event) in receive(200):
+    for received_event in receive(200):
         print(
-            "received on topic: {}    event name: {}    content: {}".format(
-                topic, received_event.name(), received_event.args()
+            "received event   name: {}    content: {}".format(
+                received_event.name(), received_event.args()
             )
         )
