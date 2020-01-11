@@ -3,7 +3,7 @@ logging:
   console_verbosity: DEBUG
   file: false
   file_verbosity: DEBUG
-  filename: threat-bus.log
+  filename: threatbus.log
 
 
 plugins:

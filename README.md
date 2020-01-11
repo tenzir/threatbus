@@ -1,6 +1,6 @@
 
 <h1 align="center">
-  Threat-Bus
+  Threat Bus
 </h1>
 <h4 align="center">
 
@@ -18,8 +18,8 @@ The missing tool to interconnect open-source security applications.
 
 </h4>
 
-**Threat-Bus** (`threat-bus`) connects various open-source security applications
-and facilitates data exchange. With Threat-Bus your can seamlessly integrate
+**Threat Bus** (`threatbus`) connects various open-source security applications
+and facilitates data exchange. With *Threat Bus*  you can seamlessly integrate
 MISP intelligence with the Zeek intel framework or report sightings from IDS
 deployments to some data base.
 
@@ -27,7 +27,7 @@ The project is plugin-based and can be extended easily.
 
 ## Installation
 
-Install threat-bus and all plugins that you require. Optionally, use a virtual
+Install `threatbus` and all plugins that you require. Optionally, use a virtual
 environment.
 
 ```
@@ -52,7 +52,7 @@ The integration tests require a local [Zeek](https://www.zeek.org) installation.
 
 ## Plugin Development
 
-Setup a virtual environment and install threat-bus and some plugins with the
+Setup a virtual environment and install `threatbus` and some plugins with the
 `--editable` flag:
 
 ```
@@ -66,7 +66,7 @@ pip install --editable plugins/<desired-plugins>
 ### Configuration & Extension
 
 A plugin must define a `setup.py`. Whenever a plugin is installed, you have to
-add a corresponding configuration section to threat-bus' `config.yaml`. That
+add a corresponding configuration section to `threatbus`' `config.yaml`. That
 section has to be named after the `name` in the entrypoint declaration of the
 plugin's `setup.py` file.
 
@@ -74,9 +74,9 @@ Please adhere to the [plugin naming conventions](https://pluggy.readthedocs.io/e
 and always prefix your plugin name with `threatbus-`.
 
 Plugins can either be *apps* or *backbones*. Application plugins (apps) add new
-functionality to `threat-bus` and allow communication to a
+functionality to `threatbus` and allow communication to a
 threat-intelligence-enabled app (e.g., Zeek or Suricata). Backbone plugins add a
-new storage and distribution backend to `threat-bus` (e.g., in-memory or Kafka).
+new storage and distribution backend to `threatbus` (e.g., in-memory or Kafka).
 
 Example:
 
@@ -102,7 +102,7 @@ Example:
     py_modules=["threatbus_myapp"],
   )
   ```
-- `config.yaml` entry for `threat-bus`
+- `config.yaml` entry for `threatbus`
   ```yaml
   ...
   plugins:
@@ -113,7 +113,7 @@ Example:
 
 ## License
 
-Threat-Bus comes with a [3-clause BSD license][license-url].
+Threat Bus comes with a [3-clause BSD license][license-url].
 
 
 [misp]: https://github.com/misp/misp
@@ -124,9 +124,9 @@ Threat-Bus comes with a [3-clause BSD license][license-url].
 [misp-zmq-config]: https://github.com/MISP/misp-book/tree/master/misp-zmq#misp-zeromq-configuration
 
 [contributing-url]: https://github.com/tenzir/.github/blob/master/contributing.md
-[latest-release-badge]: https://img.shields.io/github/commits-since/tenzir/threat-bus/latest.svg?color=green
-[latest-release-url]: https://github.com/tenzir/threat-bus/releases
-[ci-url]: https://github.com/tenzir/threat-bus/actions?query=branch%3Amaster
-[ci-badge]: https://github.com/tenzir/threat-bus/workflows/Python%20Egg/badge.svg?branch=master
+[latest-release-badge]: https://img.shields.io/github/commits-since/tenzir/threatbus/latest.svg?color=green
+[latest-release-url]: https://github.com/tenzir/threatbus/releases
+[ci-url]: https://github.com/tenzir/threatbus/actions?query=branch%3Amaster
+[ci-badge]: https://github.com/tenzir/threatbus/workflows/Python%20Egg/badge.svg?branch=master
 [license-badge]: https://img.shields.io/badge/license-BSD-blue.svg
-[license-url]: https://github.com/tenzir/threat-bus/blob/master/COPYING
+[license-url]: https://github.com/tenzir/threatbus/blob/master/COPYING

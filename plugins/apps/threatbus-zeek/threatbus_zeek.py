@@ -114,7 +114,7 @@ def listen(logger, host, port, module_namespace, ep, inq):
 def status_update(config, logger, ep, outq, subscribe_callback, unsubscribe_callback):
     stat_sub = ep.make_status_subscriber(True)
     # broker already is a pub-sub system
-    # we reuse broker topics as threat-bus topics and register all currently subscribed broker topics at the backbones
+    # we reuse broker topics as Threat Bus topics and register all currently subscribed broker topics at the backbones
     global subscribed_topics, lock
     while True:
         ready = select.select([stat_sub.fd()], [], [])

@@ -5,7 +5,7 @@ RUN pip3 install --upgrade pip
 
 EXPOSE 47761
 
-WORKDIR /opt/tenzir/threat-bus
+WORKDIR /opt/tenzir/threatbus
 COPY setup.py .
 COPY threatbus threatbus
 COPY plugins plugins

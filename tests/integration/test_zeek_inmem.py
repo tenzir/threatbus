@@ -17,7 +17,7 @@ def RunZeek():
             os.path.dirname(base), "../resources/example.com-intel-sighting.pcap"
         )
         script_file = os.path.join(
-            os.path.dirname(base), "../../apps/zeek/threat-bus.zeek"
+            os.path.dirname(base), "../../apps/zeek/threatbus.zeek"
         )
         return subprocess.Popen(
             [
@@ -79,7 +79,7 @@ class TestRoundtrips(unittest.TestCase):
         )
         rec.start()
 
-        # spawn a zeek subprocess that uses the apps/threat-bus.zeek script
+        # spawn a zeek subprocess that uses the `apps/threatbus.zeek` script
         zeek_process = RunZeek()
         if not zeek_process:
             self.fail("Error starting Zeek. Is it installed?")
