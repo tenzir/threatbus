@@ -18,7 +18,8 @@ unit-tests:
 
 .PHONY: integration-tests
 integration-tests:
-	docker build . -t threatbus-integration-test
+	docker build -q . -t threatbus-integration-test
 	docker run -td --name=tb-int --rm -p 47761:47761 threatbus-integration-test -c config_integration_test.yaml
-	python -m unittest tests/integration/test_zeek_inmem.py
+	-python -m unittest tests/integration/test_zeek_inmem.py
+	-${RM} {broker,intel,reporter,weird}.log
 	docker kill tb-int

@@ -25,10 +25,36 @@ deployments to some data base.
 
 The project is plugin-based and can be extended easily.
 
+## Installation
+
+Install threat-bus and all plugins that you require. Optionally, use a virtual
+environment.
+
+```
+virtualenv venv           # optional
+source venv/bin/activate  # optional
+pip install .
+pip install plugins/backbones/threatbus-inmem
+pip install plugins/<desired-plugins>
+```
+
+### Testing
+
+Use the `Makefile` to run unit and integration tests.
+
+```
+make unit-tests
+make integration-tests
+```
+
+The integration tests require a local [Zeek](https://www.zeek.org) installation.
+
 
 ## Plugin Development
 
-Setup a virtual environment and install threat-bus and some plugins:
+Setup a virtual environment and install threat-bus and some plugins with the
+`--editable` flag:
+
 ```
 virtualenv venv
 source venv/bin/activate

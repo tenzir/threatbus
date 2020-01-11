@@ -9,16 +9,16 @@
 module Tenzir;
 
 export {
-  ## A space-efficient represenattion of intelligence.
+  ## Threat Bus representation of intelligence.
   type Intelligence: record {
+    ## A timestamp
+    ts: time;
     ## A unique identifier for the intel item.
     id: string;
     ## The intel type according to Intel::Type.
-    kind: string;
-    ## The value of the indicator.
-    value: string;
-    ## The origin of the intel.
-    source: string;
+    data: table[string] of string;
+    ## The operation to perform (either ADD or REMOVE)
+    operation: string;
   };
 
   ## Broker bind address.
@@ -27,15 +27,11 @@ export {
   ## Broker port.
   const broker_port = 47761/tcp &redef;
 
-  ## Flag to control whether to request an intel snapshot upon successfully
-  ## establishing a peering.
-  option request_snapshot = T &redef;
-
-  ## Flag to control whether intel that matches should be reported back.
-  option report_intel = T &redef;
+  ## Flag to control whether intel sightings should be reported back.
+  option report_sightings = T &redef;
 
   ## The number of matches per second an intel item must exceed before we
-  ## report it as "noisy.
+  ## report it as "noisy".
   ##
   ## If 0, the computation of noisy intel will not take place.
   option noisy_intel_threshold = 100 &redef;
@@ -44,56 +40,80 @@ export {
   option log_operations = T &redef;
 
   ## Topic to subscribe to for receiving intel.
-  option threat_bus_topic = "tenzir/threat-bus" &redef;
+  option intel_topic = "tenzir/threatbus/intel" &redef;
 
-  ## The source name for the Intel framework for intel coming from the threat
-  ## bus.
+  ## Topic to subscribe to for receiving intel.
+  option sighting_topic = "tenzir/threatbus/sighting" &redef;
+
+  ## The source name for the Intel framework for intel coming from threat-bus.
   const tb_intel_tag = "threat-bus";
 
   ## Event to raise for intel item insertion.
   ##
   ## item: The intel type to add.
-  global add_intel: event(item: Intelligence);
-
-  ## Event to raise for intel item removal.
-  ##
-  ## item: The intel type to remove.
-  global remove_intel: event(item: Intelligence);
+  global intel: event(item: Intelligence);
 
   ## Event to report back sightings of (previously added) intel.
   ##
   ## ts: The timestamp when the intel has been seen.
   ##
-  ## ids: The set of IDs that identify the intel items.
-  global intel_report: event(ts: time, ids: set[string]);
-
-  ## Event to report back when intel matches exceed `noisy_intel_threshold`.
-  ##
-  ## id: The ID of the intel item.
-  ##
-  ## n: The number of matches per second of this item.
-  global noisy_intel_report: event(id: string, n: count);
-
-  ## Event to raise when requesting a full snapshot of intel.
-  ##
-  ## source: The source of the intel as recorded in the Intel framework.
-  global intel_snapshot_request: event(source: string);
-
-  ## Response event to :zeek:id:`intel_snapshot_request`.
-  ##
-  ## items: The intel items in the snapshot.
-  global intel_snapshot_reply: event(items: vector of Intelligence);
-
-  ## Response event to :zeek:id:`intel_snapshot_request`.
-  ##
-  ## node_id: The node ID of Threat Bus.
-  global hello: event(node_id: string);
+  ## intel_id: The ID of the seen intel item.
+  global sighting: event(ts: time, intel_id: string, context: table[string] of any);
 }
 
-# Maps string to their corresponding Intel framework types. Because Broker
+## ---------- broker management and logging ------------------------------------
+
+event Broker::peer_lost(endpoint: Broker::EndpointInfo, msg: string)
+  {
+  if ( endpoint?$network && endpoint$network$address == broker_host 
+      && endpoint$network$bound_port == broker_port && log_operations )
+    Reporter::info("threat-bus disconnected");
+  }
+
+event Broker::peer_added(endpoint: Broker::EndpointInfo, msg: string)
+  {
+  if ( endpoint?$network && endpoint$network$address == broker_host 
+      && endpoint$network$bound_port == broker_port && log_operations )
+    Reporter::info("threat-bus connected");
+  }
+
+# Only the manager communicates with Threat Bus.
+@if ( ! Cluster::is_enabled()
+      || Cluster::local_node_type() == Cluster::MANAGER )
+event zeek_init() &priority=1
+  {
+  if ( log_operations )
+    {
+    Reporter::info(fmt("subscribing to topic %s", intel_topic));
+    Reporter::info(fmt("reporting noisy intel at %d matches/sec",
+                       noisy_intel_threshold));
+    }
+  Broker::subscribe(intel_topic);
+  }
+@endif
+
+# If we operate in a cluster setting, we do not need to open another socket but
+# instead communicate over the already existing one. The endpoint for that is
+# Broker::default_listen_address and Broker::default_port
+@if ( ! Cluster::is_enabled() )
+event zeek_init() &priority=0
+  {
+  if ( log_operations )
+    Reporter::info(fmt("peering to threat-bus at %s:%s",
+                       broker_host, broker_port));
+  Broker::peer(broker_host, broker_port, 5sec);
+  }
+@endif
+
+## ---------- threat-bus specific application logic ----------------------------
+
+# Counts the number of matches of an intel item, identified by its ID.
+global sightings: table[string] of count &default=0 &create_expire=1sec;
+
+# Maps strings to their corresponding Intel framework types. Because Broker
 # cannot send enums, we must use this mapping table to obtain a native intel
 # type.
-global type_map: table[string] of Intel::Type = {
+global intel_type_map: table[string] of Intel::Type = {
   ["ADDR"] = Intel::ADDR,
   ["SUBNET"] = Intel::SUBNET,
   ["URL"] = Intel::URL,
@@ -107,248 +127,74 @@ global type_map: table[string] of Intel::Type = {
   ["FILE_HASH"] = Intel::FILE_HASH,
 };
 
-# The hello event from Threat Bus assigns this variable. When not empty, it
-# means there exists a connection to Threat Bus.
-global threat_bus_node_id = "";
-
-# Counts the number of matches of an intel item, identified by its ID.
-global intel_matches: table[string] of count &default=0 &create_expire=1sec;
-
-function is_valid_intel_type(kind: string): bool
+# Maps a data point from threat-bus format to a Intel::Item for the Zeek Intel
+# framework
+function map_to_zeek_intel(item: Intelligence): Intel::Item
   {
-  if ( kind in type_map )
-    return T;
-  Reporter::warning(fmt("ignoring invalid intel type: %s", kind));
-  return F;
-  }
-
-function make_intel(x: Intelligence): Intel::Item
-  {
-  local result: Intel::Item = [
-    $indicator = x$value,
-    $indicator_type = type_map[x$kind],
+  local intel_item: Intel::Item = [
+    $indicator = item$data["indicator"],
+    $indicator_type = intel_type_map[item$data["intel_type"]],
     $meta = record(
-      $source = x$source,
-      $desc = x$id,
-      $url = tb_intel_tag
+      $desc = item$id,
+      $url = tb_intel_tag, # re-used to identify threat-bus as sending entity
+      $source = tb_intel_tag
+      # TODO
     )
   ];
-  return result;
+  return intel_item;
   }
 
-function insert(item: Intelligence)
+function is_mappable_intel(item: Intelligence): bool
   {
-  if ( ! is_valid_intel_type(item$kind) )
+  return item?$data && "indicator" in item$data && "intel_type" in item$data && item$data["intel_type"] in intel_type_map;
+  }
+
+# Event sent by threat-bus to indicate a change of known intelligence to Zeek.
+event intel(item: Intelligence)
+  {
+  if ( ! is_mappable_intel(item) ) {
+    Reporter::warning(fmt("ignoring unmappable intel item: %s", item));
     return;
+  }
+
+  local mapped_intel = map_to_zeek_intel(item);
   if ( log_operations )
-    Reporter::info(fmt("adding intel %s", item));
-  Intel::insert(make_intel(item));
+    Reporter::info(fmt("%s intel: %s", item$operation, mapped_intel));
+  if ( item$operation == "ADD" )
+    Intel::insert(mapped_intel);
+  else if ( item$operation == "REMOVE" )
+    Intel::remove(mapped_intel, T);
   }
 
-function remove(item: Intelligence)
-  {
-  if ( ! is_valid_intel_type(item$kind) )
-    return;
-  if ( log_operations )
-    Reporter::info(fmt("removing intel %s", item));
-  Intel::remove(make_intel(item), T);
-  }
 
-event add_intel(item: Intelligence)
-  {
-  insert(item);
-  }
-
-event remove_intel(item: Intelligence)
-  {
-  remove(item);
-  }
-
-export {
-  # Only exported because we need to access it below from the Intel module.
-  global intel_snapshot_received = F;
-}
-
-module Intel;
-
-event Tenzir::intel_snapshot_request(source: string)
-  {
-  # There exists a race condition when we have just started up and not received
-  # a response to our initial snapshot request. Then this request will return
-  # an empty set. To prevent this, we postpone the execution of this event
-  # until the snapshot has arrived.
-  if ( Tenzir::request_snapshot && ! Tenzir::intel_snapshot_received )
-    {
-    schedule 1sec { Tenzir::intel_snapshot_request(source) };
-    return;
-    }
-  if ( Tenzir::log_operations )
-    Reporter::info(fmt("got request for snapshot for source %s", source));
-  local result: vector of Tenzir::Intelligence = vector();
-  for ( x in data_store$host_data )
-    if ( source == "" )
-      for ( src in data_store$host_data[x] )
-        result += Tenzir::Intelligence(
-          $id=data_store$host_data[x][src]$desc,
-          $kind="ADDR",
-          $value=cat(x),
-          $source=src
-        );
-    else if ( source in data_store$host_data[x] )
-      result += Tenzir::Intelligence(
-        $id=data_store$host_data[x][source]$desc,
-        $kind="ADDR",
-        $value=cat(x),
-        $source=source
-      );
-  for ( y in data_store$subnet_data )
-    if ( source == "" )
-      for ( src in data_store$host_data[x] )
-        result += Tenzir::Intelligence(
-          $id=data_store$subnet_data[y][src]$desc,
-          $kind="SUBNET",
-          $value=cat(y),
-          $source=src
-        );
-    else if ( source in data_store$subnet_data[y] )
-      result += Tenzir::Intelligence(
-        $id=data_store$subnet_data[y][source]$desc,
-        $kind="SUBNET",
-        $value=cat(y),
-        $source=source
-      );
-  for ( [z, kind] in data_store$string_data )
-    if ( source == "" )
-      for ( src in data_store$host_data[x] )
-        result += Tenzir::Intelligence(
-          $id=data_store$string_data[z, kind][src]$desc,
-          $kind=cat(kind),
-          $value=cat(z),
-          $source=src
-        );
-    else if ( source in data_store$string_data[z, kind] )
-      result += Tenzir::Intelligence(
-        $id=data_store$string_data[z, kind][source]$desc,
-        $kind=cat(kind),
-        $value=cat(z),
-        $source=source
-      );
-  if ( Tenzir::log_operations )
-    Reporter::info(fmt("sending snapshot with %d intel items", |result|));
-  Broker::publish(Tenzir::threat_bus_topic,
-                  Tenzir::intel_snapshot_reply, result);
-  }
-
-module Tenzir;
-
-event intel_snapshot_reply(items: vector of Intelligence)
-  {
-  intel_snapshot_received = T;
-  if ( log_operations )
-    Reporter::info(fmt("got intel snapshot with %d items", |items|));
-  for ( i in items )
-    insert(items[i]);
-  }
-
+# Intel match events seen by the Zeek intel framework.
 event Intel::match(seen: Intel::Seen, items: set[Intel::Item])
   {
-  if ( ! report_intel )
+  if ( ! report_sightings )
     return;
   # We only report intel that we have previously added ourselves. These intel
   # items all have a custom URL as meta data and a description with an ID.
-  local ids: set[string] = set();
   for ( item in items )
-    if ( item$meta?$url && item$meta$url == tb_intel_tag )
+    {
+    if ( ! item$meta?$url || item$meta$url != tb_intel_tag )
+      next;
+    if ( ! item$meta?$desc )
       {
-      if ( ! item$meta?$desc )
-        Reporter::fatal("description must be present for threat-bus intel");
-      local id = item$meta$desc;
-      if ( noisy_intel_threshold == 0 )
-        {
-        add ids[id];
-        }
-      else
-        {
-        local n = ++intel_matches[id];
-        if ( n < noisy_intel_threshold )
-          {
-          add ids[id];
-          }
-        else
-          {
-          if ( log_operations )
-            Reporter::info(fmt("reporting noisy intel ID %s", id));
-          Broker::publish(threat_bus_topic, Tenzir::noisy_intel_report,
-                          id, n);
-          Intel::remove(item, T);
-          delete intel_matches[id];
-          }
-        }
+      Reporter::error("skipping threat-bus intel item without ID");
+      next;
       }
-  if ( |ids| == 0 )
-    return;
-  local e = Broker::make_event(intel_report, current_time(), ids);
-  Broker::publish(threat_bus_topic, e);
-  if ( log_operations )
-    {
-    local value: string;
-    if ( seen?$indicator )
-      value = seen$indicator;
-    else
-      value = cat(seen$host);
-    Reporter::info(fmt("reporting %s intel match(es) for %s", |ids|, value));
-    }
-  }
-
-event hello(node_id: string)
-  {
-  threat_bus_node_id = node_id;
-  if ( log_operations )
-    Reporter::info(fmt("threat-bus connected from node %s", node_id));
-  if ( request_snapshot && ! intel_snapshot_received )
-    {
+    local intel_id = item$meta$desc;
     if ( log_operations )
-      Reporter::info("requesting current snapshot of intel");
-    local source = ""; # We want all intel
-    Broker::publish(threat_bus_topic, intel_snapshot_request, source);
+      Reporter::info(fmt("sighted threat-bus intel with ID: %s", intel_id));
+    local n = ++sightings[intel_id];
+    local noisy = noisy_intel_threshold != 0 && n > noisy_intel_threshold;
+    local context: table[string] of any;
+    context["noisy"] = noisy;
+    Broker::publish(sighting_topic, sighting, current_time(), cat(intel_id), context);
+    if ( noisy && log_operations )
+      {
+      Reporter::info(fmt("silencing noisy intel ID %s", intel_id));
+      delete sightings[intel_id];
+      }
     }
   }
-
-event Broker::peer_lost(endpoint: Broker::EndpointInfo, msg: string)
-  {
-  if ( endpoint$id != threat_bus_node_id )
-    return;
-  if ( log_operations )
-    Reporter::info("threat-bus disconnected");
-  threat_bus_node_id = "";
-  }
-
-# Only the manager communicates with Threat Bus.
-@if ( ! Cluster::is_enabled()
-      || Cluster::local_node_type() == Cluster::MANAGER )
-event zeek_init() &priority=1
-  {
-  if ( log_operations )
-    {
-    Reporter::info(fmt("subscribing to topic %s", threat_bus_topic));
-    Reporter::info(fmt("reporting noisy intel at %d matches/sec",
-                       noisy_intel_threshold));
-    }
-  Broker::subscribe(threat_bus_topic);
-  }
-@endif
-
-# If we operate in a cluster setting, we do not need to open another socket but
-# instead communicate over the already existing one. The endpoint for that is
-# Broker::default_listen_address and Broker::default_port
-@if ( ! Cluster::is_enabled() )
-event zeek_init() &priority=0
-  {
-  if ( log_operations )
-    {
-    Reporter::info(fmt("listening at %s:%s for threat-bus",
-                       broker_host, broker_port));
-    }
-  Broker::listen(broker_host, broker_port);
-  }
-@endif
