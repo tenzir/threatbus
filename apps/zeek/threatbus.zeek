@@ -45,8 +45,8 @@ export {
   ## Topic to subscribe to for receiving intel.
   option sighting_topic = "tenzir/threatbus/sighting" &redef;
 
-  ## The source name for the Intel framework for intel coming from threat-bus.
-  const tb_intel_tag = "threat-bus";
+  ## The source name for the Intel framework for intel coming from Threat Bus.
+  const tb_intel_tag = "threatbus";
 
   ## Event to raise for intel item insertion.
   ##
@@ -67,14 +67,14 @@ event Broker::peer_lost(endpoint: Broker::EndpointInfo, msg: string)
   {
   if ( endpoint?$network && endpoint$network$address == broker_host 
       && endpoint$network$bound_port == broker_port && log_operations )
-    Reporter::info("threat-bus disconnected");
+    Reporter::info("threatbus disconnected");
   }
 
 event Broker::peer_added(endpoint: Broker::EndpointInfo, msg: string)
   {
   if ( endpoint?$network && endpoint$network$address == broker_host 
       && endpoint$network$bound_port == broker_port && log_operations )
-    Reporter::info("threat-bus connected");
+    Reporter::info("threatbus connected");
   }
 
 # Only the manager communicates with Threat Bus.
@@ -99,13 +99,13 @@ event zeek_init() &priority=1
 event zeek_init() &priority=0
   {
   if ( log_operations )
-    Reporter::info(fmt("peering to threat-bus at %s:%s",
+    Reporter::info(fmt("peering to threatbus at %s:%s",
                        broker_host, broker_port));
   Broker::peer(broker_host, broker_port, 5sec);
   }
 @endif
 
-## ---------- threat-bus specific application logic ----------------------------
+## ---------- Threat Bus specific application logic ----------------------------
 
 # Counts the number of matches of an intel item, identified by its ID.
 global sightings: table[string] of count &default=0 &create_expire=1sec;
@@ -127,7 +127,7 @@ global intel_type_map: table[string] of Intel::Type = {
   ["FILE_HASH"] = Intel::FILE_HASH,
 };
 
-# Maps a data point from threat-bus format to a Intel::Item for the Zeek Intel
+# Maps a data point from Threat Bus format to a Intel::Item for the Zeek Intel
 # framework
 function map_to_zeek_intel(item: Intelligence): Intel::Item
   {
@@ -136,7 +136,7 @@ function map_to_zeek_intel(item: Intelligence): Intel::Item
     $indicator_type = intel_type_map[item$data["intel_type"]],
     $meta = record(
       $desc = item$id,
-      $url = tb_intel_tag, # re-used to identify threat-bus as sending entity
+      $url = tb_intel_tag, # re-used to identify Threat Bus as sending entity
       $source = tb_intel_tag
       # TODO
     )
@@ -149,7 +149,7 @@ function is_mappable_intel(item: Intelligence): bool
   return item?$data && "indicator" in item$data && "intel_type" in item$data && item$data["intel_type"] in intel_type_map;
   }
 
-# Event sent by threat-bus to indicate a change of known intelligence to Zeek.
+# Event sent by Threat Bus to indicate a change of known intelligence to Zeek.
 event intel(item: Intelligence)
   {
   if ( ! is_mappable_intel(item) ) {
@@ -180,12 +180,12 @@ event Intel::match(seen: Intel::Seen, items: set[Intel::Item])
       next;
     if ( ! item$meta?$desc )
       {
-      Reporter::error("skipping threat-bus intel item without ID");
+      Reporter::error("skipping threatbus intel item without ID");
       next;
       }
     local intel_id = item$meta$desc;
     if ( log_operations )
-      Reporter::info(fmt("sighted threat-bus intel with ID: %s", intel_id));
+      Reporter::info(fmt("sighted threatbus intel with ID: %s", intel_id));
     local n = ++sightings[intel_id];
     local noisy = noisy_intel_threshold != 0 && n > noisy_intel_threshold;
     local context: table[string] of any;

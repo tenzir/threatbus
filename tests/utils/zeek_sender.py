@@ -42,7 +42,7 @@ def send_generic(items):
         }
         event = broker.zeek.Event("intel", datetime.now(), i, data, "ADD")
 
-        # threat-bus will pickup the event type and hence forward on a different
+        # Threat Bus will pickup the event type and hence forward on a different
         # topic.
         ep.publish("tenzir/some-zeek-topic", event)
 
