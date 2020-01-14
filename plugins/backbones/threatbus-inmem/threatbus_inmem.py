@@ -34,6 +34,8 @@ def provision(logger, inq):
 
 @threatbus.backbone
 def subscribe(topics, q):
+    if type(topics).__name__.lower() == "str":
+        topics = [topics]
     global subscriptions, lock
     lock.acquire()
     for topic in topics:
@@ -43,6 +45,8 @@ def subscribe(topics, q):
 
 @threatbus.backbone
 def unsubscribe(topics, q):
+    if type(topics).__name__.lower() == "str":
+        topics = [topics]
     global subscriptions, lock
     lock.acquire()
     for topic in topics:
