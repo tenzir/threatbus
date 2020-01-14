@@ -96,7 +96,7 @@ def listen(logger, host, port, module_namespace, ep, inq):
         @param port The port number to listen at
         @param module_namespace A Zeek namespace to accept events from
         @param ep The broker endpoint used for listening
-        @param outq The queue to forward messages to
+        @param inq The queue to forward messages to
     """
     ep.listen(host, port)
     sub = ep.make_subscriber("tenzir")
@@ -155,7 +155,7 @@ def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
     try:
         validate_config(config)
     except Exception as e:
-        raise ValueError("Invalid config for plugin {}: {}".format(plugin_name, str(e)))
+        logger.fatal("Invalid config for plugin {}: {}".format(plugin_name, str(e)))
     host, port, namespace = (
         config["host"].get(),
         config["port"].get(),

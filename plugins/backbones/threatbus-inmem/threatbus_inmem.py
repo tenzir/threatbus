@@ -63,6 +63,6 @@ def run(config, logging, inq):
     try:
         validate_config(config)
     except Exception as e:
-        raise ValueError("Invalid config for plugin {}: {}".format(plugin_name, str(e)))
+        logger.fatal("Invalid config for plugin {}: {}".format(plugin_name, str(e)))
     threading.Thread(target=provision, args=(logger, inq), daemon=True).start()
     logger.info("In-memory backbone started.")
