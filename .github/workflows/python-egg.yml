@@ -18,4 +18,5 @@ jobs:
         pip install --upgrade pip
         pip install .
         pip install plugins/apps/threatbus-zeek
+        pip install plugins/apps/threatbus-misp
         pip install plugins/backbones/threatbus-inmem

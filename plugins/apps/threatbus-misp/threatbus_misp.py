@@ -1,14 +1,16 @@
 from datetime import datetime
+import json
 import warnings
 
-warnings.simplefilter("ignore")
+warnings.simplefilter("ignore")  # pymisp produces urllib warnings
 import pymisp
 from queue import Queue
 import threading
 import time
+import zmq
 
 import threatbus
-from threatbus.data import Intel, Operation, Sighting
+from threatbus.data import Intel, IntelData, IntelType, Operation, Sighting
 
 """MISP - Open Source Threat Intelligence Platform - plugin for Threat Bus"""
 
@@ -20,25 +22,28 @@ def validate_config(config):
     config["api_host"].get(str)
     config["ssl"].get(bool)
     config["api_key"].get(str)
+    config["zmq"].get(object)
+    config["zmq"]["host"].get(str)
+    config["zmq"]["port"].get(int)
 
 
-def map_to_intel(misp_attribute):
+def map_to_intel(misp_attribute, action):
     """Maps the given MISP attribute to the threatbus intel format.
         @param misp_attribute A MISP attribute
+        @param action A string from MISP, describing the action for the attribute (either 'add' or 'delete')
     """
-    # TODO: threatbus defines intel types that zeek can use as well.
-    # intel_type = map_misp_intel_type(misp_attribute["type"])
-    intel_type = "DOMAIN"
-    data = {
-        "indicator": misp_attribute["value"],
-        "intel_type": intel_type,
-        "source": "MISP",
-    }
+    operation = Operation.REMOVE
+    if action == "edit" and misp_attribute.get("to_ids", False):
+        operation = Operation.EDIT
+    elif action == "add":
+        operation = Operation.ADD
     return Intel(
         datetime.fromtimestamp(int(misp_attribute["timestamp"])),
         str(misp_attribute["id"]),
-        data,
-        Operation.ADD,
+        IntelData(
+            misp_attribute["value"], IntelType(misp_attribute["type"]), source="MISP"
+        ),
+        operation,
     )
 
 
@@ -71,21 +76,29 @@ def publish_sightings(logger, misp, outq):
         misp.add_sighting(misp_sighting)
 
 
-def receive(logger, misp, inq):
+def receive(logger, misp, zmq_config, inq):
     """Binds a listener for the the given host/port to the broker ep. Forwards all received messages to the inq.
         @param logger A logging.logger object
         @param misp A connected pymisp instance
+        @param zmq_config A configuration object for ZeroMQ binding
         @param inq The queue to which intel items from MISP are forwarded to
     """
+
+    socket = zmq.Context().socket(zmq.SUB)
+    socket.connect(f"tcp://{zmq_config['host']}:{zmq_config['port']}")
+    socket.setsockopt(zmq.SUBSCRIBE, b"misp_json_attribute")
+    poller = zmq.Poller()
+    poller.register(socket, zmq.POLLIN)
+
     while True:
-        data = misp.search(controller="attributes", to_ids=True)
-        if not data:
-            continue
-        for attr in data["Attribute"]:
-            msg = map_to_intel(attr)
-            if msg:
-                inq.put(msg)
-        time.sleep(5)
+        socks = dict(poller.poll(timeout=None))
+        if socket in socks and socks[socket] == zmq.POLLIN:
+            raw = socket.recv()
+            _, message = raw.decode("utf-8").split(" ", 1)
+            msg = json.loads(message)
+            if not msg.get("Attribute", None):
+                continue
+            inq.put(map_to_intel(msg["Attribute"], msg.get("action", None)))
 
 
 @threatbus.app
@@ -113,7 +126,9 @@ def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
     # TODO: make individual subscriptions per subscribed MISP endpoint
     subscribe_callback("sighting", outq)
 
-    threading.Thread(target=receive, args=(logger, misp, inq), daemon=True).start()
+    threading.Thread(
+        target=receive, args=(logger, misp, config["zmq"], inq), daemon=True
+    ).start()
     threading.Thread(
         target=publish_sightings, args=(logger, misp, outq), daemon=True
     ).start()
