@@ -16,9 +16,12 @@ plugin_name = "misp"
 
 def validate_config(config):
     assert config, "config must not be None"
-    config["api_host"].get(str)
-    config["ssl"].get(bool)
-    config["api_key"].get(str)
+    # redact fallback value to allow for omitting API configuration
+    config["api"].add({})
+    if config["api"].get():
+        config["api"]["host"].get(str)
+        config["api"]["ssl"].get(bool)
+        config["api"]["key"].get(str)
     config["zmq"].get(object)
     config["zmq"]["host"].get(str)
     config["zmq"]["port"].get(int)
@@ -30,6 +33,8 @@ def publish_sightings(logger, misp, outq):
         @param misp A connected pymisp instance
         @param outq The queue from which to forward messages to MISP 
     """
+    if not misp:
+        return
     while True:
         sighting = outq.get(block=True)
         logger.debug(
@@ -39,10 +44,9 @@ def publish_sightings(logger, misp, outq):
         misp.add_sighting(misp_sighting)
 
 
-def receive(logger, misp, zmq_config, inq):
+def receive(logger, zmq_config, inq):
     """Binds a listener for the the given host/port to the broker ep. Forwards all received messages to the inq.
         @param logger A logging.logger object
-        @param misp A connected pymisp instance
         @param zmq_config A configuration object for ZeroMQ binding
         @param inq The queue to which intel items from MISP are forwarded to
     """
@@ -76,27 +80,29 @@ def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
         validate_config(config)
     except Exception as e:
         logger.fatal("Invalid config for plugin {}: {}".format(plugin_name, str(e)))
-    api_host, api_key, ssl = (
-        config["api_host"].get(),
-        config["api_key"].get(),
-        config["ssl"].get(),
-    )
     # TODO: MISP instances shall subscribe themselves to threatbus and each subscription shall have an individual outq and receiving thread for intel updates.
     outq = Queue()
     misp = None
-    try:
-        misp = pymisp.ExpandedPyMISP(url=api_host, key=api_key, ssl=ssl)
-    except Exception as e:
-        # TODO: log individual error per MISP subscriber, do not use fatal / do not stop threatbus
-        logger.fatal(f"Cannot subscribe to MISP at {api_host}, using SSL: {ssl}")
+    if config["api"].get():
+        host, key, ssl = (
+            config["api"]["host"].get(),
+            config["api"]["key"].get(),
+            config["api"]["ssl"].get(),
+        )
+        try:
+            misp = pymisp.ExpandedPyMISP(url=host, key=key, ssl=ssl)
+        except Exception as e:
+            # TODO: log individual error per MISP subscriber
+            logger.error(f"Cannot subscribe to MISP at {host}, using SSL: {ssl}")
 
     # TODO: make individual subscriptions per subscribed MISP endpoint
     subscribe_callback("tenzir/threatbus/sighting", outq)
+    if misp:
+        threading.Thread(
+            target=publish_sightings, args=(logger, misp, outq), daemon=True
+        ).start()
 
     threading.Thread(
-        target=receive, args=(logger, misp, config["zmq"], inq), daemon=True
-    ).start()
-    threading.Thread(
-        target=publish_sightings, args=(logger, misp, outq), daemon=True
+        target=receive, args=(logger, config["zmq"], inq), daemon=True
     ).start()
     logger.info("MISP plugin started")

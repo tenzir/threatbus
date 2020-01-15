@@ -15,9 +15,10 @@ plugins:
       port: 47761
       module_namespace: Tenzir
     misp:
-      api_host: https://localhost
-      ssl: false
-      api_key: NpwGjzaWY7sQxovURfOORCFqz7eshxqDWhbARH3E
+      api:
+        host: https://localhost
+        ssl: false
+        key: NpwGjzaWY7sQxovURfOORCFqz7eshxqDWhbARH3E
       zmq:
         host: localhost
         port: 50000
