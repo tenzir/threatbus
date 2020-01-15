@@ -49,4 +49,5 @@ make deploy
 - login with your configured credentials
 - Go to `Administration` -> `Server Settings & Maintenance` -> `Diagnostics Tab`
 - Find the ZeroMQ plugin section and enable it
-
+- Go to `Administration` -> `Server Settings & Maintenance` -> `Plugin settings Tab`
+- Set the entry `Plugin.ZeroMQ_attribute_notifications_enable` to `true`
