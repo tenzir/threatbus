@@ -1,4 +1,3 @@
-from datetime import datetime
 import json
 import warnings
 
@@ -6,11 +5,9 @@ warnings.simplefilter("ignore")  # pymisp produces urllib warnings
 import pymisp
 from queue import Queue
 import threading
-import time
 import zmq
-
+from misp_message_mapping import map_to_internal, map_to_misp
 import threatbus
-from threatbus.data import Intel, IntelData, IntelType, Operation, Sighting
 
 """MISP - Open Source Threat Intelligence Platform - plugin for Threat Bus"""
 
@@ -27,40 +24,6 @@ def validate_config(config):
     config["zmq"]["port"].get(int)
 
 
-def map_to_intel(misp_attribute, action):
-    """Maps the given MISP attribute to the threatbus intel format.
-        @param misp_attribute A MISP attribute
-        @param action A string from MISP, describing the action for the attribute (either 'add' or 'delete')
-    """
-    operation = Operation.REMOVE
-    if action == "edit" and misp_attribute.get("to_ids", False):
-        operation = Operation.EDIT
-    elif action == "add":
-        operation = Operation.ADD
-    return Intel(
-        datetime.fromtimestamp(int(misp_attribute["timestamp"])),
-        str(misp_attribute["id"]),
-        IntelData(
-            misp_attribute["value"], IntelType(misp_attribute["type"]), source="MISP"
-        ),
-        operation,
-    )
-
-
-def map_to_misp(sighting):
-    """Maps the threatbus sighting format to a MISP sighting.
-        @param sighting A threatbus Sighting object
-    """
-    misp_sighting = pymisp.MISPSighting()
-    misp_sighting.from_dict(
-        id=sighting.intel,
-        source=sighting.context.get("source", None),
-        type="0",
-        timestamp=sighting.ts,
-    )
-    return misp_sighting
-
-
 def publish_sightings(logger, misp, outq):
     """Reports / publishes true-positive sightings of intelligence items back to the given MISP endpoint.
         @param logger A logging.logger object
@@ -69,10 +32,10 @@ def publish_sightings(logger, misp, outq):
     """
     while True:
         sighting = outq.get(block=True)
-
         logger.debug(
             f"report sighting for intel id {sighting.intel} seen at {sighting.ts}"
         )
+        misp_sighting = map_to_misp(sighting)
         misp.add_sighting(misp_sighting)
 
 
@@ -98,7 +61,11 @@ def receive(logger, misp, zmq_config, inq):
             msg = json.loads(message)
             if not msg.get("Attribute", None):
                 continue
-            inq.put(map_to_intel(msg["Attribute"], msg.get("action", None)))
+            intel = map_to_internal(msg["Attribute"], msg.get("action", None), logger)
+            if not intel:
+                logger.debug(f"Discarding unparsable intel {msg['Attribute']}")
+            else:
+                inq.put(intel)
 
 
 @threatbus.app
@@ -124,7 +91,7 @@ def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
         logger.fatal(f"Cannot subscribe to MISP at {api_host}, using SSL: {ssl}")
 
     # TODO: make individual subscriptions per subscribed MISP endpoint
-    subscribe_callback("sighting", outq)
+    subscribe_callback("tenzir/threatbus/sighting", outq)
 
     threading.Thread(
         target=receive, args=(logger, misp, config["zmq"], inq), daemon=True

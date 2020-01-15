@@ -1,12 +1,10 @@
-from contextlib import suppress
-from datetime import datetime
 import broker
+from zeek_message_mapping import map_to_broker, map_to_internal, map_to_string_set
 from queue import Queue
 import select
 import threading
-import time
 import threatbus
-from threatbus.data import Intel, Operation, Sighting
+
 
 """Zeek network monitor - plugin for Threat Bus"""
 
@@ -20,52 +18,6 @@ def validate_config(config):
     config["host"].get(str)
     config["port"].get(int)
     config["module_namespace"].get(str)
-
-
-def map_to_string_set(topic_vector):
-    """Maps a zeek vector of topics to a python set of strings."""
-    if not topic_vector or type(topic_vector).__name__ != "VectorTopic":
-        return set()
-    return set(map(str, topic_vector))
-
-
-def map_to_internal(broker_data, module_namespace):
-    """Maps a broker message, based on the event name, to the internal format.
-        @param broker_data The raw data that was received via broker
-        @param module_namespace A Zeek namespace to accept events from
-    """
-    event = broker.zeek.Event(broker_data)
-    name, args = event.name(), event.args()
-    module_namespace = module_namespace + "::" if module_namespace else ""
-    name = name[name.startswith(module_namespace) and len(module_namespace) :]
-    if name == "sighting" and len(args) == 3:
-        # convert args to sighting
-        return Sighting(args[0], str(args[1]), args[2])
-    elif name == "intel" and len(args) >= 3:
-        # convert args to intel
-        op = Operation.ADD
-        with suppress(Exception):
-            op = Operation(args[3])
-        return Intel(args[0], str(args[1]), args[2], op)
-
-
-def map_to_broker(msg, module_namespace):
-    """Maps the internal message format to a broker message.
-        @param msg The message that shall be converted
-        @param module_namespace A Zeek namespace to use for event sending
-    """
-    msg_type = type(msg).__name__.lower()
-    if msg_type == "sighting":
-        # convert sighting to zeek event
-        return broker.zeek.Event(
-            f"{module_namespace}::sighting", (msg.ts, str(msg.intel), msg.context),
-        )
-    elif msg_type == "intel":
-        # convert intel to zeek event
-        return broker.zeek.Event(
-            f"{module_namespace}::intel",
-            (msg.ts, str(msg.id), msg.data, msg.operation.value),
-        )
 
 
 def publish(logger, module_namespace, ep, outq):
@@ -86,7 +38,7 @@ def publish(logger, module_namespace, ep, outq):
             if topic.endswith(msg_type) or all([t not in topic for t in msg_types]):
                 ep.publish(topic, event)
         lock.release()
-        logger.debug(f"Zeek sent {msg}")
+        logger.debug(f"Published {msg}")
 
 
 def listen(logger, host, port, module_namespace, ep, inq):

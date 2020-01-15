@@ -3,8 +3,8 @@ from datetime import datetime, timezone
 import unittest
 
 import threatbus
-from threatbus.data import Intel, Operation, Sighting
-from threatbus_zeek import map_to_internal, map_to_broker, map_to_string_set
+from threatbus.data import Intel, IntelData, IntelType, Operation, Sighting
+from zeek_message_mapping import map_to_internal, map_to_broker, map_to_string_set
 
 
 class TestMessageMapping(unittest.TestCase):
@@ -35,28 +35,38 @@ class TestMessageMapping(unittest.TestCase):
         self.assertIsNone(map_to_internal(broker_data, self.module_namespace))
 
     def test_valid_intel(self):
-        data = {"foo": 23}
+        data = IntelData("6.6.6.6", IntelType.IPDST_PORT, foo=23)
+        expected_broker_data = {"indicator": "6.6.6.6", "intel_type": "ADDR"}
         op = Operation.REMOVE
         intel = Intel(self.ts, self.id, data, op)
         broker_msg = map_to_broker(intel, self.module_namespace)
         self.assertEqual(broker_msg.name(), self.module_namespace + "::intel")
-        self.assertEqual(broker_msg.args(), [(self.ts, self.id, data, op.value)])
+        self.assertEqual(
+            broker_msg.args(), [(self.ts, self.id, expected_broker_data, op.value)]
+        )
 
     def test_valid_zeek_intel(self):
-        data = {"foo": 23}
+        broker_intel_data = {"indicator": "6.6.6.6", "intel_type": "ADDR"}
+        expexted_intel_data = IntelData("6.6.6.6", IntelType.IPSRC)
         op = Operation.REMOVE
         # without namespace:
-        event = broker.zeek.Event("intel", self.ts, self.id, data, op.value)
+        event = broker.zeek.Event(
+            "intel", self.ts, self.id, broker_intel_data, op.value
+        )
         intel = map_to_internal(event, self.module_namespace)
         self.assertEqual(type(intel), Intel)
         self.assertEqual(intel.ts, self.ts)
         self.assertEqual(intel.id, self.id)
-        self.assertEqual(intel.data, data)
+        self.assertEqual(intel.data, expexted_intel_data)
         self.assertEqual(intel.operation, op)
 
         # with namespace:
         event = broker.zeek.Event(
-            self.module_namespace + "::intel", self.ts, self.id, data, op.value
+            self.module_namespace + "::intel",
+            self.ts,
+            self.id,
+            broker_intel_data,
+            op.value,
         )
         intel_ns = map_to_internal(event, self.module_namespace)
         self.assertEqual(intel, intel_ns)
@@ -85,12 +95,30 @@ class TestMessageMapping(unittest.TestCase):
         sighting_ns = map_to_internal(event, self.module_namespace)
         self.assertEqual(sighting, sighting_ns)
 
-    def test_default_intel_operation(self):
+    def test_invalid_intel_data_is_not_mapped(self):
+        event = broker.zeek.Event("intel", self.ts, 0)
+        intel = map_to_internal(event, self.module_namespace)
+        self.assertIsNone(intel)
+
         event = broker.zeek.Event("intel", self.ts, 0, {})
+        intel = map_to_internal(event, self.module_namespace)
+        self.assertIsNone(intel)
+
+        event = broker.zeek.Event("intel", self.ts, 0, {"indicator": "6.6.6.6"})
+        intel = map_to_internal(event, self.module_namespace)
+        self.assertIsNone(intel)
+
+        event = broker.zeek.Event("intel", self.ts, 0, {"intel_type": "ADDR"})
+        intel = map_to_internal(event, self.module_namespace)
+        self.assertIsNone(intel)
+
+    def test_default_intel_operation(self):
+        broker_intel_data = {"indicator": "example.com", "intel_type": "DOMAIN"}
+        event = broker.zeek.Event("intel", self.ts, 0, broker_intel_data)
         intel = map_to_internal(event, self.module_namespace)
         self.assertEqual(intel.operation, Operation.ADD)
 
-        event = broker.zeek.Event("intel", self.ts, 0, {}, "INVALID")
+        event = broker.zeek.Event("intel", self.ts, 0, broker_intel_data, "INVALID")
         intel = map_to_internal(event, self.module_namespace)
         self.assertEqual(intel.operation, Operation.ADD)
 
