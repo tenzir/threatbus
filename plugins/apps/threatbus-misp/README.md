@@ -1,7 +1,7 @@
 Threat Bus MISP Plugin
 ======================
 
-A Threat Bus plugin that facilitates communication to [MISP](https://www.misp-project.org/).
+A Threat Bus plugin that enables communication to [MISP](https://www.misp-project.org/).
 
 ## Installation
 
@@ -11,9 +11,9 @@ pip install threatbus-misp
 
 ## Development Setup
 
-Use the [dcso/MISP-dockerized](https://github.com/DCSO/MISP-dockerized) project to set up a local testing environment:
+Use the DCSO's [dockerized MISP](https://github.com/DCSO/MISP-dockerized) to set up a local testing environment:
 
-*Setup a MISP docker cluster*
+*Setup a MISP Docker cluster*
 ```
 git clone git@github.com:DCSO/MISP-dockerized.git
 cd MISP-dockerized
@@ -27,7 +27,7 @@ make install
 cd current
 vim docker-compose.yaml
 ```
-Find the section `misp-server` in the yaml and add the following:
+Find the section `misp-server` in the configuration and add the following:
 
 ```yaml
 misp-server:
@@ -37,7 +37,7 @@ misp-server:
     ...
 ```
 
-*Restart all those MISP services that changed*
+*Restart all MISP services that changed*
 
 ```sh
 make deploy

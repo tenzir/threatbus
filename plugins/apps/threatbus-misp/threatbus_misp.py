@@ -53,6 +53,7 @@ def receive(logger, zmq_config, inq):
 
     socket = zmq.Context().socket(zmq.SUB)
     socket.connect(f"tcp://{zmq_config['host']}:{zmq_config['port']}")
+    # TODO: allow reception of more topics, i.e. handle events.
     socket.setsockopt(zmq.SUBSCRIBE, b"misp_json_attribute")
     poller = zmq.Poller()
     poller.register(socket, zmq.POLLIN)

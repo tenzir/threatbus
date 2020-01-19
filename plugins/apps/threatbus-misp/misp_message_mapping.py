@@ -62,7 +62,7 @@ def map_to_internal(misp_attribute, action, logger=None):
     if not misp_attribute:
         return None
     to_ids = misp_attribute.get("to_ids", False)
-    if not action or not to_ids and action != "edit":
+    if not to_ids and action != "edit" or not action:
         return None
     operation = Operation.REMOVE
     if (action == "edit" or action == "add") and to_ids:
@@ -104,7 +104,7 @@ def map_to_misp(sighting):
     misp_sighting.from_dict(
         id=sighting.intel,
         source=sighting.context.get("source", None),
-        type="0",
+        type="0",  # true positive sighting: https://www.circl.lu/doc/misp/automation/#post-sightingsadd
         timestamp=sighting.ts,
     )
     return misp_sighting
