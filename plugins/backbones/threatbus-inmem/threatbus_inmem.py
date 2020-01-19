@@ -34,6 +34,8 @@ def provision(logger, inq):
 
 @threatbus.backbone
 def subscribe(topics, q):
+    if type(topics) is not list:
+        topics = [topics]
     global subscriptions, lock
     lock.acquire()
     for topic in topics:
@@ -43,6 +45,8 @@ def subscribe(topics, q):
 
 @threatbus.backbone
 def unsubscribe(topics, q):
+    if type(topics).__name__.lower() == "str":
+        topics = [topics]
     global subscriptions, lock
     lock.acquire()
     for topic in topics:
@@ -59,6 +63,6 @@ def run(config, logging, inq):
     try:
         validate_config(config)
     except Exception as e:
-        raise ValueError("Invalid config for plugin {}: {}".format(plugin_name, str(e)))
+        logger.fatal("Invalid config for plugin {}: {}".format(plugin_name, str(e)))
     threading.Thread(target=provision, args=(logger, inq), daemon=True).start()
     logger.info("In-memory backbone started.")

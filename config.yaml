@@ -14,3 +14,11 @@ plugins:
       host: "127.0.0.1"
       port: 47761
       module_namespace: Tenzir
+    misp:
+      api:
+        host: https://localhost
+        ssl: false
+        key: NpwGjzaWY7sQxovURfOORCFqz7eshxqDWhbARH3E
+      zmq:
+        host: localhost
+        port: 50000
