@@ -1,5 +1,5 @@
 import threading
-from collections import defaultdict
+from collections import defaultdict, Iterable
 import time
 import threatbus
 
@@ -34,7 +34,7 @@ def provision(logger, inq):
 
 @threatbus.backbone
 def subscribe(topics, q):
-    if type(topics) is not list:
+    if not isinstance(topics, Iterable):
         topics = [topics]
     global subscriptions, lock
     lock.acquire()
@@ -45,7 +45,7 @@ def subscribe(topics, q):
 
 @threatbus.backbone
 def unsubscribe(topics, q):
-    if type(topics).__name__.lower() == "str":
+    if not isinstance(topics, Iterable):
         topics = [topics]
     global subscriptions, lock
     lock.acquire()
