@@ -34,7 +34,7 @@ def provision(logger, inq):
 
 @threatbus.backbone
 def subscribe(topics, q):
-    if not isinstance(topics, Iterable):
+    if not isinstance(topics, Iterable) or isinstance(topics, str):
         topics = [topics]
     global subscriptions, lock
     lock.acquire()
@@ -45,7 +45,7 @@ def subscribe(topics, q):
 
 @threatbus.backbone
 def unsubscribe(topics, q):
-    if not isinstance(topics, Iterable):
+    if not isinstance(topics, Iterable) or isinstance(topics, str):
         topics = [topics]
     global subscriptions, lock
     lock.acquire()
