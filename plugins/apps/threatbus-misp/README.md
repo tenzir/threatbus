@@ -14,9 +14,9 @@ pip install threatbus-misp
 
 *Install Kafka on the Threat Bus host*
 
-The plugin enables communication via either ZeroMQ or Kafka. Hence you have to
-install `librdkafka` for your host system that is running `threatbus`. See also
-the [prerequisites](https://github.com/confluentinc/confluent-kafka-python#prerequisites)
+The plugin enables communication either via ZeroMQ or Kafka. When using Kafka,
+you have to install `librdkafka` for the host system that is running
+`threatbus`. See also the [prerequisites](https://github.com/confluentinc/confluent-kafka-python#prerequisites)
 section of the `confluent-kafka` python client.
 
 
@@ -27,8 +27,8 @@ and Kafka.
 
 ### Dockerized Kafka
 
-For a simple, working Kafka Docker setup use the `confluentinc/cp-docker-images`
-[single node example](https://github.com/confluentinc/cp-docker-images/blob/5.3.1-post/examples/kafka-single-node/docker-compose.yml).
+For a simple, working Kafka Docker setup use the [single node example](https://github.com/confluentinc/cp-docker-images/blob/5.3.1-post/examples/kafka-single-node/docker-compose.yml)
+from `confluentinc/cp-docker-images`.
 
 Store the `docker-compose.yaml` and modify the Kafka environment variables such
 that the Docker host (e.g., `172.17.0.1`) of your Docker machine is advertised
@@ -45,8 +45,7 @@ kafka:
   ...
 ```
 
-You might also want to read [this article](https://rmoff.net/2018/08/02/kafka-listeners-explained/)
-about Kafka listeners.
+For details about Kafka listeners, check out [this article](https://rmoff.net/2018/08/02/kafka-listeners-explained/).
 
 Then start the compose setup via `docker-compose up -d`.
 
@@ -56,7 +55,7 @@ To test the setup, use the `tests/utils/kafka_receiver.py` and
 
 ### Dockerized MISP
 
-Use the DCSO's [dockerized MISP](https://github.com/DCSO/MISP-dockerized) to set
+Use DCSO's [dockerized MISP](https://github.com/DCSO/MISP-dockerized) to set
 up a local testing environment:
 
 *Setup a MISP Docker cluster*
@@ -85,7 +84,7 @@ misp-server:
 ```
 
 
-*Restart MISP deployment to accept the new port*
+*Restart MISP to accept the new port*
 
 ```sh
 make deploy
@@ -93,7 +92,7 @@ make deploy
 
 *Enable the Kafka plugin in the MISP webview*
 
-- Visit localhost:80
+- Visit https://localhost:80
 - login with your configured credentials
 - Go to `Administration` -> `Server Settings & Maintenance` -> `Plugin settings Tab`
 - Set the following entries 
@@ -124,7 +123,7 @@ exit # leave the Docker container shell
 
 *Enable the ZMQ plugin in the MISP webview*
 
-- Visit localhost:80
+- Visit https://localhost:80
 - login with your configured credentials
 - Go to `Administration` -> `Server Settings & Maintenance` -> `Diagnostics Tab`
 - Find the ZeroMQ plugin section and enable it
