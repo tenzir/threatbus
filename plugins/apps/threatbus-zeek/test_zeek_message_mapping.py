@@ -1,10 +1,15 @@
 import broker
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import unittest
 
-import threatbus
 from threatbus.data import Intel, IntelData, IntelType, Operation, Sighting
-from zeek_message_mapping import map_to_internal, map_to_broker, map_to_string_set
+from zeek_message_mapping import (
+    map_to_internal,
+    map_to_broker,
+    map_management_message,
+    Subscription,
+    Unsubscription,
+)
 
 
 class TestMessageMapping(unittest.TestCase):
@@ -21,18 +26,36 @@ class TestMessageMapping(unittest.TestCase):
         self.assertIsNone(map_to_broker(object, self.module_namespace))
 
     def test_invalid_zeek_inputs(self):
-        broker_data = broker.zeek.Event("Hello")
+        broker_data = broker.zeek.Event("Hello")  # unknown event
         self.assertIsNone(map_to_internal(broker_data, None))
         self.assertIsNone(map_to_internal(broker_data, self.module_namespace))
+        self.assertIsNone(map_management_message(broker_data, None))
+        self.assertIsNone(map_management_message(broker_data, self.module_namespace))
 
         # not enough arguments provided
         broker_data = broker.zeek.Event("sighting", 1, 2)
         self.assertIsNone(map_to_internal(broker_data, None))
         self.assertIsNone(map_to_internal(broker_data, self.module_namespace))
+        self.assertIsNone(map_management_message(broker_data, None))
+        self.assertIsNone(map_management_message(broker_data, self.module_namespace))
 
-        broker_data = broker.zeek.Event("intel", 42, {},)
+        broker_data = broker.zeek.Event("intel", 42, {})
         self.assertIsNone(map_to_internal(broker_data, None))
         self.assertIsNone(map_to_internal(broker_data, self.module_namespace))
+        self.assertIsNone(map_management_message(broker_data, None))
+        self.assertIsNone(map_management_message(broker_data, self.module_namespace))
+
+        broker_data = broker.zeek.Event("subscribe", "topic")
+        self.assertIsNone(map_to_internal(broker_data, None))
+        self.assertIsNone(map_to_internal(broker_data, self.module_namespace))
+        self.assertIsNone(map_management_message(broker_data, None))
+        self.assertIsNone(map_management_message(broker_data, self.module_namespace))
+
+        broker_data = broker.zeek.Event("unsubscribe")
+        self.assertIsNone(map_to_internal(broker_data, None))
+        self.assertIsNone(map_to_internal(broker_data, self.module_namespace))
+        self.assertIsNone(map_management_message(broker_data, None))
+        self.assertIsNone(map_management_message(broker_data, self.module_namespace))
 
     def test_valid_intel(self):
         data = IntelData("6.6.6.6", IntelType.IPDST_PORT, foo=23)
@@ -122,13 +145,31 @@ class TestMessageMapping(unittest.TestCase):
         intel = map_to_internal(event, self.module_namespace)
         self.assertEqual(intel.operation, Operation.ADD)
 
+    def test_valid_subscription(self):
+        td = timedelta(days=5)
+        topic = "some/topic"
+        expected = Subscription(topic, td)
 
-class TestTopicMapping(unittest.TestCase):
-    def test_invalid_inputs(self):
-        self.assertEqual(map_to_string_set(None), set())
-        self.assertEqual(map_to_string_set("Foo"), set())
-        self.assertEqual(map_to_string_set(object), set())
+        # without namespace
+        event = broker.zeek.Event("subscribe", topic, td)
+        subscription = map_management_message(event, self.module_namespace)
+        self.assertEqual(subscription, expected)
 
-    def test_valid_topics(self):
-        vt = broker._broker.VectorTopic([broker.Topic("foo"), broker.Topic("bar")])
-        self.assertEqual(map_to_string_set(vt), {"foo", "bar"})
+        # with namespace:
+        event = broker.zeek.Event(self.module_namespace + "::subscribe", topic, td)
+        subscription = map_management_message(event, self.module_namespace)
+        self.assertEqual(subscription, expected)
+
+    def test_valid_unsubscription(self):
+        topic = "some/topic"
+        expected = Unsubscription(topic)
+
+        # without namespace
+        event = broker.zeek.Event("unsubscribe", topic)
+        unsubscription = map_management_message(event, self.module_namespace)
+        self.assertEqual(unsubscription, expected)
+
+        # with namespace:
+        event = broker.zeek.Event(self.module_namespace + "::unsubscribe", topic)
+        unsubscription = map_management_message(event, self.module_namespace)
+        self.assertEqual(unsubscription, expected)

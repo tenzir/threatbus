@@ -1,6 +1,7 @@
 import broker
 from contextlib import suppress
-from datetime import datetime
+from dataclasses import dataclass
+from datetime import timedelta
 from threatbus.data import Intel, IntelData, IntelType, Operation, Sighting
 import re
 
@@ -65,11 +66,30 @@ from_zeek_intel = {
 }
 
 
-def map_to_string_set(topic_vector):
-    """Maps a zeek vector of topics to a python set of strings."""
-    if not topic_vector or type(topic_vector).__name__ != "VectorTopic":
-        return set()
-    return set(map(str, topic_vector))
+@dataclass
+class Subscription:
+    topic: str
+    snapshot: timedelta
+
+
+@dataclass
+class Unsubscription:
+    topic: str
+
+
+def map_management_message(broker_data, module_namespace):
+    """Maps a management message to an actionable instruction for threatbus.
+        @param broker_data The raw data that was received via broker
+        @param module_namespace A Zeek namespace to accept events from
+    """
+    event = broker.zeek.Event(broker_data)
+    name, args = event.name(), event.args()
+    module_namespace = module_namespace + "::" if module_namespace else ""
+    name = name[name.startswith(module_namespace) and len(module_namespace) :]
+    if name == "subscribe" and len(args) == 2:
+        return Subscription(args[0], args[1])
+    elif name == "unsubscribe" and len(args) == 1:
+        return Unsubscription(args[0])
 
 
 def map_broker_intel_to_internal(intel_dict):

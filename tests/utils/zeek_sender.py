@@ -5,7 +5,7 @@ import sys
 import time
 
 
-def send(broker_event):
+def send(topic, broker_event):
     """Sends a single, user specified broker event"""
     ep = broker.Endpoint()
     status_subscriber = ep.make_status_subscriber(True)
@@ -18,12 +18,12 @@ def send(broker_event):
         print("peering with remote machine failed")
         sys.exit(1)
 
-    ep.publish("tenzir", broker_event)
+    ep.publish(topic, broker_event)
 
     time.sleep(0.1)
 
 
-def send_generic(items):
+def send_generic(topic, items):
     ep = broker.Endpoint()
     status_subscriber = ep.make_status_subscriber(True)
     ep.peer("127.0.0.1", 47761)
@@ -44,11 +44,11 @@ def send_generic(items):
 
         # Threat Bus will pickup the event type and hence forward on a different
         # topic.
-        ep.publish("tenzir/some-zeek-topic", event)
+        ep.publish(topic, event)
 
     ## apparently the receiver will not receive everything, if the sending process exits too early. Thus we wait here (just for the demo sake)
     time.sleep(1)
 
 
 if __name__ == "__main__":
-    send_generic(1)
+    send_generic("threatbus/intel", 1)

@@ -1,16 +1,24 @@
 import broker
-from zeek_message_mapping import map_to_broker, map_to_internal, map_to_string_set
+from zeek_message_mapping import (
+    map_to_broker,
+    map_to_internal,
+    map_management_message,
+    Subscription,
+    Unsubscription,
+)
 from queue import Queue
+import random
 import select
+import string
 import threading
 import threatbus
-
+import time
 
 """Zeek network monitor - plugin for Threat Bus"""
 
 plugin_name = "zeek"
 lock = threading.Lock()
-subscribed_topics = set()
+subscriptions = dict()
 
 
 def validate_config(config):
@@ -20,84 +28,103 @@ def validate_config(config):
     config["module_namespace"].get(str)
 
 
-def publish(logger, module_namespace, ep, outq):
-    """Publishes all messages that arrive via the outq to all subscribed broker topics.
+def rand_string(length):
+    """Generates a pseudo-random string with the requested length"""
+    letters = string.ascii_lowercase
+    return "".join(random.choice(letters) for i in range(length))
+
+
+def manage_subscription(
+    ep, module_namespace, task, subscribe_callback, unsubscribe_callback
+):
+    global lock, subscriptions
+    rand_suffix_length = 10
+    if isinstance(task, Subscription):
+        # point-to-point topic and queue for that particular subscription
+        p2p_topic = task.topic + rand_string(rand_suffix_length)
+        p2p_q = Queue()
+        ack = broker.zeek.Event(
+            f"{module_namespace}::subscription_acknowledged", p2p_topic
+        )
+        ep.publish("threatbus/manage", ack)
+        subscribe_callback(task.topic, p2p_q, task.snapshot)
+        lock.acquire()
+        subscriptions[p2p_topic] = p2p_q
+        lock.release()
+    elif isinstance(task, Unsubscription):
+        threatbus_topic = task.topic[: len(task.topic) - rand_suffix_length]
+        p2p_q = subscriptions.get(task.topic, None)
+        if p2p_q:
+            unsubscribe_callback(threatbus_topic, p2p_q)
+            lock.acquire()
+            del subscriptions[task.topic]
+            lock.release()
+
+
+def publish(logger, module_namespace, ep):
+    """Publishes messages for all subscriptions in a round-robin fashion to via broker.
         @param logger A logging.logger object
         @param module_namespace A Zeek namespace to use for event sending
         @param ep The broker endpoint used for publishing
-        @param outq The queue to forward messages from
     """
-    global subscribed_topics, lock
+    global subscriptions, lock
     while True:
-        msg = outq.get(block=True)
-        msg_type = type(msg).__name__.lower()
-        msg_types = ["intel", "sighting"]
-        event = map_to_broker(msg, module_namespace)
         lock.acquire()
-        for topic in subscribed_topics:
-            if topic.endswith(msg_type) or all([t not in topic for t in msg_types]):
-                ep.publish(topic, event)
+        for topic, q in subscriptions.items():
+            if q.empty():
+                continue
+            msg = q.get()
+            if not msg:
+                continue
+            event = map_to_broker(msg, module_namespace)
+            ep.publish(topic, event)
+            logger.debug(f"Published {msg} on topic {topic}")
         lock.release()
-        logger.debug(f"Published {msg}")
+        time.sleep(0.05)
 
 
-def listen(logger, host, port, module_namespace, ep, inq):
-    """Binds a listener for the the given host/port to the broker ep. Forwards all received messages to the inq.
+def manage(logger, module_namespace, ep, subscribe_callback, unsubscribe_callback):
+    """Binds a broker subscriber to the given endpoint. Only listens for
+        management messages, such as un/subscriptions of new clients.
         @param logger A logging.logger object
-        @param host The host (e.g., IP) to listen at
-        @param port The port number to listen at
+        @param module_namespace A Zeek namespace to accept events from
+        @param ep The broker endpoint used for listening
+        @param subscribe_callback The callback to invoke for new subscriptions
+        @param unsubscribe_callback The callback to invoke for revoked subscriptions
+    """
+    sub = ep.make_subscriber("threatbus/manage")
+    while True:
+        ready = select.select([sub.fd()], [], [])
+        if not ready[0]:
+            logger.critical("Broker management subscriber filedescriptor error.")
+        (topic, broker_data) = sub.get()
+        msg = map_management_message(broker_data, module_namespace)
+        if msg:
+            logger.debug(
+                f"Received management request: {type(msg).__name__} -- {msg.topic}"
+            )
+            manage_subscription(
+                ep, module_namespace, msg, subscribe_callback, unsubscribe_callback
+            )
+
+
+def listen(logger, module_namespace, ep, inq):
+    """Binds a broker subscriber to the given endpoint. Forwards all received
+        intel and sightings to the inq.
+        @param logger A logging.logger object
         @param module_namespace A Zeek namespace to accept events from
         @param ep The broker endpoint used for listening
         @param inq The queue to forward messages to
     """
-    ep.listen(host, port)
-    sub = ep.make_subscriber("tenzir")
-    logger.info(f"Broker: endpoint listening - {host}:{port}")
+    sub = ep.make_subscriber(["threatbus/intel", "threatbus/sighting"])
     while True:
         ready = select.select([sub.fd()], [], [])
         if not ready[0]:
-            logger.critical("Broker subscriber filedescriptor error.")
+            logger.critical("Broker intel/sightings subscriber filedescriptor error.")
         (topic, broker_data) = sub.get()
         msg = map_to_internal(broker_data, module_namespace)
         if msg:
             inq.put(msg)
-
-
-def status_update(config, logger, ep, outq, subscribe_callback, unsubscribe_callback):
-    stat_sub = ep.make_status_subscriber(True)
-    # broker already is a pub-sub system
-    # we reuse broker topics as Threat Bus topics and register all currently subscribed broker topics at the backbones
-    global subscribed_topics, lock
-    while True:
-        ready = select.select([stat_sub.fd()], [], [])
-        if not ready[0]:
-            logger.critical("Status-subscriber filedescriptor error.")
-        status = stat_sub.get()
-        if not status:
-            logger.error(
-                "Encountered unknown connection status on broker receiver {status}"
-            )
-            continue
-        lock.acquire()
-        ep_subscriptions = map_to_string_set(ep.peer_subscriptions())
-        if status.code() == broker.SC.PeerAdded:
-            logger.info("New peer added.")
-            added_topics = ep_subscriptions - subscribed_topics
-            if added_topics:
-                logger.info(f"New topics subscribed: {added_topics}")
-                subscribed_topics = ep_subscriptions
-                subscribe_callback(map(str, added_topics), outq)
-        elif (
-            status.code() == broker.SC.PeerRemoved
-            or status.code() == broker.SC.PeerLost
-        ):
-            logger.info("Peer removed.")
-            removed_topics = subscribed_topics - ep_subscriptions
-            if removed_topics:
-                logger.info(f"Topic subscriptions removed: {removed_topics}")
-                subscribed_topics = ep_subscriptions
-                unsubscribe_callback(map(str, removed_topics), outq)
-        lock.release()
 
 
 @threatbus.app
@@ -116,16 +143,18 @@ def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
     broker_opts = broker.BrokerOptions()
     broker_opts.forward = False
     ep = broker.Endpoint(broker.Configuration(broker_opts))
+    ep.listen(host, port)
+    logger.info(f"Broker: endpoint listening - {host}:{port}")
+
     threading.Thread(
-        target=listen, args=(logger, host, port, namespace, ep, inq), daemon=True
+        target=listen, args=(logger, namespace, ep, inq), daemon=True
     ).start()
-    outq = Queue()  # Single global queue. We cannot distinguish better with broker.
+
     threading.Thread(
-        target=status_update,
-        args=(config, logger, ep, outq, subscribe_callback, unsubscribe_callback),
+        target=manage,
+        args=(logger, namespace, ep, subscribe_callback, unsubscribe_callback),
         daemon=True,
     ).start()
-    threading.Thread(
-        target=publish, args=(logger, namespace, ep, outq), daemon=True
-    ).start()
+
+    threading.Thread(target=publish, args=(logger, namespace, ep), daemon=True).start()
     logger.info("Zeek plugin started")
