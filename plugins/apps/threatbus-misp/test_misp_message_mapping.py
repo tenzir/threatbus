@@ -1,10 +1,8 @@
-from datetime import datetime, timezone
+from datetime import datetime
 import unittest
 
-import threatbus
 from threatbus.data import Intel, IntelData, IntelType, Operation, Sighting
 from misp_message_mapping import map_to_internal, map_to_misp
-import pymisp
 
 
 class TestMessageMapping(unittest.TestCase):
