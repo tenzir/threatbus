@@ -5,7 +5,6 @@ logging:
   file_verbosity: DEBUG
   filename: threatbus.log
 
-
 plugins:
   backbones:
     inmem:
@@ -19,16 +18,16 @@ plugins:
         host: https://localhost
         ssl: false
         key: NpwGjzaWY7sQxovURfOORCFqz7eshxqDWhbARH3E
-      # zmq:
-      #   host: localhost
-      #   port: 50000
-      kafka:
-        topics:
-        - misp_attribute
-        poll_interval: 1.0
-        # All config entries are passed as-is to librdkafka
-        # https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
-        config:
-          bootstrap.servers: "localhost:9092"
-          group.id: "threatbus"
-          auto.offset.reset: "earliest"
+      zmq:
+        host: localhost
+        port: 50000
+      #kafka:
+      #  topics:
+      #  - misp_attribute
+      #  poll_interval: 1.0
+      #  # All config entries are passed as-is to librdkafka
+      #  # https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
+      #  config:
+      #    bootstrap.servers: "localhost:9092"
+      #    group.id: "threatbus"
+      #    auto.offset.reset: "earliest"
