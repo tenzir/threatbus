@@ -7,23 +7,51 @@
 The missing tool to interconnect open-source security applications.
 
 [![Build Status][ci-badge]][ci-url]
+[![Development Status][alpha-badge]][latest-release-url]
 [![Latest Release][latest-release-badge]][latest-release-url]
 [![License][license-badge]][license-url]
 
 [_Getting Started_](#getting-started) &mdash;
 [_Contributing Guidelines_][contributing-url] &mdash;
-[_Writing Plugins_](#Writing-plugins) &mdash;
-[_Changelog_][changelog-url] &mdash;
+[_Writing Plugins_](#plugin-development) &mdash;
 [_License_](#license)
 
 </h4>
 
-**Threat Bus** (`threatbus`) connects various open-source security applications
-and facilitates data exchange. With *Threat Bus*  you can seamlessly integrate
-MISP intelligence with the Zeek intel framework or report sightings from IDS
-deployments to some data base.
+## Key Features
 
-The project is plugin-based and can be extended easily.
+- **Connect Open-Source Security Tools**: Threat Bus is a pub-sub broker for
+  threat intelligence data. With *Threat Bus*  you can seamlessly integrate
+  [MISP][misp] intelligence with the [Zeek][zeek] intel framework or report
+  sightings from IDS deployments to some data base.
+
+- **Plugin-based Architecture**: The project is plugin-based and can be extended
+  easily. We welcome contributions to adopt new open source tools!
+
+- **Snapshotting**: The snapshot feature allows subscribers to directly request
+  threat intelligence data for a certain time range from other applications.
+  Threat Bus handles the point-to-point communication of all involved apps.
+
+
+## Getting Started
+
+*Start Threat Bus*
+
+```sh
+venv/bin/threatbus -c config.yaml
+```
+
+*Start Zeek as Threat Bus App*
+
+```sh
+zeek -i <INTERFACE> -C ./apps/zeek/threatbus.zeek
+```
+
+*Start Zeek and request a Snapshot*
+
+```sh
+zeek -i <INTERFACE> -C ./apps/zeek/threatbus.zeek -- "Tenzir::snapshot_intel=-30 days"
+```
 
 ## Installation
 
@@ -47,7 +75,7 @@ make unit-tests
 make integration-tests
 ```
 
-The integration tests require a local [Zeek](https://www.zeek.org) installation.
+The integration tests require a local [Zeek][zeek] installation.
 
 
 ## Plugin Development
@@ -111,6 +139,20 @@ Example:
       ...
   ```
 
+### Threat Bus API
+
+Plugins specifications are available in `threatbus/appspecs.py` and
+`threatbus/backbonespecs.py`, respectively. For any plugin, you should at least
+implement the `run` function.
+
+App plugins are provided two callback functions to use for subscription
+management. Internally, Threat Bus will propagate subscription requests to all
+installed backbone plugins.
+
+The subscription callback allows applications to request an optinal snapshot
+time delta. Threat Bus will forward snapshot requests to all those apps that
+have implemented the snapshot feature (see `threatbus/appspecs.py`).
+
 ## License
 
 Threat Bus comes with a [3-clause BSD license][license-url].
@@ -130,3 +172,4 @@ Threat Bus comes with a [3-clause BSD license][license-url].
 [ci-badge]: https://github.com/tenzir/threatbus/workflows/Python%20Egg/badge.svg?branch=master
 [license-badge]: https://img.shields.io/badge/license-BSD-blue.svg
 [license-url]: https://github.com/tenzir/threatbus/blob/master/COPYING
+[alpha-badge]: https://img.shields.io/badge/stage-alpha-blueviolet
