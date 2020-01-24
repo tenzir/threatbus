@@ -49,7 +49,7 @@ class TestRoundtrips(unittest.TestCase):
             target=zeek_receiver.forward, args=(items, result_q), daemon=False
         )
         rec.start()
-        zeek_sender.send_generic(items)
+        zeek_sender.send_generic("threatbus/intel", items)
         rec.join()
 
         self.assertEqual(result_q.qsize(), items)
@@ -62,7 +62,7 @@ class TestRoundtrips(unittest.TestCase):
 
     def test_intel_sighting_roundtrip(self):
         """
-            Backend agnostic routrip screnario, that starts invokes a Zeek
+            Backend agnostic routrip screnario, that starts a Zeek
             subprocess. Zeek is started using the threatbus.zeek "app" script.
             The test sends an intelligence item via threatbus. The Zeek
             subprocess reads a PCAP trace which contains that known threat
@@ -74,7 +74,7 @@ class TestRoundtrips(unittest.TestCase):
         result_q = queue.Queue()
         rec = threading.Thread(
             target=zeek_receiver.forward,
-            args=(1, result_q, "tenzir/threatbus/sighting"),
+            args=(1, result_q, "threatbus/sighting"),
             daemon=False,
         )
         rec.start()
@@ -90,10 +90,11 @@ class TestRoundtrips(unittest.TestCase):
         intel_id = "EXAMPLE.COM.IS.EVIL"
         data = {"indicator": "example.com", "intel_type": "DOMAIN"}
         intel = broker.zeek.Event("intel", datetime.now(), intel_id, data, "ADD")
-        zeek_sender.send(intel)
+        zeek_sender.send("threatbus/intel", intel)
 
         # wait for zeek to report sighting of the intel
         sighting = result_q.get(block=True)
+        print("have sighting", sighting)
         result_q.task_done()
         result_q.join()
         rec.join()

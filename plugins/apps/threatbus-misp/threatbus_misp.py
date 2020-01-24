@@ -1,4 +1,5 @@
-from confluent_kafka import Consumer, KafkaError
+from confluent_kafka import Consumer
+from datetime import datetime
 import json
 import pymisp
 from queue import Queue
@@ -8,12 +9,15 @@ import zmq
 
 from misp_message_mapping import map_to_internal, map_to_misp
 import threatbus
+from threatbus.data import MessageType
 
 warnings.simplefilter("ignore")  # pymisp produces urllib warnings
 
 """MISP - Open Source Threat Intelligence Platform - plugin for Threat Bus"""
 
 plugin_name = "misp"
+misp = None
+lock = threading.Lock()
 
 
 def validate_config(config):
@@ -39,12 +43,11 @@ def validate_config(config):
         config["kafka"]["config"].get(dict)
 
 
-def publish_sightings(logger, misp, outq):
+def publish_sightings(outq):
     """Reports / publishes true-positive sightings of intelligence items back to the given MISP endpoint.
-        @param logger A logging.logger object
-        @param misp A connected pymisp instance
         @param outq The queue from which to forward messages to MISP 
     """
+    global logger, misp, lock
     if not misp:
         return
     while True:
@@ -53,17 +56,19 @@ def publish_sightings(logger, misp, outq):
             f"report sighting for intel id {sighting.intel} seen at {sighting.ts}"
         )
         misp_sighting = map_to_misp(sighting)
+        lock.acquire()
         misp.add_sighting(misp_sighting)
+        lock.release()
 
 
-def receive_kafka(logger, kafka_config, inq):
+def receive_kafka(kafka_config, inq):
     """Binds a Kafka consumer to the the given host/port. Forwards all received messages to the inq.
-        @param logger A logging.logger object
         @param kafka_config A configuration object for Kafka binding
         @param inq The queue to which intel items from MISP are forwarded to
     """
     consumer = Consumer(kafka_config["config"].get(dict))
     consumer.subscribe(kafka_config["topics"].get(list))
+    global logger
     while True:
         message = consumer.poll(timeout=kafka_config["poll_interval"].get(float))
         if message is None:
@@ -86,9 +91,8 @@ def receive_kafka(logger, kafka_config, inq):
             inq.put(intel)
 
 
-def receive_zmq(logger, zmq_config, inq):
+def receive_zmq(zmq_config, inq):
     """Binds a ZMQ poller to the the given host/port. Forwards all received messages to the inq.
-        @param logger A logging.logger object
         @param zmq_config A configuration object for ZeroMQ binding
         @param inq The queue to which intel items from MISP are forwarded to
     """
@@ -120,16 +124,37 @@ def receive_zmq(logger, zmq_config, inq):
 
 
 @threatbus.app
+def snapshot(snapshot_type, result_q, time_delta):
+    global logger, misp, lock
+    if snapshot_type != MessageType.INTEL:
+        logger.debug(f"Sighting snapshot feature not yet implemented.")
+        return  # TODO sighting snapshot not yet implemented
+
+    if not misp:
+        return
+    logger.debug(f"Executing intel snapshot for time delta {time_delta}")
+    lock.acquire()
+    data = misp.search(
+        controller="attributes", to_ids=True, date_from=datetime.now() - time_delta
+    )
+    lock.release()
+    if not data:
+        return
+    for attr in data["Attribute"]:
+        intel = map_to_internal(attr, "add", logger)
+        if intel:
+            result_q.put(intel)
+
+
+@threatbus.app
 def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
+    global logger
     logger = threatbus.logger.setup(logging, __name__)
     config = config[plugin_name]
     try:
         validate_config(config)
     except Exception as e:
         logger.fatal("Invalid config for plugin {}: {}".format(plugin_name, str(e)))
-    # TODO: MISP instances shall subscribe themselves to threatbus and each subscription shall have an individual outq and receiving thread for intel updates.
-    outq = Queue()
-    misp = None
     if config["api"].get():
         host, key, ssl = (
             config["api"]["host"].get(),
@@ -137,24 +162,27 @@ def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
             config["api"]["ssl"].get(),
         )
         try:
+            global misp, lock
+            lock.acquire()
             misp = pymisp.ExpandedPyMISP(url=host, key=key, ssl=ssl)
-        except Exception as e:
+            lock.release()
+        except Exception:
             # TODO: log individual error per MISP subscriber
             logger.error(f"Cannot subscribe to MISP at {host}, using SSL: {ssl}")
+            lock.release()
 
-    # TODO: make individual subscriptions per subscribed MISP endpoint
-    subscribe_callback("tenzir/threatbus/sighting", outq)
+    # TODO: MISP instances shall subscribe themselves to threatbus and each subscription shall have an individual outq and receiving thread for intel updates.
+    outq = Queue()
+    subscribe_callback("threatbus/sighting", outq)
 
     if misp:
-        threading.Thread(
-            target=publish_sightings, args=(logger, misp, outq), daemon=True
-        ).start()
+        threading.Thread(target=publish_sightings, args=(outq,), daemon=True).start()
     if config["zmq"].get():
         threading.Thread(
-            target=receive_zmq, args=(logger, config["zmq"], inq), daemon=True
+            target=receive_zmq, args=(config["zmq"], inq), daemon=True
         ).start()
     if config["kafka"].get():
         threading.Thread(
-            target=receive_kafka, args=(logger, config["kafka"], inq), daemon=True
+            target=receive_kafka, args=(config["kafka"], inq), daemon=True
         ).start()
     logger.info("MISP plugin started")

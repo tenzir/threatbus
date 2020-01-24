@@ -27,6 +27,9 @@ export {
   ## Broker port.
   const broker_port = 47761/tcp &redef;
 
+  ## The source name for the Intel framework for intel coming from Threat Bus.
+  const tb_intel_tag = "threatbus";
+
   ## Flag to control whether intel sightings should be reported back.
   option report_sightings = T &redef;
 
@@ -39,19 +42,16 @@ export {
   ## Flag that indicates whether to log intel operations via reporter.log
   option log_operations = T &redef;
 
-  ## Topic to subscribe to for receiving intel.
-  option intel_topic = "tenzir/threatbus/intel" &redef;
-
-  ## Topic to subscribe to for receiving intel.
-  option sighting_topic = "tenzir/threatbus/sighting" &redef;
-
-  ## The source name for the Intel framework for intel coming from Threat Bus.
-  const tb_intel_tag = "threatbus";
+  ## Threat Bus topic to subscribe to for receiving intel.
+  option intel_topic = "threatbus/intel" &redef;
 
   ## Event to raise for intel item insertion.
   ##
   ## item: The intel type to add.
   global intel: event(item: Intelligence);
+
+  ## Threat Bus topic to report sightings.
+  option sighting_topic = "threatbus/sighting" &redef;
 
   ## Event to report back sightings of (previously added) intel.
   ##
@@ -59,6 +59,37 @@ export {
   ##
   ## intel_id: The ID of the seen intel item.
   global sighting: event(ts: time, intel_id: string, context: table[string] of any);
+
+  ## Broker topic to negotiate un/subscriptions with Threat Bus.
+  option management_topic = "threatbus/manage" &redef;
+
+  ## Point-to-point topic for this Zeek instance to Threat Bus.
+  ##
+  ## The p2p_topic will be created by Threat Bus and all data coming on that
+  ## topic is meant for this particular Zeek instance only.
+  global p2p_topic: string = "" &redef;
+
+  ## Event to subscribe a new topic at Threat Bus.
+  ##
+  ## topic: The topic we are interested in
+  ##
+  ## snapshot: The earliest timestamp for which to request a snapshot for.
+  global subscribe: event(topic: string, snapshot_intel: interval);
+
+  ## Event raised by Threat Bus when new subscriptions are acknowledged.
+  ## The returned p2p_topic is only valid for this Zeek instance.
+  ##
+  ## p2p_topic: a dedicated topic for this Zeek instance to subscribe to
+  global subscription_acknowledged: event(p2p_topic: string);
+
+  ## Event to unsubscribe a topic from Threat Bus.
+  ##
+  ## topic: The topic we are interested in
+  global unsubscribe: event(topic: string);
+
+  ## The earliest timestamp for which to request a snapshot for.
+  option snapshot_intel: interval = 0 sec &redef;
+
 }
 
 ## ---------- broker management and logging ------------------------------------
@@ -67,14 +98,16 @@ event Broker::peer_lost(endpoint: Broker::EndpointInfo, msg: string)
   {
   if ( endpoint?$network && endpoint$network$address == broker_host 
       && endpoint$network$bound_port == broker_port && log_operations )
-    Reporter::info("threatbus disconnected");
+    Reporter::info("threatbus unpeered");
   }
 
 event Broker::peer_added(endpoint: Broker::EndpointInfo, msg: string)
   {
   if ( endpoint?$network && endpoint$network$address == broker_host 
-      && endpoint$network$bound_port == broker_port && log_operations )
-    Reporter::info("threatbus connected");
+      && endpoint$network$bound_port == broker_port )
+    if ( log_operations )
+      Reporter::info("threatbus peered");
+    Broker::publish(management_topic, subscribe, intel_topic, snapshot_intel);
   }
 
 # Only the manager communicates with Threat Bus.
@@ -84,11 +117,12 @@ event zeek_init() &priority=1
   {
   if ( log_operations )
     {
-    Reporter::info(fmt("subscribing to topic %s", intel_topic));
+    Reporter::info(fmt("subscribing to management topic %s", management_topic));
     Reporter::info(fmt("reporting noisy intel at %d matches/sec",
                        noisy_intel_threshold));
     }
-  Broker::subscribe(intel_topic);
+  # explicitly use management topic to register a subscription with snapshot
+  Broker::subscribe(management_topic);
   }
 @endif
 
@@ -104,6 +138,18 @@ event zeek_init() &priority=0
   Broker::peer(broker_host, broker_port, 5sec);
   }
 @endif
+
+# Only the manager communicates with Threat Bus.
+@if ( ! Cluster::is_enabled()
+      || Cluster::local_node_type() == Cluster::MANAGER )
+event zeek_done() &priority=1
+  {
+  Broker::publish(management_topic, unsubscribe, p2p_topic);
+  if ( log_operations )
+    Reporter::info(fmt("unsubscribing from p2p_topic %s", p2p_topic));
+  }
+@endif
+
 
 ## ---------- Threat Bus specific application logic ----------------------------
 
@@ -164,6 +210,17 @@ event intel(item: Intelligence)
     Intel::insert(mapped_intel);
   else if ( item$operation == "REMOVE" )
     Intel::remove(mapped_intel, T);
+  }
+
+# Event sent by Threat Bus to acknowledge new subscriptions.
+event subscription_acknowledged(topic: string)
+  {
+  # This particular topic is used by Threat Bus to send dedicated messages to
+  # only this Zeek instance.
+  p2p_topic = topic;
+  Broker::subscribe(p2p_topic);
+  if ( log_operations )
+    Reporter::info(fmt("Subscribed to p2p_topic: %s", p2p_topic));
   }
 
 

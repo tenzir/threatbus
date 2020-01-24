@@ -10,6 +10,12 @@ class Operation(Enum):
 
 
 @unique
+class MessageType(Enum):
+    INTEL = auto()
+    SIGHTING = auto()
+
+
+@unique
 class IntelType(Enum):
     IPSRC = auto()
     IPDST = auto()

@@ -1,6 +1,5 @@
 import threading
-from collections import defaultdict, Iterable
-import time
+from collections import defaultdict
 import threatbus
 
 """In-Memory backbone plugin for Threat Bus"""
@@ -24,7 +23,7 @@ def provision(logger, inq):
     while True:
         msg = inq.get(block=True)
         logger.debug(f"Backbone got message {msg}")
-        topic = f"tenzir/threatbus/{type(msg).__name__.lower()}"
+        topic = f"threatbus/{type(msg).__name__.lower()}"
         lock.acquire()
         for t in filter(lambda t: str(topic).startswith(str(t)), subscriptions.keys()):
             for outq in subscriptions[t]:
@@ -33,25 +32,26 @@ def provision(logger, inq):
 
 
 @threatbus.backbone
-def subscribe(topics, q):
-    if not isinstance(topics, Iterable) or isinstance(topics, str):
-        topics = [topics]
+def provision_p2p(src_q, dst_q):
+    while not src_q.empty():
+        msg = src_q.get(timeout=5)
+        dst_q.put(msg)
+
+
+@threatbus.backbone
+def subscribe(topic, q):
     global subscriptions, lock
     lock.acquire()
-    for topic in topics:
-        subscriptions[topic].add(q)
+    subscriptions[topic].add(q)
     lock.release()
 
 
 @threatbus.backbone
-def unsubscribe(topics, q):
-    if not isinstance(topics, Iterable) or isinstance(topics, str):
-        topics = [topics]
+def unsubscribe(topic, q):
     global subscriptions, lock
     lock.acquire()
-    for topic in topics:
-        if q in subscriptions[topic]:
-            subscriptions[topic].remove(q)
+    if q in subscriptions[topic]:
+        subscriptions[topic].remove(q)
     lock.release()
 
 

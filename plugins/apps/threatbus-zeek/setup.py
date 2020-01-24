@@ -5,4 +5,5 @@ setup(
     install_requires="threatbus",
     entry_points={"threatbus.app": ["zeek = threatbus_zeek"]},
     py_modules=["threatbus_zeek", "zeek_message_mapping"],
+    version="0.3.0",
 )
