@@ -10,4 +10,5 @@ setup(
     ],
     entry_points={"threatbus.app": ["misp = threatbus_misp"]},
     py_modules=["threatbus_misp", "misp_message_mapping"],
+    version="0.3.0",
 )

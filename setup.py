@@ -21,7 +21,7 @@ setup(
     license="BSD 3-Clause license",
     include_package_data=True,
     packages=find_packages(),
-    version="0.2.0",
+    version="0.3.0",
     zip_safe=False,
     entry_points={"console_scripts": ["threatbus=threatbus.threatbus:main"]},
 )
