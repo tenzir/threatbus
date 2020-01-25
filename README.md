@@ -7,6 +7,8 @@
 The missing tool to interconnect open-source security applications.
 
 [![Build Status][ci-badge]][ci-url]
+[![Total alerts][lgtm-alerts-badge]][lgtm-alerts-url]
+[![Language grade: Python][lgtm-quality-badge]][lgtm-quality-url]
 [![Development Status][alpha-badge]][latest-release-url]
 [![Latest Release][latest-release-badge]][latest-release-url]
 [![License][license-badge]][license-url]
@@ -173,3 +175,7 @@ Threat Bus comes with a [3-clause BSD license][license-url].
 [license-badge]: https://img.shields.io/badge/license-BSD-blue.svg
 [license-url]: https://github.com/tenzir/threatbus/blob/master/COPYING
 [alpha-badge]: https://img.shields.io/badge/stage-alpha-blueviolet
+[lgtm-alerts-badge]: https://img.shields.io/lgtm/alerts/g/tenzir/threatbus.svg?logo=lgtm&logoWidth=18
+[lgtm-alerts-url]: https://lgtm.com/projects/g/tenzir/threatbus/alerts/
+[lgtm-quality-badge]: https://img.shields.io/lgtm/grade/python/g/tenzir/threatbus.svg?logo=lgtm&logoWidth=18
+[lgtm-quality-url]: https://lgtm.com/projects/g/tenzir/threatbus/context:python
