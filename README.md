@@ -6,6 +6,7 @@
 
 The missing tool to interconnect open-source security applications.
 
+[![PyPI Status][pypi-badge]][pypi-url]
 [![Build Status][ci-badge]][ci-url]
 [![Total alerts][lgtm-alerts-badge]][lgtm-alerts-url]
 [![Language grade: Python][lgtm-quality-badge]][lgtm-quality-url]
@@ -63,9 +64,11 @@ environment.
 ```
 virtualenv venv           # optional
 source venv/bin/activate  # optional
-pip install .
-pip install plugins/backbones/threatbus-inmem
-pip install plugins/<desired-plugins>
+pip install threatbus
+pip install threatbus-inmem
+pip install threatbus-misp
+pip install threatbus-zeek
+pip install threatbus-<plugin_name>
 ```
 
 ### Testing
@@ -114,9 +117,9 @@ Example:
   ```sh
   plugins
   ├── apps
-  │   └── threatbus-zeek
-  │       ├── setup.py
-  │       └── threatbus_zeek.py
+  |   └── threatbus-zeek
+  │       ├── setup.py
+  |       └── threatbus_zeek.py
   └── backbones
       └── threatbus-inmem
           ├── setup.py
@@ -167,6 +170,8 @@ Threat Bus comes with a [3-clause BSD license][license-url].
 [zeek]: https://www.zeek.org
 [misp-zmq-config]: https://github.com/MISP/misp-book/tree/master/misp-zmq#misp-zeromq-configuration
 
+[pypi-badge]: https://img.shields.io/pypi/v/threatbus.svg
+[pypi-url]: https://pypi.org/project/threatbus
 [contributing-url]: https://github.com/tenzir/.github/blob/master/contributing.md
 [latest-release-badge]: https://img.shields.io/github/commits-since/tenzir/threatbus/latest.svg?color=green
 [latest-release-url]: https://github.com/tenzir/threatbus/releases

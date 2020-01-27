@@ -1,6 +1,8 @@
 *.sw?
-env
-venv
-vast
-**/__pycache__
-**/*.egg-info
+env/
+build/
+dist/
+venv/
+**/__pycache__/
+**/*.egg-info/
+*tar.gz
