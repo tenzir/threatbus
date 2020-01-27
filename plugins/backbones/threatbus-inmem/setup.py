@@ -22,7 +22,7 @@ setup(
     ],
     description="A simplistic in-memory backbone for threatbus.",
     entry_points={"threatbus.backbone": ["inmem = threatbus_inmem"]},
-    install_requires=["threatbus>=0.3.0",],
+    install_requires=["threatbus>=0.3.1",],
     keywords=["threatbus", "plugin"],
     license="BSD 3-clause",
     long_description=long_description,
@@ -31,5 +31,5 @@ setup(
     py_modules=["threatbus_inmem"],
     python_requires=">=3.7",
     url="https://github.com/tenzir/threatbus",
-    version="0.3.0",
+    version="0.3.1",
 )

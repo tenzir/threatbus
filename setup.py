@@ -45,5 +45,5 @@ setup(
     packages=find_packages(),
     python_requires=">=3.7",
     url="https://github.com/tenzir/threatbus",
-    version="0.3.0",
+    version="0.3.1",
 )
