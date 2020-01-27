@@ -63,6 +63,11 @@ jobs:
         python plugins/apps/threatbus-zeek/setup.py sdist bdist_wheel
         python plugins/apps/threatbus-misp/setup.py sdist bdist_wheel
         python plugins/backbones/threatbus-inmem/setup.py sdist bdist_wheel
+    - name: Create Release Name
+      id: release_name
+      run: |
+        NAME="Threat Bus $(date +%Y-%m-%d)"
+        echo "::set-output name=name::$NAME"
     - name: GitHub Release
       id: create_release
       uses: actions/create-release@v1
@@ -70,7 +75,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{ github.ref }}
-        release_name: Threat Bus ${{ github.ref }}
+        release_name: ${{ steps.release_name.outputs.name }}
         draft: false
         prerelease: false
     - name: Publish to PyPI
