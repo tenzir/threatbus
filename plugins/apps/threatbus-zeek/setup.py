@@ -1,4 +1,10 @@
 from setuptools import setup
+import pathlib
+
+plugin_dir = pathlib.Path(__file__).parent.absolute()
+
+with open(f"{plugin_dir}/README.md", "r") as fh:
+    long_description = fh.read()
 
 setup(
     author="Tenzir",
@@ -22,6 +28,8 @@ setup(
     install_requires=["threatbus>=0.3.0",],
     keywords=["threatbus", "Zeek", "intrusion detection", "IDS", "broker", "plugin"],
     license="BSD 3-clause",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     name="threatbus-zeek",
     py_modules=["threatbus_zeek", "zeek_message_mapping"],
     python_requires=">=3.7",

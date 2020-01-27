@@ -1,4 +1,10 @@
 from setuptools import setup
+import pathlib
+
+plugin_dir = pathlib.Path(__file__).parent.absolute()
+
+with open(f"{plugin_dir}/README.md", "r") as fh:
+    long_description = fh.read()
 
 setup(
     author="Tenzir",
@@ -35,6 +41,8 @@ setup(
         "kafka",
     ],
     license="BSD 3-clause",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     name="threatbus-misp",
     py_modules=["threatbus_misp", "misp_message_mapping"],
     python_requires=">=3.7",

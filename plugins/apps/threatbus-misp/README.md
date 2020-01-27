@@ -1,10 +1,22 @@
 Threat Bus MISP Plugin
 ======================
 
+<h4 align="center">
+
+[![PyPI Status][pypi-badge]][pypi-url]
+[![Build Status][ci-badge]][ci-url]
+[![License][license-badge]][license-url]
+
+</h4>
+
 A Threat Bus plugin that enables communication to [MISP](https://www.misp-project.org/).
 
-## Installation
+The plugin goes against the pub/sub architecture of Threat Bus (for now),
+because the plugin subscribes a listener to ZeroMQ / Kafka, rather than having
+MISP subscribe itself to Threat Bus. That will be addressed with a MISP module
+in the near future.
 
+## Installation
 
 ```sh
 pip install threatbus-misp
@@ -19,6 +31,38 @@ you have to install `librdkafka` for the host system that is running
 `threatbus`. See also the [prerequisites](https://github.com/confluentinc/confluent-kafka-python#prerequisites)
 section of the `confluent-kafka` python client.
 
+## Configuration
+
+The plugin can either use ZeroMQ or Kafka to retrieve intelligence items from
+MISP. It uses the MISP REST api to report back sightings of indicators.
+
+ZeroMQ and Kafka are mutually exclusive, such that Threat Bus does not receive
+all attribute updates twice. See below for an example configuration.
+
+
+```yaml
+...
+plugins:
+  misp:
+    api:
+      host: https://localhost
+      ssl: false
+      key: MISP_API_KEY
+    zmq:
+      host: localhost
+      port: 50000
+    #kafka:
+    #  topics:
+    #  - misp_attribute
+    #  poll_interval: 1.0
+    #  # All config entries are passed as-is to librdkafka
+    #  # https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
+    #  config:
+    #    bootstrap.servers: "localhost:9092"
+    #    group.id: "threatbus"
+    #    auto.offset.reset: "earliest"
+...
+```
 
 ## Development Setup
 
@@ -135,3 +179,15 @@ exit # leave the Docker container shell
 ```sh
 make restart-all
 ```
+
+
+## License
+
+Threat Bus comes with a [3-clause BSD license][license-url].
+
+[pypi-badge]: https://img.shields.io/pypi/v/threatbus-misp.svg
+[pypi-url]: https://pypi.org/project/threatbus-misp
+[ci-url]: https://github.com/tenzir/threatbus/actions?query=branch%3Amaster
+[ci-badge]: https://github.com/tenzir/threatbus/workflows/Python%20Egg/badge.svg?branch=master
+[license-badge]: https://img.shields.io/badge/license-BSD-blue.svg
+[license-url]: https://github.com/tenzir/threatbus/blob/master/COPYING
