@@ -61,6 +61,7 @@ class ThreatBus:
         self.backbones.unsubscribe(topic=topic, q=q)
 
     def run(self):
+        self.logger.info("Starting plugins...")
         logging = self.config["logging"]
         self.apps.run(
             config=self.config["plugins"]["apps"],

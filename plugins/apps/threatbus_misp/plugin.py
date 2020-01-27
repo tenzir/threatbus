@@ -7,7 +7,7 @@ import threading
 import warnings
 import zmq
 
-from misp_message_mapping import map_to_internal, map_to_misp
+from threatbus_misp.message_mapping import map_to_internal, map_to_misp
 import threatbus
 from threatbus.data import MessageType
 

@@ -1,5 +1,5 @@
 import broker
-from zeek_message_mapping import (
+from threatbus_zeek.message_mapping import (
     map_to_broker,
     map_to_internal,
     map_management_message,

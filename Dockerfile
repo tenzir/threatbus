@@ -10,9 +10,9 @@ COPY setup.py .
 COPY README.md .
 COPY threatbus threatbus
 COPY plugins plugins
-RUN pip install . && \
-  pip install plugins/apps/threatbus-zeek && \
-  pip install plugins/backbones/threatbus-inmem
+RUN python3 setup.py install && \
+  python3 plugins/apps/threatbus_zeek/setup.py install && \
+  python3 plugins/backbones/threatbus_inmem/setup.py install
 COPY config* ./
 
 ENTRYPOINT ["threatbus"]

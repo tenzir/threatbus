@@ -42,8 +42,9 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     name="threatbus",
-    packages=find_packages(),
+    packages=["threatbus"],
     python_requires=">=3.7",
+    setup_requires=["setuptools", "wheel"],
     url="https://github.com/tenzir/threatbus",
-    version="0.3.1",
+    version="0.3.2",
 )

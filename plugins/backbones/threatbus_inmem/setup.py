@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 import pathlib
 
 plugin_dir = pathlib.Path(__file__).parent.absolute()
@@ -17,22 +17,20 @@ setup(
         "Operating System :: MacOS :: MacOS X",
         "Operating System :: POSIX :: Linux",
         "Programming Language :: Python :: 3",
-        "Topic :: Scientific/Engineering :: Information Analysis",
-        "Topic :: Scientific/Engineering :: Interface Engine/Protocol Translator",
         "Topic :: Security",
         "Topic :: Software Development :: Object Brokering",
-        "Topic :: System :: Distributed Computing",
     ],
-    description="A plugin to enable threatbus communication with Zeek network monitor.",
-    entry_points={"threatbus.app": ["zeek = threatbus_zeek"]},
-    install_requires=["threatbus>=0.3.1",],
-    keywords=["threatbus", "Zeek", "intrusion detection", "IDS", "broker", "plugin"],
+    description="A simplistic in-memory backbone for threatbus.",
+    entry_points={"threatbus.backbone": ["inmem = threatbus_inmem.plugin"]},
+    install_requires=["threatbus>=0.3.2",],
+    keywords=["threatbus", "plugin"],
     license="BSD 3-clause",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    name="threatbus-zeek",
-    py_modules=["threatbus_zeek", "zeek_message_mapping"],
+    name="threatbus-inmem",
+    package_dir={"": "plugins/backbones"},
+    packages=["threatbus_inmem"],
     python_requires=">=3.7",
     url="https://github.com/tenzir/threatbus",
-    version="0.3.1",
+    version="0.3.2",
 )
