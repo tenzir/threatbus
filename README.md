@@ -114,9 +114,9 @@ Example:
   ```sh
   plugins
   ├── apps
-  │   └── threatbus-zeek
-  │       ├── setup.py
-  │       └── threatbus_zeek.py
+  |   └── threatbus-zeek
+  │       ├── setup.py
+  |       └── threatbus_zeek.py
   └── backbones
       └── threatbus-inmem
           ├── setup.py
