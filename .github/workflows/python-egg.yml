@@ -75,4 +75,4 @@ jobs:
         prerelease: false
     - name: Publish to PyPI
       run: |
-        python -m twine upload --verbose --non-interactive dist dist/*
+        python -m twine upload --verbose --non-interactive dist/*

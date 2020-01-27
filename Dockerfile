@@ -7,6 +7,7 @@ EXPOSE 47761
 
 WORKDIR /opt/tenzir/threatbus
 COPY setup.py .
+COPY README.md .
 COPY threatbus threatbus
 COPY plugins plugins
 RUN pip install . && \
