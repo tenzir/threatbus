@@ -1,5 +1,5 @@
 .PHONY: all
-all: format test
+all: format build dist test
 
 .PHONY: install-dependencies
 install-dependencies:
@@ -14,7 +14,8 @@ test: unit-tests integration-tests
 
 .PHONY: unit-tests
 unit-tests:
-	python -m unittest discover
+	python -m unittest discover plugins/apps
+	python -m unittest discover plugins/backbones
 
 .PHONY: integration-tests
 integration-tests:
@@ -23,3 +24,41 @@ integration-tests:
 	-python -m unittest tests/integration/test_zeek_inmem.py
 	-${RM} {broker,intel,reporter,weird}.log
 	docker kill tb-int
+
+.PHONY: clean
+clean:
+	-find . -type d -name "*egg-info" -exec ${RM} -r {} \;
+	-find . -type d -name "__pycache__" -exec ${RM} -r {} \;
+	-${RM} -r build
+
+.PHONY: build
+build:
+	python setup.py build
+	python plugins/apps/threatbus_zeek/setup.py build
+	python plugins/apps/threatbus_misp/setup.py build
+	python plugins/backbones/threatbus_inmem/setup.py build
+
+.PHONY: dist
+dist:
+	python setup.py sdist bdist_wheel
+	make clean
+	python plugins/apps/threatbus_zeek/setup.py sdist bdist_wheel
+	make clean
+	python plugins/apps/threatbus_misp/setup.py sdist bdist_wheel
+	make clean
+	python plugins/backbones/threatbus_inmem/setup.py sdist bdist_wheel
+	make clean
+
+.PHONY: install
+install:
+	python setup.py install
+	python plugins/apps/threatbus_zeek/setup.py install
+	python plugins/apps/threatbus_misp/setup.py install
+	python plugins/backbones/threatbus_inmem/setup.py install
+
+.PHONY: dev-mode
+dev-mode:
+	python setup.py develop
+	python plugins/apps/threatbus_zeek/setup.py develop
+	python plugins/apps/threatbus_misp/setup.py develop
+	python plugins/backbones/threatbus_inmem/setup.py develop

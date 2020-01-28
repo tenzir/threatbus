@@ -2,7 +2,7 @@ from datetime import datetime
 import unittest
 
 from threatbus.data import Intel, IntelData, IntelType, Operation, Sighting
-from misp_message_mapping import map_to_internal, map_to_misp
+from threatbus_misp.message_mapping import map_to_internal, map_to_misp
 
 
 class TestMessageMapping(unittest.TestCase):

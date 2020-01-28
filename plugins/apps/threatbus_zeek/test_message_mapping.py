@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 import unittest
 
 from threatbus.data import Intel, IntelData, IntelType, Operation, Sighting
-from zeek_message_mapping import (
+from threatbus_zeek.message_mapping import (
     map_to_internal,
     map_to_broker,
     map_management_message,

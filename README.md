@@ -86,14 +86,12 @@ The integration tests require a local [Zeek][zeek] installation.
 ## Plugin Development
 
 Setup a virtual environment and install `threatbus` and some plugins with the
-`--editable` flag:
+in development mode:
 
 ```
 virtualenv venv
 source venv/bin/activate
-pip install --editable .
-pip install --editable plugins/backbones/threatbus-inmem
-pip install --editable plugins/<desired-plugins>
+make dev-mode
 ```
 
 ### Configuration & Extension

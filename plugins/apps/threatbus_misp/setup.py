@@ -24,9 +24,9 @@ setup(
         "Topic :: System :: Distributed Computing",
     ],
     description="A plugin to enable threatbus communication with MISP.",
-    entry_points={"threatbus.app": ["misp = threatbus_misp"]},
+    entry_points={"threatbus.app": ["misp = threatbus_misp.plugin"]},
     install_requires=[
-        "threatbus>=0.3.1",
+        "threatbus>=0.3.2",
         "pymisp>=2.4.120",
         "pyzmq>=18.1.1",
         "confluent-kafka>=1.3.0",
@@ -44,8 +44,9 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     name="threatbus-misp",
-    py_modules=["threatbus_misp", "misp_message_mapping"],
+    package_dir={"": "plugins/apps"},
+    packages=["threatbus_misp"],
     python_requires=">=3.7",
     url="https://github.com/tenzir/threatbus",
-    version="0.3.1",
+    version="0.3.2",
 )

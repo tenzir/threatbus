@@ -25,17 +25,10 @@ jobs:
         pip install wheel setuptools
     - name: Install Application and Plugins
       run: |
-        python setup.py build
-        pip install .
-        pip install plugins/apps/threatbus-zeek
-        pip install plugins/apps/threatbus-misp
-        pip install plugins/backbones/threatbus-inmem
+        make clean build
     - name: Package Application and Plugins
       run: |
-        python setup.py sdist bdist_wheel
-        python plugins/apps/threatbus-zeek/setup.py sdist bdist_wheel
-        python plugins/apps/threatbus-misp/setup.py sdist bdist_wheel
-        python plugins/backbones/threatbus-inmem/setup.py sdist bdist_wheel
+        make clean dist
 
   egg-release:
     name: Egg Release
@@ -59,10 +52,7 @@ jobs:
         pip install wheel setuptools twine
     - name: Package Application and Plugins
       run: |
-        python setup.py sdist bdist_wheel
-        python plugins/apps/threatbus-zeek/setup.py sdist bdist_wheel
-        python plugins/apps/threatbus-misp/setup.py sdist bdist_wheel
-        python plugins/backbones/threatbus-inmem/setup.py sdist bdist_wheel
+        make clean dist
     - name: Create Release Name
       id: release_name
       run: |
