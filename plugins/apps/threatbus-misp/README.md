@@ -144,6 +144,8 @@ make deploy
   - `Plugin.Kafka_brokers` -> `172.17.0.1:9092`    <- In this example, 172.17.0.1 is the Docker host, reachable from other Docker networks. The port is reachable when the Kafka Docker setup binds to it globally.
   - `Plugin.Kafka_attribute_notifications_enable` -> `true`
   - `Plugin.Kafka_attribute_notifications_topic` -> `misp_attribute` <- The topic goes into the threatbus `config.yaml`
+  - `Plugin.Kafka_event_notifications_enable` -> `true`
+  - `Plugin.Kafka_event_notifications_topic` -> `misp_event` <- The topic goes into the threatbus `config.yaml`
 
 *Install Kafka inside the `misp-server` container*
 
@@ -173,6 +175,7 @@ exit # leave the Docker container shell
 - Find the ZeroMQ plugin section and enable it
 - Go to `Administration` -> `Server Settings & Maintenance` -> `Plugin settings Tab`
 - Set the entry `Plugin.ZeroMQ_attribute_notifications_enable` to `true`
+- Set the entry `Plugin.ZeroMQ_event_notifications_enable` to `true`
 
 *Restart all MISP services*
 

@@ -61,6 +61,33 @@ def publish_sightings(outq):
         lock.release()
 
 
+def forward_raw(msg_str, inq):
+    """Gracefully tries to parse and forward a message string. If the message
+        cannot be parsed, an error is logged and None is returned.
+        @param msg_str The message (JSON string) to forward
+        @param inq The queue to forward successfully parsed message to
+    """
+    global logger
+    try:
+        msg = json.loads(msg_str)
+    except Exception as e:
+        logger.error(f"Error decoding message {msg_str}: {e}")
+        return
+    all_intel = []
+    if msg.get("Attribute", None):
+        intel = map_to_internal(msg["Attribute"], msg.get("action", None), logger)
+        if intel:
+            all_intel.append(intel)
+    elif msg.get("Event", None) and msg.get("action", None) == "delete":
+        # TODO: find all deleted attributes, add to all_intel
+        # See https://github.com/MISP/MISP/issues/4450
+        pass
+    if not all_intel:
+        return
+    for intel in all_intel:
+        inq.put(intel)
+
+
 def receive_kafka(kafka_config, inq):
     """Binds a Kafka consumer to the the given host/port. Forwards all received messages to the inq.
         @param kafka_config A configuration object for Kafka binding
@@ -76,19 +103,7 @@ def receive_kafka(kafka_config, inq):
         if message.error():
             logger.error(f"Kafka error: {message.error()}")
             continue
-        try:
-            msg = json.loads(message.value())
-        except Exception as e:
-            logger.error(f"Error decoding Kafka message: {e}")
-            continue
-        if not msg.get("Attribute", None):
-            logger.debug("Skipping message without MISP Attribute")
-            continue
-        intel = map_to_internal(msg["Attribute"], msg.get("action", None), logger)
-        if not intel:
-            logger.debug(f"Discarding unparsable intel {msg['Attribute']}")
-        else:
-            inq.put(intel)
+        forward_raw(message.value(), inq)
 
 
 def receive_zmq(zmq_config, inq):
@@ -99,8 +114,8 @@ def receive_zmq(zmq_config, inq):
 
     socket = zmq.Context().socket(zmq.SUB)
     socket.connect(f"tcp://{zmq_config['host']}:{zmq_config['port']}")
-    # TODO: allow reception of more topics, i.e. handle events.
     socket.setsockopt(zmq.SUBSCRIBE, b"misp_json_attribute")
+    socket.setsockopt(zmq.SUBSCRIBE, b"misp_json_event")
     poller = zmq.Poller()
     poller.register(socket, zmq.POLLIN)
 
@@ -109,18 +124,7 @@ def receive_zmq(zmq_config, inq):
         if socket in socks and socks[socket] == zmq.POLLIN:
             raw = socket.recv()
             _, message = raw.decode("utf-8").split(" ", 1)
-            try:
-                msg = json.loads(message)
-            except Exception as e:
-                logger.error(f"Erro decoding message {message}: {e}")
-                continue
-            if not msg.get("Attribute", None):
-                continue
-            intel = map_to_internal(msg["Attribute"], msg.get("action", None), logger)
-            if not intel:
-                logger.debug(f"Discarding unparsable intel {msg['Attribute']}")
-            else:
-                inq.put(intel)
+            forward_raw(message, inq)
 
 
 @threatbus.app
