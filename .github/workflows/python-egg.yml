@@ -29,6 +29,22 @@ jobs:
     - name: Package Application and Plugins
       run: |
         make clean dist
+  
+  publish-docker:
+    name: Publish to DockerHub
+    runs-on: ubuntu-latest
+    needs: egg-install
+    if: github.ref == 'refs/heads/master'
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: ${{ github.ref }}
+    - name: Publish Docker Image 
+      uses: elgohr/Publish-Docker-Github-Action@2.12
+      with:
+        name: tenzir/threatbus
+        username: ${{ secrets.DOCKERHUB_USER }}
+        password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
   egg-release:
     name: Egg Release
