@@ -1,5 +1,8 @@
 name: "Python Egg"
-on: push
+on:
+  push:
+  release:
+    types: published
 env:
   DEBIAN_FRONTEND: noninteractive
 jobs:
@@ -30,11 +33,11 @@ jobs:
       run: |
         make clean dist
   
-  publish-docker:
+  docker-release:
     name: Publish to DockerHub
+    if: github.ref == 'refs/heads/master' || github.event.action == 'published'
     runs-on: ubuntu-latest
     needs: egg-install
-    if: github.ref == 'refs/heads/master'
     steps:
     - uses: actions/checkout@v2
       with:
@@ -48,12 +51,12 @@ jobs:
 
   egg-release:
     name: Egg Release
+    if: github.event.action == 'published'
     needs: egg-install
     runs-on: ubuntu-latest
     env:
       TWINE_USERNAME: __token__
       TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
-    if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags')
     steps:
     - uses: actions/checkout@v2
       with:
@@ -69,21 +72,23 @@ jobs:
     - name: Package Application and Plugins
       run: |
         make clean dist
-    - name: Create Release Name
-      id: release_name
+    - name: Create Release
+      id: create_release
       run: |
         NAME="Threat Bus $(date +%Y-%m-%d)"
+        ASSET="$NAME.tar.gz"
+        tar czf "$ASSET" dist
         echo "::set-output name=name::$NAME"
-    - name: GitHub Release
-      id: create_release
-      uses: actions/create-release@v1
+        echo "::set-output name=asset::$ASSET"
+    - name: Publish to GitHub
+      uses: actions/upload-release-asset@v1.0.1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ github.ref }}
-        release_name: ${{ steps.release_name.outputs.name }}
-        draft: false
-        prerelease: false
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ${{ steps.create_release.outputs.asset}}
+        asset_name: ${{ steps.create_release.outputs.name}}
+        asset_content_type: application/gzip
     - name: Publish to PyPI
       run: |
         python -m twine upload --verbose --non-interactive dist/*
