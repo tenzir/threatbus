@@ -44,16 +44,28 @@ The missing tool to interconnect open-source security applications.
 venv/bin/threatbus -c config.yaml
 ```
 
-*Start Zeek as Threat Bus App*
+*Start Zeek as Threat Bus app*
 
 ```sh
 zeek -i <INTERFACE> -C ./apps/zeek/threatbus.zeek
 ```
 
-*Start Zeek and request a Snapshot*
+*Start Zeek and request a snapshot*
 
 ```sh
 zeek -i <INTERFACE> -C ./apps/zeek/threatbus.zeek -- "Tenzir::snapshot_intel=-30 days"
+```
+
+*Use the Threat Bus Docker container*
+
+```sh
+docker run tenzir/threatbus:latest --help
+```
+
+*Start Threat Bus container with a custom config file*
+
+```sh
+docker run -p 47661:47661 -v $PWD/my-custom-config.yaml:/opt/tenzir/threatbus/my-custom-config.yaml tenzir/threatbus:latest -c my-custom-config.yaml
 ```
 
 ## Installation
