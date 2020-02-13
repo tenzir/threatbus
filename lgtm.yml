@@ -1,0 +1,10 @@
+path_classifiers:
+  test:
+  - tests
+  - exclude: tests/utils
+  template:
+  - apps
+extraction:
+  python:
+    python_setup:
+      version: 3

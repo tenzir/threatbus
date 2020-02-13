@@ -1,5 +1,4 @@
 from confluent_kafka import Consumer, KafkaException
-import json
 
 # See https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
 bootstrap_servers = "localhost:9092"
