@@ -32,5 +32,5 @@ setup(
     packages=["threatbus_inmem"],
     python_requires=">=3.7",
     url="https://github.com/tenzir/threatbus",
-    version="2020.01.31",
+    version="2020.02.27",
 )
