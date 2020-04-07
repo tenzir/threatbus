@@ -29,32 +29,32 @@ async def start(cmd, vast_endpoint, management_endpoint, snapshot):
     if not reply or not isinstance(reply, dict):
         logger.error("Subsription unsuccessful")
         exit(1)
-    pubsub_endpoint, topic = reply.get("endpoint", None), reply.get("topic", None)
-    if not pubsub_endpoint or not topic:
+    pub_endpoint = reply.get("pub_endpoint", None)
+    sub_endpoint = reply.get("sub_endpoint", None)
+    topic = reply.get("topic", None)
+    if not pub_endpoint or not sub_endpoint or not topic:
         logger.error("Unparsable subscription reply")
         exit(1)
     logger.info(f"Subscription successfull")
     atexit.register(unsubscribe, management_endpoint, topic)
-    await receive(vast, pubsub_endpoint, topic)
+    await receive(vast, pub_endpoint, topic)
 
 
-async def receive(vast, pubsub_endpoint, topic):
+async def receive(vast, pub_endpoint, topic):
     """
         Starts a zmq subscriber on the given endpoint and listens for the
         desired topic.
         @param vast A pyvast instance to be used for interaction with vast
-        @param pubsub_endpoint A host:port string to connect to via zmq
+        @param pub_endpoint A host:port string to connect to via zmq
         @param topic The topic to subscribe to
     """
 
     socket = zmq.Context().socket(zmq.SUB)
-    socket.connect(f"tcp://{pubsub_endpoint}")
+    socket.connect(f"tcp://{pub_endpoint}")
     socket.setsockopt(zmq.SUBSCRIBE, topic.encode())
     poller = zmq.Poller()
     poller.register(socket, zmq.POLLIN)
-    logger.info(
-        f"Subscribed to continuous pub-sub broker intel broker on {pubsub_endpoint} - {topic}"
-    )
+    logger.info(f"Subscribed to pub-sub intel broker on {pub_endpoint} - {topic}")
     while True:
         socks = dict(poller.poll(timeout=None))
         if socket in socks and socks[socket] == zmq.POLLIN:

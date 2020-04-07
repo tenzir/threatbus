@@ -20,23 +20,26 @@ pip install threatbus-vast
 
 ## Configuration
 
-The plugin uses ZeroMQ to communicate with the [VAST bridge](https://github.com/tenzir/threatbus/tree/master/apps/vast).
-The plugin serves as a Zmq endpoint for the bridge to connect with. It uses two
-endpoints, one for managing subscriptions (and thus snapshot requests). The
-other endpoint is for plain pub-sub.
+The plugin uses ZeroMQ to communicate with the
+[VAST bridge](https://github.com/tenzir/threatbus/tree/master/apps/vast). The
+plugin serves as a Zmq endpoint for the bridge to connect with. It uses three
+endpoints. One for managing subscriptions (and thus snapshot requests). The
+other two endpoints are for plain pub-sub.
 
 ```yaml
 ...
 plugins:
   vast:
-    zmq_manage:
-        host: "127.0.0.1"
-        port: 13370
-    zmq_pubsub:
-      host: "127.0.0.1"
-      port: 13371
+    host: "127.0.0.1"
+        manage: 13370
+        pub: 13371
+        sub: 13372
 ...
 ```
+
+Initially, the bridge only needs to know the `manage` endpoint. The plugin and
+the vast-bridge negotiate all other internals for pub-sub message exchange at
+runtime.
 
 ## License
 

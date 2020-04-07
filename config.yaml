@@ -32,9 +32,8 @@ plugins:
       #    group.id: "threatbus"
       #    auto.offset.reset: "earliest"
     vast:
-      zmq_manage:
+      zmq:
         host: "127.0.0.1"
-        port: 13370
-      zmq_pubsub:
-        host: "127.0.0.1"
-        port: 13371
+        manage: 13370
+        pub: 13371
+        sub: 13372

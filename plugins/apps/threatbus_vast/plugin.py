@@ -18,12 +18,11 @@ subscriptions = dict()
 
 def validate_config(config):
     assert config, "config must not be None"
-    config["zmq_manage"].get(dict)
-    config["zmq_manage"]["host"].get(str)
-    config["zmq_manage"]["port"].get(int)
-    config["zmq_pubsub"].get(dict)
-    config["zmq_pubsub"]["host"].get(str)
-    config["zmq_pubsub"]["port"].get(int)
+    config["zmq"].get(dict)
+    config["zmq"]["host"].get(str)
+    config["zmq"]["manage"].get(int)
+    config["zmq"]["pub"].get(int)
+    config["zmq"]["sub"].get(int)
 
 
 def rand_string(length):
@@ -32,14 +31,11 @@ def rand_string(length):
     return "".join(random.choice(letters) for i in range(length))
 
 
-def receive_management(
-    zmq_manage_config, zmq_pubsub_config, subscribe_callback, unsubscribe_callback
-):
+def receive_management(zmq_config, subscribe_callback, unsubscribe_callback):
     """
         Management endpoint to handle (un)subscriptions of VAST-bridge
         instances.
-        @param zmq_manage_config Config object for the management endpoint
-        @param zmq_pubsub_config Config object for the pub-sub endpoint
+        @param zmq_config Config object for the zmq endpoints
         @param subscribe_callback Callback from Threat Bus to unsubscribe new apps
         @param unsubscribe_callback Callback from Threat Bus to unsubscribe apps
     """
@@ -47,9 +43,10 @@ def receive_management(
 
     context = zmq.Context()
     socket = context.socket(zmq.REP)  # REP socket for point-to-point reply
-    socket.bind(f"tcp://{zmq_manage_config['host']}:{zmq_manage_config['port']}")
+    socket.bind(f"tcp://{zmq_config['host']}:{zmq_config['manage']}")
     rand_suffix_length = 10
-    pubsub_endpoint = f"{zmq_pubsub_config['host']}:{zmq_pubsub_config['port']}"
+    pub_endpoint = f"{zmq_config['host']}:{zmq_config['pub']}"
+    sub_endpoint = f"{zmq_config['host']}:{zmq_config['sub']}"
 
     while True:
         #  Wait for next request from client
@@ -68,7 +65,13 @@ def receive_management(
                 f"Received subscription for topic {task.topic}, snapshot {task.snapshot}"
             )
             # send success message for reconnecting
-            socket.send_json({"topic": p2p_topic, "endpoint": pubsub_endpoint})
+            socket.send_json(
+                {
+                    "topic": p2p_topic,
+                    "pub_endpoint": pub_endpoint,
+                    "sub_endpoint": sub_endpoint,
+                }
+            )
             lock.acquire()
             subscriptions[p2p_topic] = p2p_q
             lock.release()
@@ -87,11 +90,11 @@ def receive_management(
             socket.send_string("Unknown request")
 
 
-def pub_zmq(zmq_pubsub_config):
+def pub_zmq(zmq_config):
     global subscriptions, lock, logger
     context = zmq.Context()
     socket = context.socket(zmq.PUB)
-    socket.bind(f"tcp://{zmq_pubsub_config['host']}:{zmq_pubsub_config['port']}")
+    socket.bind(f"tcp://{zmq_config['host']}:{zmq_config['pub']}")
 
     while True:
         lock.acquire()
@@ -116,14 +119,10 @@ def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
         validate_config(config)
     except Exception as e:
         logger.fatal("Invalid config for plugin {}: {}".format(plugin_name, str(e)))
-    zmq_manage, zmq_pubsub = (
-        config["zmq_manage"].get(),
-        config["zmq_pubsub"].get(),
-    )
-    threading.Thread(target=pub_zmq, args=(zmq_pubsub,), daemon=True).start()
+    threading.Thread(target=pub_zmq, args=(config["zmq"],), daemon=True).start()
     threading.Thread(
         target=receive_management,
-        args=(zmq_manage, zmq_pubsub, subscribe_callback, unsubscribe_callback),
+        args=(config["zmq"], subscribe_callback, unsubscribe_callback),
         daemon=True,
     ).start()
     logger.info(f"VAST plugin started")
