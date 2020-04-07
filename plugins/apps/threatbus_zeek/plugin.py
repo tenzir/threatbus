@@ -3,8 +3,6 @@ from threatbus_zeek.message_mapping import (
     map_to_broker,
     map_to_internal,
     map_management_message,
-    Subscription,
-    Unsubscription,
 )
 from queue import Queue
 import random
@@ -12,6 +10,7 @@ import select
 import string
 import threading
 import threatbus
+from threatbus.data import Subscription, Unsubscription
 import time
 
 """Zeek network monitor - plugin for Threat Bus"""
