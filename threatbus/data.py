@@ -1,6 +1,17 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import auto, Enum, unique
+
+
+@dataclass
+class Subscription:
+    topic: str
+    snapshot: timedelta
+
+
+@dataclass
+class Unsubscription:
+    topic: str
 
 
 @unique
