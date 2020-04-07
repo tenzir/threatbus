@@ -2,13 +2,12 @@
 
 import argparse
 import asyncio
-import logging
-import zmq
-import time
 import atexit
+import logging
+import json
+import zmq
 
 from pyvast import VAST
-from threatbus.data import Intel, IntelData, Operation
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -36,10 +35,18 @@ async def start(cmd, vast_endpoint, management_endpoint, snapshot):
         exit(1)
     logger.info(f"Subscription successfull")
     atexit.register(unsubscribe, management_endpoint, topic)
-    await receive(pubsub_endpoint, topic)
+    await receive(vast, pubsub_endpoint, topic)
 
 
-async def receive(pubsub_endpoint, topic):
+async def receive(vast, pubsub_endpoint, topic):
+    """
+        Starts a zmq subscriber on the given endpoint and listens for the
+        desired topic.
+        @param vast A pyvast instance to be used for interaction with vast
+        @param pubsub_endpoint A host:port string to connect to via zmq
+        @param topic The topic to subscribe to
+    """
+
     socket = zmq.Context().socket(zmq.SUB)
     socket.connect(f"tcp://{pubsub_endpoint}")
     socket.setsockopt(zmq.SUBSCRIBE, topic.encode())
@@ -52,15 +59,14 @@ async def receive(pubsub_endpoint, topic):
         socks = dict(poller.poll(timeout=None))
         if socket in socks and socks[socket] == zmq.POLLIN:
             try:
-                msg = socket.recv_json()
+                _, msg = socket.recv().decode().split(" ", 1)
+                intel = json.loads(msg)
             except Exception as e:
-                logger.error(f"Error decoding message {message}: {e}")
+                logger.error(f"Error decoding message: {e}")
                 continue
-            if msg.get("operation") != Operation.ADD:
-                continue
-            vast_intel = map_incoming_intel(msg)
-            vast.import_().json(type="intel.pulsedive", stdin=vast_intel).exec()
-            # TODO: issue query to vast export
+            await vast.import_().json(type="intel.pulsedive").exec(
+                stdin=json.dumps(intel)
+            )
 
 
 def subscribe(endpoint, topic, snapshot):
@@ -84,6 +90,7 @@ def subscribe(endpoint, topic, snapshot):
     context.term()
     return reply
 
+
 def unsubscribe(endpoint, topic):
     """
         Unsubscribes the vast-bridge from Threat Bus for the given topic.
@@ -98,13 +105,12 @@ def unsubscribe(endpoint, topic):
     poller = zmq.Poller()
     poller.register(socket, zmq.POLLIN)
 
-    reply = None
+    reply = "Unsuccessful"
     if poller.poll(5 * 1000):  # timeout
         reply = socket.recv_string()
     socket.close()
     context.term()
     logger.info(f"Unsubscription: {reply}")
-
 
 
 def main():

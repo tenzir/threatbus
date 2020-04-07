@@ -5,6 +5,7 @@ import threading
 from threatbus_vast.message_mapping import map_management_message, map_intel_to_vast
 import threatbus
 from threatbus.data import Subscription, Unsubscription
+import time
 import zmq
 
 
@@ -41,7 +42,6 @@ def receive_management(
         @param zmq_pubsub_config Config object for the pub-sub endpoint
         @param subscribe_callback Callback from Threat Bus to unsubscribe new apps
         @param unsubscribe_callback Callback from Threat Bus to unsubscribe apps
-
     """
     global logger, lock, subscriptions
 
@@ -87,6 +87,26 @@ def receive_management(
             socket.send_string("Unknown request")
 
 
+def pub_zmq(zmq_pubsub_config):
+    global subscriptions, lock, logger
+    context = zmq.Context()
+    socket = context.socket(zmq.PUB)
+    socket.bind(f"tcp://{zmq_pubsub_config['host']}:{zmq_pubsub_config['port']}")
+
+    while True:
+        lock.acquire()
+        for topic, q in subscriptions.items():
+            if q.empty():
+                continue
+            msg = q.get()
+            if not msg:
+                continue
+            intel = map_intel_to_vast(msg)
+            socket.send((f"{topic} {intel}").encode())
+        lock.release()
+        time.sleep(0.05)
+
+
 @threatbus.app
 def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
     global logger
@@ -100,6 +120,7 @@ def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
         config["zmq_manage"].get(),
         config["zmq_pubsub"].get(),
     )
+    threading.Thread(target=pub_zmq, args=(zmq_pubsub,), daemon=True).start()
     threading.Thread(
         target=receive_management,
         args=(zmq_manage, zmq_pubsub, subscribe_callback, unsubscribe_callback),
