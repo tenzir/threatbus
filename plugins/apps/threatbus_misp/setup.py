@@ -26,7 +26,7 @@ setup(
     description="A plugin to enable threatbus communication with MISP.",
     entry_points={"threatbus.app": ["misp = threatbus_misp.plugin"]},
     install_requires=[
-        "threatbus>=2020.01.31",
+        "threatbus>=2020.04.24",
         "pymisp>=2.4.120",
         "pyzmq>=18.1.1",
         "confluent-kafka>=1.3.0",
@@ -48,5 +48,5 @@ setup(
     packages=["threatbus_misp"],
     python_requires=">=3.7",
     url="https://github.com/tenzir/threatbus",
-    version="2020.02.27",
+    version="2020.04.24",
 )
