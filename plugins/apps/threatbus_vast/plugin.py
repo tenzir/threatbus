@@ -2,7 +2,7 @@ from queue import Queue
 import random
 import string
 import threading
-from threatbus_vast.message_mapping import map_management_message
+from threatbus_vast.message_mapping import map_management_message, map_intel_to_vast
 import threatbus
 from threatbus.data import Subscription, Unsubscription
 import zmq
@@ -34,7 +34,15 @@ def rand_string(length):
 def receive_management(
     zmq_manage_config, zmq_pubsub_config, subscribe_callback, unsubscribe_callback
 ):
-    """Management message endpoint"""
+    """
+        Management endpoint to handle (un)subscriptions of VAST-bridge
+        instances.
+        @param zmq_manage_config Config object for the management endpoint
+        @param zmq_pubsub_config Config object for the pub-sub endpoint
+        @param subscribe_callback Callback from Threat Bus to unsubscribe new apps
+        @param unsubscribe_callback Callback from Threat Bus to unsubscribe apps
+
+    """
     global logger, lock, subscriptions
 
     context = zmq.Context()
@@ -59,12 +67,12 @@ def receive_management(
             logger.debug(
                 f"Received subscription for topic {task.topic}, snapshot {task.snapshot}"
             )
-            subscribe_callback(task.topic, p2p_q, task.snapshot)
+            # send success message for reconnecting
+            socket.send_json({"topic": p2p_topic, "endpoint": pubsub_endpoint})
             lock.acquire()
             subscriptions[p2p_topic] = p2p_q
             lock.release()
-            # send success message for reconnecting
-            socket.send_json({"topic": p2p_topic, "endpoint": pubsub_endpoint})
+            subscribe_callback(task.topic, p2p_q, task.snapshot)
         elif isinstance(task, Unsubscription):
             logger.debug(f"Received unsubscription from topic {task.topic}")
             threatbus_topic = task.topic[: len(task.topic) - rand_suffix_length]
@@ -74,7 +82,7 @@ def receive_management(
                 lock.acquire()
                 del subscriptions[task.topic]
                 lock.release()
-            socket.send_string("Unsubscribe success")
+            socket.send_string("Success")
         else:
             socket.send_string("Unknown request")
 

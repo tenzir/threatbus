@@ -5,6 +5,7 @@ import asyncio
 import logging
 import zmq
 import time
+import atexit
 
 from pyvast import VAST
 from threatbus.data import Intel, IntelData, Operation
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 
-async def start(cmd, vast_endpoint, threatbus_endpoint, snapshot):
+async def start(cmd, vast_endpoint, management_endpoint, snapshot):
     """
     Starts the bridge between the two given endpoints. Subscribes the configured
     VAST instance for threat intelligence (IoCs) and reports new intelligence to
@@ -24,17 +25,18 @@ async def start(cmd, vast_endpoint, threatbus_endpoint, snapshot):
     assert await vast.test_connection() is True, "Cannot connect to VAST"
 
     # stdout, _ = await vast.export().json('#type == "intel.sighting"').exec()
-    logger.info(f"Subscribing to Threat Bus {threatbus_endpoint}")
-    reply = await subscribe(threatbus_endpoint, "threatbus/intel", snapshot)
+    logger.info(f"Subscribing to Threat Bus {management_endpoint}")
+    reply = subscribe(management_endpoint, "threatbus/intel", snapshot)
     if not reply or not isinstance(reply, dict):
         logger.error("Subsription unsuccessful")
         exit(1)
-    endpoint, topic = reply.get("endpoint", None), reply.get("topic", None)
-    if not endpoint or not topic:
+    pubsub_endpoint, topic = reply.get("endpoint", None), reply.get("topic", None)
+    if not pubsub_endpoint or not topic:
         logger.error("Unparsable subscription reply")
         exit(1)
     logger.info(f"Subscription successfull")
-    await receive(endpoint, topic)
+    atexit.register(unsubscribe, management_endpoint, topic)
+    await receive(pubsub_endpoint, topic)
 
 
 async def receive(pubsub_endpoint, topic):
@@ -61,7 +63,7 @@ async def receive(pubsub_endpoint, topic):
             # TODO: issue query to vast export
 
 
-async def subscribe(endpoint, topic, snapshot):
+def subscribe(endpoint, topic, snapshot):
     """
         Subscribes the vast-bridge to the Threat Bus for the given topic.
         Requests an optional snapshot of past intelligence data.
@@ -81,6 +83,28 @@ async def subscribe(endpoint, topic, snapshot):
     socket.close()
     context.term()
     return reply
+
+def unsubscribe(endpoint, topic):
+    """
+        Unsubscribes the vast-bridge from Threat Bus for the given topic.
+    """
+    logger.info("Unsubscribing...")
+    unsub = {"action": "unsubscribe", "topic": topic}
+    context = zmq.Context()
+    socket = context.socket(zmq.REQ)
+    socket.setsockopt(zmq.LINGER, 0)
+    socket.connect(f"tcp://{endpoint}")
+    socket.send_json(unsub)
+    poller = zmq.Poller()
+    poller.register(socket, zmq.POLLIN)
+
+    reply = None
+    if poller.poll(5 * 1000):  # timeout
+        reply = socket.recv_string()
+    socket.close()
+    context.term()
+    logger.info(f"Unsubscription: {reply}")
+
 
 
 def main():
