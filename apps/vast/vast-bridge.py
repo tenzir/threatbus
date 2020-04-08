@@ -3,28 +3,44 @@
 import argparse
 import asyncio
 import atexit
-import logging
+import coloredlogs
 import json
+import logging
 import zmq
-
 from pyvast import VAST
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+
+def setup_logging(level):
+    log_level = logging.getLevelName(level.upper())
+
+    fmt = "%(asctime)s %(levelname)-8s %(message)s"
+    colored_formatter = coloredlogs.ColoredFormatter(fmt)
+
+    handler = logging.StreamHandler()
+    handler.setLevel(log_level)
+    if logger.level > log_level or logger.level == 0:
+        logger.setLevel(log_level)
+    handler.setFormatter(colored_formatter)
+    logger.addHandler(handler)
 
 
 async def start(cmd, vast_endpoint, management_endpoint, snapshot):
     """
-    Starts the bridge between the two given endpoints. Subscribes the configured
-    VAST instance for threat intelligence (IoCs) and reports new intelligence to
-    Threat Bus.
+        Starts the bridge between the two given endpoints. Subscribes the
+        configured VAST instance for threat intelligence (IoCs) and reports new
+        intelligence to Threat Bus.
+        @param cmd The vast binary command to use with PyVAST
+        @param vast_endpoint The endpoint of a running vast node
+        @param management_endpoint The ZMQ management endpoint of Threat Bus
+        @param snapshot An integer value to request n days of past intel items
     """
 
     vast = VAST(binary=cmd, endpoint=vast_endpoint)
     assert await vast.test_connection() is True, "Cannot connect to VAST"
 
-    # stdout, _ = await vast.export().json('#type == "intel.sighting"').exec()
-    logger.info(f"Subscribing to Threat Bus {management_endpoint}")
+    logger.info(f"Calling Threat Bus management endpoint {management_endpoint}")
     reply = subscribe(management_endpoint, "threatbus/intel", snapshot)
     if not reply or not isinstance(reply, dict):
         logger.error("Subsription unsuccessful")
@@ -36,27 +52,38 @@ async def start(cmd, vast_endpoint, management_endpoint, snapshot):
         logger.error("Unparsable subscription reply")
         exit(1)
     logger.info(f"Subscription successfull")
+
+    intel_task = asyncio.create_task(
+        receive_intel(cmd, vast_endpoint, pub_endpoint, topic)
+    )
+    sighting_task = asyncio.create_task(
+        report_sightings(cmd, vast_endpoint, sub_endpoint)
+    )
+
     atexit.register(unsubscribe, management_endpoint, topic)
-    await receive(vast, pub_endpoint, topic)
+    atexit.register(intel_task.cancel)
+    atexit.register(sighting_task.cancel)
+    await asyncio.gather(intel_task, sighting_task)
 
 
-async def receive(vast, pub_endpoint, topic):
+async def receive_intel(cmd, vast_endpoint, pub_endpoint, topic):
     """
-        Starts a zmq subscriber on the given endpoint and listens for the
-        desired topic.
-        @param vast A pyvast instance to be used for interaction with vast
+        Starts a zmq subscriber on the given endpoint and listens new intel
+        items on the given topic.
+        @param cmd The vast binary command to use with PyVAST
+        @param vast_endpoint The endpoint of a running vast node
         @param pub_endpoint A host:port string to connect to via zmq
-        @param topic The topic to subscribe to
+        @param topic The topic to subscribe to get intelligence items
     """
-
+    vast = VAST(binary=cmd, endpoint=vast_endpoint)
     socket = zmq.Context().socket(zmq.SUB)
     socket.connect(f"tcp://{pub_endpoint}")
     socket.setsockopt(zmq.SUBSCRIBE, topic.encode())
     poller = zmq.Poller()
     poller.register(socket, zmq.POLLIN)
-    logger.info(f"Subscribed to pub-sub intel broker on {pub_endpoint} - {topic}")
+    logger.info(f"Receiving intelligence items on {pub_endpoint}/{topic}")
     while True:
-        socks = dict(poller.poll(timeout=None))
+        socks = dict(poller.poll(timeout=10))
         if socket in socks and socks[socket] == zmq.POLLIN:
             try:
                 _, msg = socket.recv().decode().split(" ", 1)
@@ -64,9 +91,39 @@ async def receive(vast, pub_endpoint, topic):
             except Exception as e:
                 logger.error(f"Error decoding message: {e}")
                 continue
-            await vast.import_().json(type="intel.pulsedive").exec(
-                stdin=json.dumps(intel)
+            proc = (
+                await vast.import_()
+                .json(type="intel.pulsedive")
+                .exec(stdin=json.dumps(intel))
             )
+            await proc.wait()
+            logger.debug(f"Ingested intel: {intel}")
+        else:
+            await asyncio.sleep(0.01)  # free event loop for other tasks
+
+
+async def report_sightings(cmd, vast_endpoint, sub_endpoint):
+    """
+        Starts a zmq publisher on the given endpoint and publishes new sightings
+        @param cmd The vast binary command to use with PyVAST
+        @param vast_endpoint The endpoint of a running vast node
+        @param sub_endpoint A host:port string to connect to via zmq
+    """
+    vast = VAST(binary=cmd, endpoint=vast_endpoint)
+    socket = zmq.Context().socket(zmq.PUB)
+    socket.connect(f"tcp://{sub_endpoint}")
+    topic = "vast/sightings"
+    logger.info(f"Forwarding sightings to {sub_endpoint}/{topic}")
+    proc = await vast.export(continuous=True).json('#type == "intel.sighting"').exec()
+    while True:
+        data = await proc.stdout.readline()
+        try:
+            sighting = data.decode("utf-8").rstrip()
+            json.loads(sighting)  # validate
+            socket.send_string(f"{topic} {sighting}")
+            logger.debug(f"Reported sighting: {sighting}")
+        except Exception as e:
+            logger.error(f"Cannot parse sighting-output from vast: {data}", e)
 
 
 def subscribe(endpoint, topic, snapshot):
@@ -143,7 +200,16 @@ def main():
         default=0,
         help="Request intelligence snapshot for past n days",
     )
+    parser.add_argument(
+        "--loglevel",
+        "-l",
+        dest="log_level",
+        default="info",
+        help="Loglevel to use for the bridge",
+    )
     args = parser.parse_args()
+
+    setup_logging(args.log_level)
     asyncio.run(start(args.binary, args.vast, args.threatbus, args.snapshot))
 
 
