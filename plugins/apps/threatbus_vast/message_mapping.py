@@ -40,5 +40,10 @@ def map_intel_to_vast(intel: Intel):
         vast_type = "ipv6"
 
     return json.dumps(
-        {"ioc": indicator, "type": vast_type, "reference": f"threatbus__{intel.id}"}
+        {
+            "ioc": indicator,
+            "type": vast_type,
+            "reference": f"threatbus__{intel.id}",
+            "operation": intel.operation.value,
+        }
     )

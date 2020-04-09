@@ -91,13 +91,20 @@ async def receive_intel(cmd, vast_endpoint, pub_endpoint, topic):
             except Exception as e:
                 logger.error(f"Error decoding message: {e}")
                 continue
-            proc = (
-                await vast.import_()
-                .json(type="intel.pulsedive")
-                .exec(stdin=json.dumps(intel))
-            )
-            await proc.wait()
-            logger.debug(f"Ingested intel: {intel}")
+            operation = intel.get("operation", None)
+            intel.pop("operation", None)
+            if operation == "ADD":
+                proc = (
+                    await vast.import_()
+                    .json(type="intel.pulsedive")
+                    .exec(stdin=json.dumps(intel))
+                )
+                await proc.wait()
+                logger.debug(f"Ingested intel: {intel}")
+            elif operation == "REMOVE":
+                logger.warning("Removal of indicators is not yet supported.")
+            else:
+                logger.warning(f"Unsupported operation for indicator: {intel}")
         else:
             await asyncio.sleep(0.01)  # free event loop for other tasks
 
