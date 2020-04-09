@@ -110,6 +110,27 @@ def pub_zmq(zmq_config):
         time.sleep(0.05)
 
 
+def sub_zmq(zmq_config, inq):
+    global logger
+    context = zmq.Context()
+    socket = context.socket(zmq.SUB)
+    socket.bind(f"tcp://{zmq_config['host']}:{zmq_config['sub']}")
+    socket.setsockopt(zmq.SUBSCRIBE, b"vast/sightings")
+
+    poller = zmq.Poller()
+    poller.register(socket, zmq.POLLIN)
+
+    while True:
+        socks = dict(poller.poll(timeout=None))
+        if socket in socks and socks[socket] == zmq.POLLIN:
+            try:
+                msg = socket.recv()
+                # TODO: map sighting and put in inq.
+            except Exception as e:
+                logger.error(f"Error decoding message {msg}: {e}")
+                continue
+
+
 @threatbus.app
 def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
     global logger
@@ -120,6 +141,7 @@ def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
     except Exception as e:
         logger.fatal("Invalid config for plugin {}: {}".format(plugin_name, str(e)))
     threading.Thread(target=pub_zmq, args=(config["zmq"],), daemon=True).start()
+    threading.Thread(target=sub_zmq, args=(config["zmq"], inq), daemon=True).start()
     threading.Thread(
         target=receive_management,
         args=(config["zmq"], subscribe_callback, unsubscribe_callback),
