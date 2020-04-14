@@ -2,7 +2,11 @@ from queue import Queue
 import random
 import string
 import threading
-from threatbus_vast.message_mapping import map_management_message, map_intel_to_vast
+from threatbus_vast.message_mapping import (
+    map_management_message,
+    map_intel_to_vast,
+    map_vast_sighting,
+)
 import threatbus
 from threatbus.data import Subscription, Unsubscription
 import time
@@ -125,7 +129,10 @@ def sub_zmq(zmq_config, inq):
         if socket in socks and socks[socket] == zmq.POLLIN:
             try:
                 msg = socket.recv()
-                # TODO: map sighting and put in inq.
+                # TODO: find reference to IOC -> currently, there is no way to
+                # reference the IOC from the VAST sighting.
+                sighting = map_vast_sighting(msg)
+                inq.put(sighting)
             except Exception as e:
                 logger.error(f"Error decoding message {msg}: {e}")
                 continue

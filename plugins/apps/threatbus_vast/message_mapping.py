@@ -23,7 +23,7 @@ def map_management_message(msg):
     snapshot = timedelta(days=int(snapshot))
     if action == "subscribe" and topic is not None and snapshot is not None:
         return Subscription(topic, snapshot)
-    elif action == "unsubscribe":
+    elif action == "unsubscribe" and topic is not None:
         return Unsubscription(topic)
 
 
@@ -31,6 +31,8 @@ def map_intel_to_vast(intel: Intel):
     """Maps an Intel item to a VAST compatible format;
         @param intel The item to map
     """
+    if not type(intel).__name__.lower() == "intel":
+        return None
     vast_type = to_vast_intel.get(intel.data["intel_type"], None)
     if not vast_type:
         return None
@@ -47,3 +49,11 @@ def map_intel_to_vast(intel: Intel):
             "operation": intel.operation.value,
         }
     )
+
+
+def map_vast_sighting(msg):
+    """Maps a VAST sighting to Threat Bus internal format
+        @param msg The raw sighting from VAST (dict)
+    """
+    # TODO: Implement once the report format for IOC references is known.
+    return msg
