@@ -64,7 +64,7 @@ class TestRoundtrips(unittest.TestCase):
         )
         rec.start()
 
-        zmq_sender.send(misp_json_attribute)
+        zmq_sender.send("misp_json_attribute", misp_json_attribute, host="*")
 
         # wait for threatbus to forward intel
         zeek_intel = result_q.get(block=True)
