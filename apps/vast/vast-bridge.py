@@ -96,7 +96,7 @@ async def receive_intel(cmd, vast_endpoint, pub_endpoint, topic):
             if operation == "ADD":
                 proc = (
                     await vast.import_()
-                    .json(type="intel.pulsedive")
+                    .json(type="intel.indicator")
                     .exec(stdin=json.dumps(intel))
                 )
                 await proc.wait()
