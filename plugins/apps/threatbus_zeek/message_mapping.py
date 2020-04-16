@@ -1,8 +1,14 @@
 import broker
 from contextlib import suppress
-from dataclasses import dataclass
-from datetime import timedelta
-from threatbus.data import Intel, IntelData, IntelType, Operation, Sighting
+from threatbus.data import (
+    Intel,
+    IntelData,
+    IntelType,
+    Operation,
+    Sighting,
+    Subscription,
+    Unsubscription,
+)
 import re
 
 # See https://docs.zeek.org/en/stable/scripts/base/frameworks/intel/main.zeek.html#type-Intel::Type
@@ -64,17 +70,6 @@ from_zeek_intel = {
     "SOFTWARE": IntelType.USERAGENT,
     "FILE_HASH": IntelType.MD5,
 }
-
-
-@dataclass
-class Subscription:
-    topic: str
-    snapshot: timedelta
-
-
-@dataclass
-class Unsubscription:
-    topic: str
 
 
 def map_management_message(broker_data, module_namespace):

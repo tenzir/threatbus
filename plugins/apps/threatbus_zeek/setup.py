@@ -25,7 +25,7 @@ setup(
     ],
     description="A plugin to enable threatbus communication with Zeek network monitor.",
     entry_points={"threatbus.app": ["zeek = threatbus_zeek.plugin"]},
-    install_requires=["threatbus>=2020.01.31",],
+    install_requires=["threatbus>=2020.04.29",],
     keywords=["threatbus", "Zeek", "intrusion detection", "IDS", "broker", "plugin"],
     license="BSD 3-clause",
     long_description=long_description,
@@ -36,5 +36,5 @@ setup(
     python_requires=">=3.7",
     setup_requires=["setuptools", "wheel"],
     url="https://github.com/tenzir/threatbus",
-    version="2020.02.27",
+    version="2020.04.29",
 )
