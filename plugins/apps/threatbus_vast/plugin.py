@@ -39,7 +39,7 @@ def receive_management(zmq_config, subscribe_callback, unsubscribe_callback):
     """
         Management endpoint to handle (un)subscriptions of VAST-bridge
         instances.
-        @param zmq_config Config object for the zmq endpoints
+        @param zmq_config Config object for the ZeroMQ endpoints
         @param subscribe_callback Callback from Threat Bus to unsubscribe new apps
         @param unsubscribe_callback Callback from Threat Bus to unsubscribe apps
     """

@@ -2,16 +2,17 @@ Threat Bus to VAST Bridge
 =========================
 
 Threat Bus is a publish-subscribe broker for threat intelligence. It is expected
-that applications register themselves at the bus. Since vast cannot do so on its
-own (yet), the `vast-bridge.py` is used for that purpose.
+that applications register themselves at the bus. Since VAST cannot do so on its
+own (yet), `vast-bridge.py` implements that functionality in the meantime.
 
-The bridge provides a thin layer around the PyVAST CLI bindings. It facilitates
-message exchange between Threat Bus and a vast instance.
+The bridge provides a thin layer around 
+[PyVAST](https://docs.tenzir.com/vast/python-bindings/overview), VAST's Python CLI bindings. It facilitates
+message exchange between Threat Bus and a VAST instance.
 
 ## Setup
 
-- Install the PyVAST CLI bindings. See [github.com/tenzir/vast/README.md](https://github.com/tenzir/vast/blob/master/pyvast/)
-- Install python bindings for ZeroMQ
+- [Install PyVAST](https://docs.tenzir.com/vast/python-bindings/installation)
+- Install Python bindings for ZeroMQ
 
 ```sh
 virtualenv --system-site-packages venv

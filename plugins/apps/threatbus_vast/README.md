@@ -9,7 +9,7 @@ Threat Bus VAST Plugin
 
 </h4>
 
-A Threat Bus plugin that enables communication to [VAST](https://github.com/tenzir/vast).
+A Threat Bus plugin that enables communication with [VAST](https://github.com/tenzir/vast).
 
 
 ## Installation
@@ -22,9 +22,9 @@ pip install threatbus-vast
 
 The plugin uses ZeroMQ to communicate with the
 [VAST bridge](https://github.com/tenzir/threatbus/tree/master/apps/vast). The
-plugin serves as a Zmq endpoint for the bridge to connect with. It uses three
+plugin serves as a ZeroMQ endpoint for the bridge to connect with. It uses three
 endpoints. One for managing subscriptions (and thus snapshot requests). The
-other two endpoints are for plain pub-sub.
+other two endpoints are for plain pub-sub operations.
 
 ```yaml
 ...

@@ -111,10 +111,10 @@ async def receive_intel(cmd, vast_endpoint, pub_endpoint, topic):
 
 async def report_sightings(cmd, vast_endpoint, sub_endpoint):
     """
-        Starts a zmq publisher on the given endpoint and publishes new sightings
-        @param cmd The vast binary command to use with PyVAST
-        @param vast_endpoint The endpoint of a running vast node
-        @param sub_endpoint A host:port string to connect to via zmq
+        Starts a ZeroMQ publisher on the given endpoint and publishes new sightings
+        @param cmd The VAST binary command to use with PyVAST
+        @param vast_endpoint The endpoint of a running VAST node
+        @param sub_endpoint A host:port string to connect to via ZeroMQ
     """
     vast = VAST(binary=cmd, endpoint=vast_endpoint)
     socket = zmq.Context().socket(zmq.PUB)
