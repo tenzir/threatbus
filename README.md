@@ -17,7 +17,8 @@ The missing tool to interconnect open-source security applications.
 [_Getting Started_](#getting-started) &mdash;
 [_Contributing Guidelines_][contributing-url] &mdash;
 [_Writing Plugins_](#plugin-development) &mdash;
-[_License_](#license)
+[_License_](#license) &mdash;
+[_Documentation_](https://docs.tenzir.com/threatbus/quick-start/introduction)
 
 </h4>
 
