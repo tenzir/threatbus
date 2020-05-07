@@ -1,5 +1,5 @@
 from datetime import timedelta
-from threatbus.data import Intel, IntelType, Subscription, Unsubscription
+from threatbus.data import Intel, IntelType, Sighting, Subscription, Unsubscription
 import json
 import ipaddress
 
@@ -11,6 +11,8 @@ to_vast_intel = {
     IntelType.DOMAIN_IP: "domain",
     IntelType.URL: "url",
 }
+
+threatbus_reference = "threatbus__"
 
 
 def map_management_message(msg):
@@ -45,7 +47,7 @@ def map_intel_to_vast(intel: Intel):
         {
             "ioc": indicator,
             "type": vast_type,
-            "reference": f"threatbus__{intel.id}",
+            "reference": f"{threatbus_reference}{intel.id}",
             "operation": intel.operation.value,
         }
     )
@@ -55,5 +57,12 @@ def map_vast_sighting(msg):
     """Maps a VAST sighting to Threat Bus internal format
         @param msg The raw sighting from VAST (dict)
     """
-    # TODO: Implement once the report format for IOC references is known.
-    return msg
+    if not isinstance(msg, dict):
+        return None
+    ts = msg.get("ts", None)
+    ref = msg.get("reference", "")
+    if not ts or not ref or not len(ref) > len(threatbus_reference):
+        return None
+    ref = ref[len(threatbus_reference) :]
+    context = {"source": "VAST"}
+    return Sighting(ts, ref, context)
