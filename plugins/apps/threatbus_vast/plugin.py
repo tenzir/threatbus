@@ -1,3 +1,4 @@
+import json
 from queue import Queue
 import random
 import string
@@ -128,13 +129,14 @@ def sub_zmq(zmq_config, inq):
         socks = dict(poller.poll(timeout=None))
         if socket in socks and socks[socket] == zmq.POLLIN:
             try:
-                msg = socket.recv()
-                # TODO: find reference to IOC -> currently, there is no way to
-                # reference the IOC from the VAST sighting.
+                _, msg = socket.recv().decode().split(" ", 1)
+                msg = json.loads(msg)
                 sighting = map_vast_sighting(msg)
+                if not sighting:
+                    continue
                 inq.put(sighting)
             except Exception as e:
-                logger.error(f"Error decoding message {msg}: {e}")
+                logger.error(f"Error decoding message: {e}")
                 continue
 
 
