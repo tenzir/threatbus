@@ -18,7 +18,7 @@ The missing tool to interconnect open-source security applications.
 [_Contributing Guidelines_][contributing-url] &mdash;
 [_Writing Plugins_](#plugin-development) &mdash;
 [_License_](#license) &mdash;
-[_Documentation_](https://docs.tenzir.com/threatbus/quick-start/introduction)
+[_Documentation_][docs]
 
 </h4>
 
@@ -177,7 +177,7 @@ Threat Bus comes with a [3-clause BSD license][license-url].
 [misp]: https://github.com/misp/misp
 [vast]: https://github.com/vast-io/vast
 [broker]: https://github.com/zeek/broker
-[tenzir]: https://docs.tenzir.com
+[docs]: https://docs.tenzir.com/threatbus
 [zeek]: https://www.zeek.org
 [misp-zmq-config]: https://github.com/MISP/misp-book/tree/master/misp-zmq#misp-zeromq-configuration
 
