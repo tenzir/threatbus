@@ -6,13 +6,18 @@ import atexit
 import coloredlogs
 import json
 import logging
+import random
+from string import ascii_lowercase as letters
+import sys
 import zmq
 from pyvast import VAST
 
 logger = logging.getLogger(__name__)
+matcher_name = None
 
 
 def setup_logging(level):
+    global logger
     log_level = logging.getLevelName(level.upper())
 
     fmt = "%(asctime)s %(levelname)-8s %(message)s"
@@ -36,7 +41,7 @@ async def start(cmd, vast_endpoint, zmq_endpoint, snapshot):
         @param zmq_endpoint The ZMQ management endpoint of Threat Bus
         @param snapshot An integer value to request n days of past intel items
     """
-
+    global logger
     vast = VAST(binary=cmd, endpoint=vast_endpoint)
     assert await vast.test_connection() is True, "Cannot connect to VAST"
 
@@ -75,6 +80,7 @@ async def receive_intel(cmd, vast_endpoint, pub_endpoint, topic):
         @param pub_endpoint A host:port string to connect to via zmq
         @param topic The topic to subscribe to get intelligence items
     """
+    global logger
     vast = VAST(binary=cmd, endpoint=vast_endpoint)
     socket = zmq.Context().socket(zmq.SUB)
     socket.connect(f"tcp://{pub_endpoint}")
@@ -102,7 +108,16 @@ async def receive_intel(cmd, vast_endpoint, pub_endpoint, topic):
                 await proc.wait()
                 logger.debug(f"Ingested intel: {intel}")
             elif operation == "REMOVE":
-                logger.warning("Removal of indicators is not yet supported.")
+                global matcher_name
+                ioc = intel.get("ioc", None)
+                type_ = intel.get("type", None)
+                if not ioc or not type_:
+                    logger.error(
+                        f"Cannot remove intel with missing required fields 'ioc' or 'type': {intel}"
+                    )
+                    continue
+                await vast.matcher().ioc_remove(matcher_name, ioc, type_).exec()
+                logger.debug(f"Removed indicator {intel}")
             else:
                 logger.warning(f"Unsupported operation for indicator: {intel}")
         else:
@@ -116,21 +131,29 @@ async def report_sightings(cmd, vast_endpoint, sub_endpoint):
         @param vast_endpoint The endpoint of a running VAST node
         @param sub_endpoint A host:port string to connect to via ZeroMQ
     """
+    global logger
     vast = VAST(binary=cmd, endpoint=vast_endpoint)
     socket = zmq.Context().socket(zmq.PUB)
     socket.connect(f"tcp://{sub_endpoint}")
     topic = "vast/sightings"
     logger.info(f"Forwarding sightings to {sub_endpoint}/{topic}")
-    proc = await vast.export(continuous=True).json('#type == "intel.sighting"').exec()
+    global matcher_name
+    matcher_name = "threatbus-" + "".join(random.choice(letters) for i in range(10))
+    proc = await vast.matcher().start(name=matcher_name).exec()
     while True:
         data = await proc.stdout.readline()
+        if not data:
+            if not await vast.test_connection():
+                logger.error("Lost connection to VAST, exiting.")
+                sys.exit(1)
+            continue
         try:
             sighting = data.decode("utf-8").rstrip()
             json.loads(sighting)  # validate
             socket.send_string(f"{topic} {sighting}")
             logger.debug(f"Reported sighting: {sighting}")
         except Exception as e:
-            logger.error(f"Cannot parse sighting-output from vast: {data}", e)
+            logger.error(f"Cannot parse sighting-output from VAST: {data}", e)
 
 
 def subscribe(endpoint, topic, snapshot, timeout=5):
@@ -166,6 +189,7 @@ def unsubscribe(endpoint, topic, timeout=5):
         @param topic The topic to unsubscribe from
         @param timeout The period after which the connection attempt is aborted
     """
+    global logger
     logger.info("Unsubscribing...")
     unsub = {"action": "unsubscribe", "topic": topic}
     context = zmq.Context()
