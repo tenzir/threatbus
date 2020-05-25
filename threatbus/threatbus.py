@@ -8,10 +8,11 @@ from threatbus.data import MessageType
 
 
 class ThreatBus:
-    def __init__(self, backbones, apps, config):
-        self.backbones, self.apps = backbones, apps
+    def __init__(self, backbones, apps, logger, config):
+        self.backbones = backbones
+        self.apps = apps
         self.config = config
-        self.logger = logger.setup(config["logging"], "threatbus")
+        self.logger = logger
         self.inq = Queue()
 
     def request_snapshot(self, topic, dst_q, time_delta):
@@ -106,7 +107,15 @@ def main():
         validate_config(config)
     except Exception as e:
         raise ValueError("Invalid config: {}".format(str(e)))
-    bus = ThreatBus(backbones.hook, apps.hook, config)
+
+    tb_logger = logger.setup(config["logging"], "threatbus")
+    configured_apps = set(config["plugins"]["apps"].keys())
+    installed_apps = set(dict(apps.list_name_plugin()).keys())
+    for unwanted_app in installed_apps - configured_apps:
+        tb_logger.info(f"Disabling installed, but unconfigured app '{unwanted_app}'")
+        apps.unregister(name=unwanted_app)
+
+    bus = ThreatBus(backbones.hook, apps.hook, tb_logger, config)
     bus.run()
 
 
