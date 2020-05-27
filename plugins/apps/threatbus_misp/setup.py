@@ -48,5 +48,5 @@ setup(
     packages=["threatbus_misp"],
     python_requires=">=3.7",
     url="https://github.com/tenzir/threatbus",
-    version="2020.04.29",
+    version="2020.05.28",
 )
