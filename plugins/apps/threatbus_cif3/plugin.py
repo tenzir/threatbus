@@ -67,6 +67,7 @@ def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
             config["api"]["token"].get(),
             config["api"]["ssl"].get(),
         )
+        cif = None
         try:
             cif = Client(remote=remote, token=token, verify_ssl=ssl)
             cif.ping()
