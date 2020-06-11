@@ -85,7 +85,7 @@ def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
     topic = "threatbus/intel"  # topic used by MISP when it sends to backbone
     subscribe_callback(topic, from_backbone_to_cifq)
     logger.debug(
-        f"Created and subscribed queue {from_backbone_to_cifq} to accept topic {topic} of interest for CIF"
+        f"CIF plugin subscribed to topic {topic}"
     )
 
     if cif:
