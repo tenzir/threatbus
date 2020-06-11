@@ -37,13 +37,6 @@ def map_to_cif(intel: Intel, logger, confidence, tags, tlp, group):
     if not indicator:
         return None
 
-    confidence = config["confidence"].as_number()
-    if not confidence:
-        confidence = 5
-
-    tags = config["tags"].get(list)
-    tlp = config["tlp"].get(str)
-    group = config["group"].get(str)
 
     # convert lasttime
     lasttime = intel.ts.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
