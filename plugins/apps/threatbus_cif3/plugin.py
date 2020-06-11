@@ -22,7 +22,7 @@ def validate_config(config):
         config["api"]["token"].get(str)
 
 
-def receive_intel_from_backbone(watched_queue, config):
+def receive_intel_from_backbone(watched_queue, cif, config):
     """Reports / publishes intel items back to the given CIF endpoint.
         @param watched_queue The py queue from which to read messages to submit on to CIF
     """
