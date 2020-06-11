@@ -9,7 +9,6 @@ import threatbus
 
 plugin_name = "cif3"
 cif = None
-lock = threading.Lock()
 
 
 def validate_config(config):
