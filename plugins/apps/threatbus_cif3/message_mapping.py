@@ -19,7 +19,7 @@ cif_supported_types = [
 ]
 
 
-def map_to_cif(intel: Intel, logger=None, config=None):
+def map_to_cif(intel: Intel, logger, confidence, tags, tlp, group):
     """Maps an Intel item to a CIFv3 compatible indicator format.
         @param intel The item to map
         @return the mapped intel item or None
