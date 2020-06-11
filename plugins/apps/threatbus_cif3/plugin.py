@@ -30,7 +30,7 @@ def receive_intel_from_backbone(watched_queue, config):
     """
     global logger, cif, lock
     logger.debug(
-        f"Entering receive_intel_from_backbone func to monitor queue {watched_queue}..."
+        f"Waiting for intel from Threat Bus..."
     )
     if not cif:
         logger.debug("No global CIF found. Exiting function")
