@@ -27,11 +27,9 @@ def receive_intel_from_backbone(watched_queue, cif, config):
         @param watched_queue The py queue from which to read messages to submit on to CIF
     """
     global logger
-    logger.debug(
-        "Waiting for intel from Threat Bus..."
-    )
+    logger.debug(f"Waiting for intel from Threat Bus...")
     if not cif:
-        logger.error("No global CIF found. Exiting function")
+        logger.error("CIF is not properly configured. Exiting.")
         return
 
     confidence = config["confidence"].as_number()
@@ -54,6 +52,7 @@ def receive_intel_from_backbone(watched_queue, cif, config):
         try:
             resp = cif.indicators_create(cif_mapped_intel)
             logger.debug(f"CIF response: {resp}")
+            logger.debug(f"Successfully submitted to CIF: {cif_mapped_intel}")
         except Exception as err:
             logger.error(f"CIF submission error: {err}")
 

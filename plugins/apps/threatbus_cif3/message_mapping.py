@@ -26,7 +26,6 @@ def map_to_cif(intel: Intel, logger, confidence, tags, tlp, group):
     """
     if (
         not intel
-        or not config
         or intel.operation != Operation.ADD
         or intel.data["intel_type"] not in cif_supported_types
     ):
