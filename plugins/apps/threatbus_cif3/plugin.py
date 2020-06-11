@@ -77,7 +77,9 @@ def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
                 f"Cannot connect CIF client to {remote}, using SSL: {ssl} : {err}"
             )
             cif = None
-
+    if not cif:
+        logger.error("Could not connect to CIF, exiting CIF plugin")
+    return
     # establish a py queue to accept queue.put from the backbone
     from_backbone_to_cifq = Queue()
     topic = "threatbus/intel"  # topic used by MISP when it sends to backbone
