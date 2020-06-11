@@ -88,12 +88,10 @@ def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
         f"CIF plugin subscribed to topic {topic}"
     )
 
-    if cif:
-        threading.Thread(
-            target=receive_intel_from_backbone,
-            args=[from_backbone_to_cifq, config],
-            daemon=True,
-        ).start()
-        logger.debug("Started CIF thread to monitor future Intel from backbone...")
+    threading.Thread(
+        target=receive_intel_from_backbone,
+        args=[from_backbone_to_cifq, cif, config],
+        daemon=True,
+    ).start()
 
     logger.info("CIF3 plugin started")
