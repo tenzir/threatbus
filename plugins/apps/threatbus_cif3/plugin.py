@@ -44,6 +44,7 @@ def receive_intel_from_backbone(watched_queue, cif, config):
         logger.debug(f"Adding intel to CIF: {cif_mapped_intel}")
         try:
             resp = cif.indicators_create(cif_mapped_intel)
+            logger.debug(f"CIF response: {resp}")
             logger.debug(f"Successfully submitted to CIF: {cif_mapped_intel}")
         except Exception as err:
             logger.error(f"CIF submission error: {err}")
