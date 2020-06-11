@@ -36,7 +36,7 @@ def receive_intel_from_backbone(watched_queue, cif, config):
     while True:
         intel = watched_queue.get()
         if not intel:
-            logger.debug("Sighting msg was empty")
+            logger.debug("Received unparsable intel item.")
             continue
         cif_mapped_intel = map_to_cif(intel, logger, config)
         if not cif_mapped_intel:
