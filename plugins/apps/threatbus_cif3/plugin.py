@@ -31,7 +31,7 @@ def receive_intel_from_backbone(watched_queue, cif, config):
         f"Waiting for intel from Threat Bus..."
     )
     if not cif:
-        logger.debug("No global CIF found. Exiting function")
+        logger.error("CIF is not properly configured. Exiting.")
         return
     while True:
         intel = watched_queue.get()
