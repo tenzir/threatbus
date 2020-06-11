@@ -68,7 +68,6 @@ def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
             config["api"]["ssl"].get(),
         )
         try:
-            global cif, lock
             cif = Client(remote=remote, token=token, verify_ssl=ssl)
             cif.ping()
             logger.debug(f"Started CIF client to remote {remote}")
