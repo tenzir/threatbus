@@ -8,7 +8,6 @@ import threatbus
 """Threatbus - Open Source Threat Intelligence Platform - plugin for CIFv3"""
 
 plugin_name = "cif3"
-cif = None
 
 
 def validate_config(config):
