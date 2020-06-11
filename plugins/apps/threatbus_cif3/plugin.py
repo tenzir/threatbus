@@ -40,7 +40,7 @@ def receive_intel_from_backbone(watched_queue, cif, config):
             continue
         cif_mapped_intel = map_to_cif(intel, logger, config)
         if not cif_mapped_intel:
-            return
+            continue
         logger.info(f"CIF queue report sighting for intel {intel}")
         try:
             resp = cif.indicators_create(cif_mapped_intel)
