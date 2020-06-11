@@ -8,8 +8,6 @@ import threatbus
 """Threatbus - Open Source Threat Intelligence Platform - plugin for CIFv3"""
 
 plugin_name = "cif3"
-cif = None
-lock = threading.Lock()
 
 
 def validate_config(config):
@@ -24,29 +22,38 @@ def validate_config(config):
         config["api"]["token"].get(str)
 
 
-def receive_intel_from_backbone(watched_queue, config):
+def receive_intel_from_backbone(watched_queue, cif, config):
     """Reports / publishes intel items back to the given CIF endpoint.
         @param watched_queue The py queue from which to read messages to submit on to CIF
     """
-    global logger, cif, lock
+    global logger
     logger.debug(
-        f"Entering receive_intel_from_backbone func to monitor queue {watched_queue}..."
+        "Waiting for intel from Threat Bus..."
     )
     if not cif:
-        logger.debug("No global CIF found. Exiting function")
+        logger.error("No global CIF found. Exiting function")
         return
+
+    confidence = config["confidence"].as_number()
+    if not confidence:
+        confidence = 5
+
+    tags = config["tags"].get(list)
+    tlp = config["tlp"].get(str)
+    group = config["group"].get(str)
+
     while True:
         intel = watched_queue.get()
         if not intel:
-            logger.debug("Sighting msg was empty")
+            logger.debug("Received unparsable intel item")
             continue
-        cif_mapped_intel = map_to_cif(intel, logger, config)
+        cif_mapped_intel = map_to_cif(intel, logger, confidence, tags, tlp, group)
         if not cif_mapped_intel:
-            return
-        logger.info(f"CIF queue report sighting for intel {intel}")
+            continue
+        logger.debug(f"Adding intel to CIF: {cif_mapped_intel}")
         try:
             resp = cif.indicators_create(cif_mapped_intel)
-            logger.debug(f"Successfully submitted to CIF: {cif_mapped_intel}")
+            logger.debug(f"CIF response: {resp}")
         except Exception as err:
             logger.error(f"CIF submission error: {err}")
 
@@ -68,8 +75,8 @@ def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
             config["api"]["token"].get(),
             config["api"]["ssl"].get(),
         )
+        cif = None
         try:
-            global cif, lock
             cif = Client(remote=remote, token=token, verify_ssl=ssl)
             cif.ping()
             logger.debug(f"Started CIF client to remote {remote}")
@@ -77,22 +84,22 @@ def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
             logger.error(
                 f"Cannot connect CIF client to {remote}, using SSL: {ssl} : {err}"
             )
-            cif = None
+        
+        if not cif:
+            logger.error("Could not connect to CIF, existing CIF plugin")
+            return
 
     # establish a py queue to accept queue.put from the backbone
     from_backbone_to_cifq = Queue()
     topic = "threatbus/intel"  # topic used by MISP when it sends to backbone
     subscribe_callback(topic, from_backbone_to_cifq)
-    logger.debug(
-        f"Created and subscribed queue {from_backbone_to_cifq} to accept topic {topic} of interest for CIF"
-    )
+    logger.debug(f"CIF plugin subscribed to topic {topic}")
 
-    if cif:
-        threading.Thread(
-            target=receive_intel_from_backbone,
-            args=[from_backbone_to_cifq, config],
-            daemon=True,
-        ).start()
-        logger.debug("Started CIF thread to monitor future Intel from backbone...")
+    threading.Thread(
+        target=receive_intel_from_backbone,
+        args=[from_backbone_to_cifq, cif, config],
+        daemon=True,
+    ).start()
+    logger.debug("Started CIF thread to monitor future Intel from backbone...")
 
     logger.info("CIF3 plugin started")

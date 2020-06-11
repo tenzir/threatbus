@@ -19,7 +19,7 @@ cif_supported_types = [
 ]
 
 
-def map_to_cif(intel: Intel, logger=None, config=None):
+def map_to_cif(intel: Intel, logger, confidence, tags, tlp, group):
     """Maps an Intel item to a CIFv3 compatible indicator format.
         @param intel The item to map
         @return the mapped intel item or None
@@ -37,14 +37,6 @@ def map_to_cif(intel: Intel, logger=None, config=None):
     if not indicator:
         return None
 
-    confidence = config["confidence"].as_number()
-    if not confidence:
-        confidence = 5
-
-    tags = config["tags"].get(list)
-    tlp = config["tlp"].get(str)
-    group = config["group"].get(str)
-
     # convert lasttime
     lasttime = intel.ts.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
@@ -60,8 +52,8 @@ def map_to_cif(intel: Intel, logger=None, config=None):
     try:
         ii = Indicator(**ii)
     except InvalidIndicator as e:
-        self.error(f"Invalid CIF indicator {e}")
+        logger.error(f"Invalid CIF indicator {e}")
     except Exception as e:
-        self.error(f"CIF indicator error: {e}")
+        logger.error(f"CIF indicator error: {e}")
 
     return ii

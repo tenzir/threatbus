@@ -11,19 +11,11 @@ pip install threatbus-cif3
 
 ## Configuration
 
-The plugin uses the cifsdk python client to report back MISP indicators.
+The plugin uses the cifsdk python client to submit indicators received on the threatbus into a CIF instance.
 
 ```yaml
 ...
 plugins:
-  misp:
-    api:
-      host: https://misp.host.tld
-      ssl: false
-      key: MISP_API_KEY
-    zmq:
-      host: misp.host.tld
-      port: 50000
   cif3:
     api:
       host: http://cif.host.tld:5000
@@ -42,58 +34,48 @@ plugins:
 
 The following guides describe how to set up local, dockerized instances of MISP.
 
-### Dockerized MISP
+### Dockerized CIFv3
 
-Use DCSO's [dockerized MISP](https://github.com/DCSO/MISP-dockerized) to set
-up a local testing environment:
+Use [dockerized CIFv3](https://github.com/sfinlon/cif-docker) to set
+up a local CIFv3 environment:
 
-*Setup a MISP Docker cluster*
-
-```
-git clone git@github.com:DCSO/MISP-dockerized.git
-cd MISP-dockerized
-make install
-# follow the dialog...
-```
-
-*Edit the docker-compose.yaml*
+*Setup a CIFv3 docker container*
 
 ```sh
-cd current
-vim docker-compose.yaml
+git clone https://github.com/sfinlon/cif-docker.git
+cd cif-docker
+docker-compose build
 ```
-Find the section `misp-server` in the configuration and add the following:
+
+*Edit the docker-compose.yml*
+
+```sh
+vim docker-compose.yml
+```
+Find the section `cif` in the configuration and edit the following as appropriate:
 
 ```yaml
-misp-server:
+cif:
     ...
     ports:
-      - "50000:50000"
+      - "5000:5000"
     ...
 ```
 
 
-*Restart MISP to accept the new port*
+*Start the container*
 
 ```sh
-make deploy
+docker-compose up -d
+# get an interactive shell
+docker-compose exec cif /bin/bash
+# become the cif user
+su cif
+# check to see if access tokens were successfully created
+cif-tokens
+# ping the router to ensure connectivity
+cif --ping
 ```
-
-*Enable the ZMQ plugin in the MISP webview*
-
-- Visit https://localhost:80
-- login with your configured credentials
-- Go to `Administration` -> `Server Settings & Maintenance` -> `Diagnostics Tab`
-- Find the ZeroMQ plugin section and enable it
-- Go to `Administration` -> `Server Settings & Maintenance` -> `Plugin settings Tab`
-- Set the entry `Plugin.ZeroMQ_attribute_notifications_enable` to `true`
-
-*Restart all MISP services*
-
-```sh
-make restart-all
-```
-
 
 ## License
 
