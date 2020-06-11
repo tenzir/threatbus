@@ -60,8 +60,8 @@ def map_to_cif(intel: Intel, logger=None, config=None):
     try:
         ii = Indicator(**ii)
     except InvalidIndicator as e:
-        self.error(f"Invalid CIF indicator {e}")
+        logger.error(f"Invalid CIF indicator {e}")
     except Exception as e:
-        self.error(f"CIF indicator error: {e}")
+        logger.error(f"CIF indicator error: {e}")
 
     return ii
