@@ -48,5 +48,5 @@ setup(
     # packages=find_packages(),
     python_requires=">=3.6",
     url="",
-    version="0.1.0",
+    version="2020.06.25",
 )
