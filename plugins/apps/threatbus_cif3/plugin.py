@@ -16,10 +16,10 @@ def validate_config(config):
     config["tlp"].get(str)
     config["confidence"].as_number()
     config["group"].get(str)
-    if config["api"].get(dict):
-        config["api"]["host"].get(str)
-        config["api"]["ssl"].get(bool)
-        config["api"]["token"].get(str)
+    config["api"].get(dict)
+    config["api"]["host"].get(str)
+    config["api"]["ssl"].get(bool)
+    config["api"]["token"].get(str)
 
 
 def receive_intel_from_backbone(watched_queue, cif, config):
@@ -27,7 +27,6 @@ def receive_intel_from_backbone(watched_queue, cif, config):
         @param watched_queue The py queue from which to read messages to submit on to CIF
     """
     global logger
-    logger.debug(f"Waiting for intel from Threat Bus...")
     if not cif:
         logger.error("CIF is not properly configured. Exiting.")
         return
@@ -66,22 +65,20 @@ def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
     except Exception as e:
         logger.fatal("Invalid config for plugin {}: {}".format(plugin_name, str(e)))
 
-    if config["api"].get():
-        remote, token, ssl = (
-            config["api"]["host"].get(),
-            config["api"]["token"].get(),
-            config["api"]["ssl"].get(),
+    remote, token, ssl = (
+        config["api"]["host"].get(),
+        config["api"]["token"].get(),
+        config["api"]["ssl"].get(),
+    )
+    cif = None
+    try:
+        cif = Client(remote=remote, token=token, verify_ssl=ssl)
+        cif.ping()
+    except Exception as err:
+        logger.error(
+            f"Cannot connect to CIFv3 at {remote}, using SSL: {ssl}. Exiting plugin."
         )
-        cif = None
-        try:
-            cif = Client(remote=remote, token=token, verify_ssl=ssl)
-            cif.ping()
-            logger.debug(f"Started CIF client to remote {remote}")
-        except Exception as err:
-            logger.error(
-                f"Cannot connect to CIFv3 at {host}, using SSL: {ssl}. Exiting plugin."
-            )
-            return
+        return
 
     from_backbone_to_cifq = Queue()
     topic = "threatbus/intel"
