@@ -83,7 +83,7 @@ def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
             logger.error(
                 f"Cannot connect CIF client to {remote}, using SSL: {ssl} : {err}"
             )
-        
+
         if not cif:
             logger.error("Could not connect to CIF, existing CIF plugin")
             return
