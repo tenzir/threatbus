@@ -143,7 +143,6 @@ def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
     broker_opts.forward = False
     ep = broker.Endpoint(broker.Configuration(broker_opts))
     ep.listen(host, port)
-    logger.info(f"Broker: endpoint listening - {host}:{port}")
 
     threading.Thread(
         target=listen, args=(logger, namespace, ep, inq), daemon=True
