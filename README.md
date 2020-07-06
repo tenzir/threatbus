@@ -25,12 +25,13 @@ The missing tool to interconnect open-source security applications.
 ## Key Features
 
 - **Connect Open-Source Security Tools**: Threat Bus is a pub-sub broker for
-  threat intelligence data. With *Threat Bus*  you can seamlessly integrate
+  threat intelligence data. With *Threat Bus* you can seamlessly integrate
   [MISP][misp] intelligence with the [Zeek][zeek] intel framework or report
   sightings from IDS deployments to some data base.
 
 - **Plugin-based Architecture**: The project is plugin-based and can be extended
-  easily. We welcome contributions to adopt new open source tools!
+  easily. We welcome contributions to adopt new open source tools! So far, there
+  exist plugins for [VAST][vast], [MISP][misp], [Zeek][zeek], and [CIFv3][cif].
 
 - **Snapshotting**: The snapshot feature allows subscribers to directly request
   threat intelligence data for a certain time range from other applications.
@@ -38,6 +39,10 @@ The missing tool to interconnect open-source security applications.
 
 
 ## Getting Started
+
+The following example shows how to connect [MISP][misp], [Zeek][zeek] via
+Threat Bus. There are more integrations available, so make sure to check out all
+[Threat Bus projects on PyPI](https://pypi.org/search/?q=threatbus).
 
 *Start Threat Bus*
 
@@ -54,8 +59,11 @@ zeek -i <INTERFACE> -C ./apps/zeek/threatbus.zeek
 *Start Zeek and request a snapshot*
 
 ```sh
-zeek -i <INTERFACE> -C ./apps/zeek/threatbus.zeek -- "Tenzir::snapshot_intel=-30 days"
+zeek -i <INTERFACE> -C ./apps/zeek/threatbus.zeek -- "Tenzir::snapshot_intel=30 days"
 ```
+
+Threat Bus also ships as pre-built Docker image and is available on
+[Docker Hub](https://hub.docker.com/r/tenzir/threatbus).
 
 *Use the Threat Bus Docker container*
 
@@ -175,10 +183,11 @@ Threat Bus comes with a [3-clause BSD license][license-url].
 
 
 [misp]: https://github.com/misp/misp
-[vast]: https://github.com/vast-io/vast
+[vast]: https://github.com/tenzir/vast
 [broker]: https://github.com/zeek/broker
 [docs]: https://docs.tenzir.com/threatbus
 [zeek]: https://www.zeek.org
+[cif]: https://github.com/csirtgadgets/bearded-avenger
 [misp-zmq-config]: https://github.com/MISP/misp-book/tree/master/misp-zmq#misp-zeromq-configuration
 
 [pypi-badge]: https://img.shields.io/pypi/v/threatbus.svg
