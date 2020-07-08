@@ -12,6 +12,7 @@ The missing tool to interconnect open-source security applications.
 [![Language grade: Python][lgtm-quality-badge]][lgtm-quality-url]
 [![Development Status][alpha-badge]][latest-release-url]
 [![Latest Release][latest-release-badge]][latest-release-url]
+[![Chat][chat-badge]][chat-url]
 [![License][license-badge]][license-url]
 
 [_Getting Started_](#getting-started) &mdash;
@@ -20,6 +21,7 @@ The missing tool to interconnect open-source security applications.
 [_License_](#license) &mdash;
 [_Documentation_][docs]
 
+Chat with us on [Matrix][chat-url].
 </h4>
 
 ## Key Features
@@ -197,6 +199,8 @@ Threat Bus comes with a [3-clause BSD license][license-url].
 [latest-release-url]: https://github.com/tenzir/threatbus/releases
 [ci-url]: https://github.com/tenzir/threatbus/actions?query=branch%3Amaster
 [ci-badge]: https://github.com/tenzir/threatbus/workflows/Python%20Egg/badge.svg?branch=master
+[chat-badge]: https://img.shields.io/badge/matrix-chat-brightgreen.svg
+[chat-url]: https://tenzir.riot.im
 [license-badge]: https://img.shields.io/badge/license-BSD-blue.svg
 [license-url]: https://github.com/tenzir/threatbus/blob/master/COPYING
 [alpha-badge]: https://img.shields.io/badge/stage-alpha-blueviolet
