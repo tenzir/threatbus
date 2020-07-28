@@ -45,8 +45,7 @@ setup(
     name="threatbus-cif3",
     package_dir={"": "plugins/apps"},
     packages=["threatbus_cif3"],
-    # packages=find_packages(),
     python_requires=">=3.6",
-    url="",
-    version="2020.06.25",
+    url="https://github.com/tenzir/threatbus",
+    version="2020.07.28",
 )
