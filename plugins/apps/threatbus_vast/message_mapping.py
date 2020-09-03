@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 from threatbus.data import Intel, IntelType, Sighting, Subscription, Unsubscription
 import json
 import ipaddress
@@ -61,9 +61,12 @@ def map_vast_sighting(msg):
     if not isinstance(msg, dict):
         return None
     ts = msg.get("ts", None)
+    if type(ts) is str:
+        ts = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S.%f")
     ref = msg.get("reference", "")
+    context = msg.get("context", {})
     if not ts or not ref or not len(ref) > len(threatbus_reference):
         return None
     ref = ref[len(threatbus_reference) :]
-    context = {"source": "VAST"}
+    context["source"] = "VAST"
     return Sighting(ts, ref, context)
