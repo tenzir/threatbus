@@ -32,7 +32,15 @@ def setup_logging(level):
     logger.addHandler(handler)
 
 
-async def start(cmd, vast_endpoint, zmq_endpoint, snapshot, retro_match):
+async def start(
+    cmd,
+    vast_endpoint,
+    zmq_endpoint,
+    snapshot,
+    retro_match,
+    transform_cmd=None,
+    sink=None,
+):
     """
     Starts the bridge between the two given endpoints. Subscribes the
     configured VAST instance for threat intelligence (IoCs) and reports new
@@ -41,12 +49,15 @@ async def start(cmd, vast_endpoint, zmq_endpoint, snapshot, retro_match):
     @param vast_endpoint The endpoint of a running vast node
     @param zmq_endpoint The ZMQ management endpoint of Threat Bus
     @param snapshot An integer value to request n days of past intel items
+    @param transform_cmd The command to use to transform Sighting context with
+    @param sink Forward sighting context to this sink (subprocess) instead of
+        reporting back to Threat Bus
     """
     global logger
     vast = VAST(binary=cmd, endpoint=vast_endpoint)
     assert await vast.test_connection() is True, "Cannot connect to VAST"
 
-    logger.info(f"Calling Threat Bus management endpoint {zmq_endpoint}")
+    logger.debug(f"Calling Threat Bus management endpoint {zmq_endpoint}")
     reply = subscribe(zmq_endpoint, "threatbus/intel", snapshot)
     if not reply or not isinstance(reply, dict):
         logger.error("Subsription unsuccessful")
@@ -57,13 +68,13 @@ async def start(cmd, vast_endpoint, zmq_endpoint, snapshot, retro_match):
     if not pub_endpoint or not sub_endpoint or not topic:
         logger.error("Unparsable subscription reply")
         exit(1)
-    logger.info(f"Subscription successfull")
+    logger.debug(f"Subscription successfull")
     atexit.register(unsubscribe, zmq_endpoint, topic)
 
     intel_queue = asyncio.Queue()
     sightings_queue = asyncio.Queue()
     report_sightings_task = asyncio.create_task(
-        report_sightings(sub_endpoint, sightings_queue)
+        report_sightings(sub_endpoint, sightings_queue, transform_cmd, sink)
     )
     atexit.register(report_sightings_task.cancel)
     receive_intel_task = asyncio.create_task(
@@ -99,24 +110,22 @@ def ioc_to_query(intel):
         return f'"{ioc}" in url'
     if type_ == "domain":
         return f'"{ioc}" in domain || "{ioc}" in host || "{ioc}" in hostname'
-    return ""
+    return None
 
 
-def query_result_to_sighting(query_result, intel_ref):
+def query_result_to_sighting(query_result, intel):
     """
     Creates a VAST sighting (json string) in the format of the live-matcher from
     a VAST query result.
     @param query_result The query result to convert
-    @param intel_ref The IoC reference to use for the sighting
+    @param intel The intel item that the sighting refers to
     """
-    ts = str(datetime.now())
-    return json.dumps(
-        {
-            "ts": ts,
-            "reference": intel_ref,
-            "context": {"data": json.loads(query_result)},
-        }
-    )
+    return {
+        "ts": str(datetime.now()),
+        "reference": intel.get("reference", ""),
+        "ioc": intel.get("ioc", ""),
+        "context": json.loads(query_result),
+    }
 
 
 async def receive_intel(pub_endpoint, topic, intel_queue):
@@ -166,13 +175,13 @@ async def match_intel(cmd, vast_endpoint, intel_queue, sightings_queue, retro_ma
         if operation == "ADD":
             if retro_match:
                 query = ioc_to_query(intel)
+                if not query:
+                    continue
                 proc = await vast.export().json(query).exec()
                 while not proc.stdout.at_eof():
                     line = (await proc.stdout.readline()).decode().rstrip()
                     if line:
-                        sighting = query_result_to_sighting(
-                            line, intel.get("reference", "")
-                        )
+                        sighting = query_result_to_sighting(line, intel)
                         await sightings_queue.put(sighting)
                 logger.debug(f"Finished retro-matching for intel: {intel}")
             else:
@@ -221,27 +230,88 @@ async def live_match_vast(cmd, vast_endpoint, sightings_queue):
             continue
         try:
             sighting = data.decode("utf-8").rstrip()
-            json.loads(sighting)  # validate
+            sighting = json.loads(sighting)
             await sightings_queue.put(sighting)
         except Exception as e:
             logger.error(f"Cannot parse sighting-output from VAST: {data}", e)
 
 
-async def report_sightings(sub_endpoint, sightings_queue):
+async def invoke_cmd_for_context(cmd, context, ioc="%ioc"):
+    """
+    Invoke a command as subprocess for the given context. The command string is
+    treated as template string and occurences of "%ioc" are replaced with the
+    actually matched IoC.
+    Returns stdout from the invoked command.
+    @param cmd The command, including flags, to invoke as subprocess. cmd is
+        treated as template string and occurrences of '%ioc' are replaced with
+        the actually matched IoC.
+    @param context The context (python dict) to forward as JSON
+    @param ioc The value to replace '%ioc' with in the `cmd` string
+    """
+    cmd = cmd.replace("%ioc", ioc)
+    proc = await asyncio.create_subprocess_exec(
+        *cmd.split(" "),
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        stdin=asyncio.subprocess.PIPE,
+    )
+    proc.stdin.write(json.dumps(context).encode())
+    await proc.stdin.drain()
+    proc.stdin.close()
+    stdout, stderr = await proc.communicate()
+    if stderr:
+        logger.error(f"Error while transforming sighting context: {stderr}")
+    return stdout
+
+
+async def report_sightings(
+    sub_endpoint, sightings_queue, transform_cmd=None, sink=None
+):
     """
     Starts a ZeroMQ publisher on the given endpoint and publishes sightings from
     the sightings_queue.
     @param sub_endpoint A host:port string to connect to via ZeroMQ
     @param sightings_queue The queue to receive sightings from
+    @param transform_cmd The command to use to pipe sightings to. Treated
+        as template string: occurrences of '%ioc' in the cmd string get replaced
+        with the matched IoC.
+    @param report_data If True, only report sighting.context.data instead of the
+        whole sighting.
     """
     global logger
-    socket = zmq.Context().socket(zmq.PUB)
-    socket.connect(f"tcp://{sub_endpoint}")
-    topic = "vast/sightings"
-    logger.info(f"Forwarding sightings to {sub_endpoint}/{topic}")
+    if transform_cmd:
+        logger.info(
+            f"Using '{transform_cmd}' to transform every sighting's context before sending"
+        )
+    if sink:
+        logger.info(f"Forwarding sightings to sink '{sink}'")
+    else:
+        socket = zmq.Context().socket(zmq.PUB)
+        socket.connect(f"tcp://{sub_endpoint}")
+        topic = "vast/sightings"
+        logger.info(f"Forwarding sightings to Threat Bus at {sub_endpoint}/{topic}")
     while True:
         sighting = await sightings_queue.get()
-        socket.send_string(f"{topic} {sighting}")
+        if transform_cmd:
+            context_str = await invoke_cmd_for_context(
+                transform_cmd, sighting.get("context", None), sighting.get("ioc", None)
+            )
+            try:
+                context = json.loads(context_str)
+                sighting["context"] = context
+            except Exception as e:
+                logger.error(
+                    f"Cannot parse transformed sighting context (expecting JSON): {context_str}",
+                    e,
+                )
+        if sink:
+            context = sighting.get("context", {})
+            if sink.lower() == "stdout":
+                print(json.dumps(context))
+            else:
+                await invoke_cmd_for_context(sink, context)
+        else:
+            socket.send_string(f"{topic} {json.dumps(sighting)}")
         sightings_queue.task_done()
         logger.debug(f"Reported sighting: {sighting}")
 
@@ -341,12 +411,34 @@ def main():
         action="store_true",
         help="Use plain vast queries instead of live-matcher",
     )
+    parser.add_argument(
+        "--transform-context",
+        "-T",
+        dest="transform",
+        default=None,
+        help="Forward the context of each sighting (only the contents without the Threat Bus specific sighting structure) via a UNIX pipe. This flag takes a command line string to use and invokes it as direct subprocess without shell / globbing support. Note: Treated as template string. Occurrences of '%%ioc' get replaced with the matched IoC.",
+    )
+    parser.add_argument(
+        "--sink",
+        "-S",
+        dest="sink",
+        default=None,
+        help="If sink is specified, sightings are not reported back to Threat Bus. Instead, the context of a sighting (only the contents without the Threat Bus specific sighting structure) is forwarded to the specified sink via a UNIX pipe. This flag takes a command line string to use and invokes it as direct subprocess without shell / globbing support.",
+    )
 
     args = parser.parse_args()
 
     setup_logging(args.log_level)
     asyncio.run(
-        start(args.binary, args.vast, args.threatbus, args.snapshot, args.retro_match)
+        start(
+            args.binary,
+            args.vast,
+            args.threatbus,
+            args.snapshot,
+            args.retro_match,
+            args.transform,
+            args.sink,
+        )
     )
 
 
