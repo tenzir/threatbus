@@ -8,10 +8,10 @@ from tests.utils import zmq_sender, zeek_receiver
 class TestRoundtrips(unittest.TestCase):
     def test_zeek_plugin_message_roundtrip(self):
         """
-            Backend agnostic message passing screnario. Sends a single MISP
-            Attribute via ZeroMQ to the threatbus MISP plugin, subscribes via
-            broker to threatbus, and checks if the initially sent message got
-            parsed and forwarded correctly as new Intelligence item.
+        Backend agnostic message passing screnario. Sends a single MISP
+        Attribute via ZeroMQ to the threatbus MISP plugin, subscribes via
+        broker to threatbus, and checks if the initially sent message got
+        parsed and forwarded correctly as new Intelligence item.
         """
         misp_json_attribute = """{
             "Attribute": {

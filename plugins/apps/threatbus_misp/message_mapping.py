@@ -54,7 +54,8 @@ misp_intel_type_mapping = {
 
 
 def map_to_internal(misp_attribute, action, logger=None):
-    """Maps the given MISP attribute to the threatbus intel format.
+    """
+    Maps the given MISP attribute to the threatbus intel format.
     @param misp_attribute A MISP attribute
     @param action A string from MISP, describing the action for the attribute (either 'add' or 'delete')
     @return the mapped intel item or None
@@ -98,7 +99,8 @@ def map_to_internal(misp_attribute, action, logger=None):
 
 
 def map_to_misp(sighting):
-    """Maps the threatbus sighting format to a MISP sighting.
+    """
+    Maps the threatbus sighting format to a MISP sighting.
     @param sighting A threatbus Sighting object
     @return the mapped MISP sighting object or None
     """

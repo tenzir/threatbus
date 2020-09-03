@@ -35,7 +35,12 @@ class TestMessageMapping(unittest.TestCase):
         )
         self.assertIsNone(
             map_intel_to_vast(
-                {"ts": self.ts, "id": self.id, "operation": Operation.ADD, "data": {},}
+                {
+                    "ts": self.ts,
+                    "id": self.id,
+                    "operation": Operation.ADD,
+                    "data": {},
+                }
             )
         )
         self.assertIsNone(

@@ -22,7 +22,9 @@ setup(
     ],
     description="A simplistic in-memory backbone for threatbus.",
     entry_points={"threatbus.backbone": ["inmem = threatbus_inmem.plugin"]},
-    install_requires=["threatbus>=2020.04.29",],
+    install_requires=[
+        "threatbus>=2020.04.29",
+    ],
     keywords=["threatbus", "plugin"],
     license="BSD 3-clause",
     long_description=long_description,

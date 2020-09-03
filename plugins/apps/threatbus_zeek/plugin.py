@@ -62,9 +62,9 @@ def manage_subscription(
 
 def publish(logger, module_namespace, ep):
     """Publishes messages for all subscriptions in a round-robin fashion to via broker.
-        @param logger A logging.logger object
-        @param module_namespace A Zeek namespace to use for event sending
-        @param ep The broker endpoint used for publishing
+    @param logger A logging.logger object
+    @param module_namespace A Zeek namespace to use for event sending
+    @param ep The broker endpoint used for publishing
     """
     global subscriptions, lock
     while True:
@@ -84,12 +84,12 @@ def publish(logger, module_namespace, ep):
 
 def manage(logger, module_namespace, ep, subscribe_callback, unsubscribe_callback):
     """Binds a broker subscriber to the given endpoint. Only listens for
-        management messages, such as un/subscriptions of new clients.
-        @param logger A logging.logger object
-        @param module_namespace A Zeek namespace to accept events from
-        @param ep The broker endpoint used for listening
-        @param subscribe_callback The callback to invoke for new subscriptions
-        @param unsubscribe_callback The callback to invoke for revoked subscriptions
+    management messages, such as un/subscriptions of new clients.
+    @param logger A logging.logger object
+    @param module_namespace A Zeek namespace to accept events from
+    @param ep The broker endpoint used for listening
+    @param subscribe_callback The callback to invoke for new subscriptions
+    @param unsubscribe_callback The callback to invoke for revoked subscriptions
     """
     sub = ep.make_subscriber("threatbus/manage")
     while True:
@@ -109,11 +109,11 @@ def manage(logger, module_namespace, ep, subscribe_callback, unsubscribe_callbac
 
 def listen(logger, module_namespace, ep, inq):
     """Binds a broker subscriber to the given endpoint. Forwards all received
-        intel and sightings to the inq.
-        @param logger A logging.logger object
-        @param module_namespace A Zeek namespace to accept events from
-        @param ep The broker endpoint used for listening
-        @param inq The queue to forward messages to
+    intel and sightings to the inq.
+    @param logger A logging.logger object
+    @param module_namespace A Zeek namespace to accept events from
+    @param ep The broker endpoint used for listening
+    @param inq The queue to forward messages to
     """
     sub = ep.make_subscriber(["threatbus/intel", "threatbus/sighting"])
     while True:
