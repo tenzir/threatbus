@@ -292,9 +292,9 @@ async def report_sightings(
         logger.info(f"Forwarding sightings to Threat Bus at {sub_endpoint}/{topic}")
     while True:
         sighting = await sightings_queue.get()
-        if transform_cmd:
+        if transform_cmd and sighting.get("context", None):
             context_str = await invoke_cmd_for_context(
-                transform_cmd, sighting.get("context", None), sighting.get("ioc", None)
+                transform_cmd, sighting.get("context"), sighting.get("ioc", None)
             )
             try:
                 context = json.loads(context_str)
