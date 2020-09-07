@@ -114,6 +114,13 @@ def main():
     for unwanted_app in installed_apps - configured_apps:
         tb_logger.info(f"Disabling installed, but unconfigured app '{unwanted_app}'")
         apps.unregister(name=unwanted_app)
+    configured_backbones = set(config["plugins"]["backbones"].keys())
+    installed_backbones = set(dict(backbones.list_name_plugin()).keys())
+    for unwanted_backbones in installed_backbones - configured_backbones:
+        tb_logger.info(
+            f"Disabling installed, but unconfigured backbones '{unwanted_backbones}'"
+        )
+        backbones.unregister(name=unwanted_backbones)
 
     bus = ThreatBus(backbones.hook, apps.hook, tb_logger, config)
     bus.run()
