@@ -39,6 +39,7 @@ build:
 	python plugins/apps/threatbus_vast/setup.py build
 	python plugins/apps/threatbus_cif3/setup.py build
 	python plugins/backbones/threatbus_inmem/setup.py build
+	python plugins/backbones/threatbus_rabbitmq/setup.py build
 
 .PHONY: dist
 dist:
@@ -53,6 +54,7 @@ dist:
 	python plugins/apps/threatbus_cif3/setup.py sdist bdist_wheel
 	make clean
 	python plugins/backbones/threatbus_inmem/setup.py sdist bdist_wheel
+	python plugins/backbones/threatbus_rabbitmq/setup.py sdist bdist_wheel
 	make clean
 
 .PHONY: install
@@ -63,6 +65,7 @@ install:
 	python plugins/apps/threatbus_vast/setup.py install
 	python plugins/apps/threatbus_cif3/setup.py install
 	python plugins/backbones/threatbus_inmem/setup.py install
+	python plugins/backbones/threatbus_rabbitmq/setup.py install
 
 .PHONY: dev-mode
 dev-mode:
@@ -72,3 +75,4 @@ dev-mode:
 	python plugins/apps/threatbus_vast/setup.py develop
 	python plugins/apps/threatbus_cif3/setup.py develop
 	python plugins/backbones/threatbus_inmem/setup.py develop
+	python plugins/backbones/threatbus_rabbitmq/setup.py develop
