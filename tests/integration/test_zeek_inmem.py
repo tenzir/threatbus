@@ -21,15 +21,23 @@ def RunZeek():
         )
         return subprocess.Popen(
             [
-                "zeek",
+                "docker",
+                "run",
+                "--net=host",
+                "--rm",
+                "--name=zeek",
+                "-v",
+                f"{trace_file}:/trace.pcap",
+                "-v",
+                f"{script_file}:/opt/zeek/share/zeek/site/threatbus.zeek",
+                "fixel/zeek:latest",
                 "-C",
-                "-b",
                 "--pseudo-realtime=0.5",
                 "-r",
-                trace_file,
-                script_file,
+                "/trace.pcap",
+                "/opt/zeek/share/zeek/site/threatbus.zeek",
                 "--",
-                "Tenzir::log_operations=F",
+                "Tenzir::log_operations=T",
             ]
         )
     except subprocess.CalledProcessError:
@@ -39,9 +47,9 @@ def RunZeek():
 class TestRoundtrips(unittest.TestCase):
     def test_zeek_plugin_message_roundtrip(self):
         """
-            Backend agnostic message passing screnario. Sends a fixed amount of
-            messages via the threatbus Zeek plugin, subscribes to threatbus, and
-            checks if the initially sent messages can be retrieved back.
+        Backend agnostic message passing screnario. Sends a fixed amount of
+        messages via the threatbus Zeek plugin, subscribes to threatbus, and
+        checks if the initially sent messages can be retrieved back.
         """
         result_q = queue.Queue()
         items = 5
@@ -62,12 +70,12 @@ class TestRoundtrips(unittest.TestCase):
 
     def test_intel_sighting_roundtrip(self):
         """
-            Backend agnostic routrip screnario, that starts a Zeek
-            subprocess. Zeek is started using the threatbus.zeek "app" script.
-            The test sends an intelligence item via threatbus. The Zeek
-            subprocess reads a PCAP trace which contains that known threat
-            intelligence. The integration test subscribes to the sightings topic
-            and verifies that Zeek reports sighted threat intelligence items.
+        Backend agnostic routrip screnario, that starts a Zeek
+        subprocess. Zeek is started using the threatbus.zeek "app" script.
+        The test sends an intelligence item via threatbus. The Zeek
+        subprocess reads a PCAP trace which contains that known threat
+        intelligence. The integration test subscribes to the sightings topic
+        and verifies that Zeek reports sighted threat intelligence items.
         """
 
         # start a receiver that pushes exactly 1 item to a result queue
