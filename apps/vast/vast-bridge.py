@@ -99,13 +99,13 @@ async def start(
 
 def ioc_to_query(intel):
     """
-    Creates a valid VAST query from an intel IoC item. See the Threat Bus
-    VAST plugin, `message_mapping.py`, for details of possible IoC `type`s.
+    Creates a VAST query from an intel IoC item. See the Threat Bus VAST plugin,
+    `message_mapping.py`, for details of possible IoC `type`s.
     """
     ioc = intel.get("ioc", None)
     type_ = intel.get("type", None)
     if type_ == "ip" or type_ == "ipv6":
-        return f":addr == {ioc}"
+        return str(ioc)
     if type_ == "url":
         return f'"{ioc}" in url'
     if type_ == "domain":
@@ -160,7 +160,7 @@ async def receive_intel(pub_endpoint, topic, intel_queue):
 async def match_intel(cmd, vast_endpoint, intel_queue, sightings_queue, retro_match):
     """
     Reads from the intel_queue and matches all IoCs, either via VAST's
-    live-matching (pro feature) or retro-matching.
+    live-matching or retro-matching.
     @param cmd The vast binary command to use with PyVAST
     @param vast_endpoint The endpoint of a running vast node
     @param intel_queue The queue to read new IoCs from
@@ -211,7 +211,7 @@ async def match_intel(cmd, vast_endpoint, intel_queue, sightings_queue, retro_ma
 
 async def live_match_vast(cmd, vast_endpoint, sightings_queue):
     """
-    Starts a VAST matcher (pro feature). Enqueues all matches from VAST to the
+    Starts a VAST matcher. Enqueues all matches from VAST to the
     sightings_queue.
     @param cmd The VAST binary command to use with PyVAST
     @param vast_endpoint The endpoint of a running VAST node

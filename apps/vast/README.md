@@ -43,13 +43,11 @@ Request an intelligence snapshot of the past 50 days.
 
 ## Bridge Features
 
-This section explains the most important features of the `vast-bridge` and the
-CLI toggles to enable them.
+This section explains the most important features and CLI options of the `vast-bridge`.
 
 ### IoC Matching
 
-VAST can match IoCs either live (pro-feature) or retrospectively via the means
-of usual queries.
+VAST can match IoCs either live or retrospectively via usual queries.
 
 #### Live Matching
 
@@ -60,14 +58,14 @@ works as
 The `vast-bridge` subscribes to those continuous query results and reports all
 new IoC matches from VAST to Threat Bus as `Sightings`.
 
-The live matching is the default mode of operation for the `vast-bridge`. Note
+Live matching is the default mode of operation for the `vast-bridge`. Note
 that the VAST node must support this feature.
 
 #### Retro Matching
 
-The `vast-bridge` supports retro matching via the command line toggle
-`--retro-match`. When this toggle is used, the bridge transforms IoCs from
-Threat Bus to valid VAST queries, instead of feeding the IoCs to a live matcher.
+The `vast-bridge` supports retro matching via the command line option
+`--retro-match`. This instructs the bridge to translate IoCs from
+Threat Bus to VAST queries instead of feeding the IoCs to a live matcher.
 
 Each result from an IoC query is treated as `Sighting` of that IoC and reported
 back to Threat Bus.
@@ -75,7 +73,15 @@ back to Threat Bus.
 ### Sighting Context Transformation
 
 The bridge provides a command line option to invoke another program for parsing
-Sighting context data.
+Sighting `context` data.
+
+The option `--transform-context "cmd args"` translates the `context`
+field of a Sighting via the specified utility. For example, pass the `context`
+object to [DCSO/fever](https://github.com/DCSO/fever) `alertify`:
+
+```
+apps/vast/vast-bridge.py --retro-match --transform-context "fever alertify --alert-prefix VAST-RETRO --extra-key vast-ioc --ioc %ioc"
+```
 
 A `Sighting` object is structured as follows:
 
@@ -92,14 +98,6 @@ A `Sighting` object is structured as follows:
 The `context` field can contain arbitrary data. For example, retro matches from
 VAST contain the full query result in the context field (like a Suricata EVE
 entry or a Zeek conn.log entry).
-
-Use the CLI toggle `--transform-context "cmd args" to transform the `context`
-object via some command line tool. For example, pass the `context` object to
-[DCSO/fever](https://github.com/DCSO/fever) `alertify`:
-
-```
-apps/vast/vast-bridge.py --retro-match --transform-context "fever alertify --alert-prefix VAST-RETRO --extra-key vast-ioc --ioc %ioc"
-```
 
 Note that the `cmd` string passed to `--transform-context` is treated as
 template string. The placeholder `%ioc` is replaced with the contents of the
