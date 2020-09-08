@@ -1,6 +1,6 @@
 FROM fixel/zeek:broker-latest
 
-RUN apt-get update -qqy && apt-get install -qqy \
+RUN apt-get -qq update && apt-get -qqy install \
   python3-pip wget software-properties-common gnupg2
 RUN wget -qO - https://packages.confluent.io/deb/5.4/archive.key | apt-key add - && \
   add-apt-repository "deb [arch=amd64] https://packages.confluent.io/deb/5.4 stable main" && \
@@ -24,4 +24,4 @@ RUN python3 setup.py install && \
 COPY config* ./
 
 ENTRYPOINT ["threatbus"]
-CMD ["-c", , "config.yaml"]
+CMD ["-c", "config.yaml"]

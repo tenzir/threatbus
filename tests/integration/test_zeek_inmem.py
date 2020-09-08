@@ -21,15 +21,23 @@ def RunZeek():
         )
         return subprocess.Popen(
             [
-                "zeek",
+                "docker",
+                "run",
+                "--net=host",
+                "--rm",
+                "--name=zeek",
+                "-v",
+                f"{trace_file}:/trace.pcap",
+                "-v",
+                f"{script_file}:/opt/zeek/share/zeek/site/threatbus.zeek",
+                "fixel/zeek:latest",
                 "-C",
-                "-b",
                 "--pseudo-realtime=0.5",
                 "-r",
-                trace_file,
-                script_file,
+                "/trace.pcap",
+                "/opt/zeek/share/zeek/site/threatbus.zeek",
                 "--",
-                "Tenzir::log_operations=F",
+                "Tenzir::log_operations=T",
             ]
         )
     except subprocess.CalledProcessError:

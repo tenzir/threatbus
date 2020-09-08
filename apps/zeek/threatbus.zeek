@@ -22,10 +22,10 @@ export {
   };
 
   ## Broker bind address.
-  const broker_host = "localhost" &redef;
+  option broker_host = "localhost" &redef;
 
   ## Broker port.
-  const broker_port = 47761/tcp &redef;
+  option broker_port = 47761/tcp &redef;
 
   ## The source name for the Intel framework for intel coming from Threat Bus.
   const tb_intel_tag = "threatbus";
