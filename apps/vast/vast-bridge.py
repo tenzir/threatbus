@@ -400,6 +400,7 @@ def main():
         "-s",
         dest="snapshot",
         default=0,
+        type=int,
         help="Request intelligence snapshot for past n days",
     )
     parser.add_argument(
