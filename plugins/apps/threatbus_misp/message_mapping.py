@@ -16,6 +16,7 @@ misp_intel_type_mapping = {
     "domain": IntelType.DOMAIN,
     "domain|ip": IntelType.DOMAIN_IP,
     "url": IntelType.URL,
+    "uri": IntelType.URL,
     "user-agent": IntelType.USERAGENT,
     "md5": IntelType.MD5,
     "malware-sample": IntelType.MALWARESAMPLE,
@@ -53,10 +54,11 @@ misp_intel_type_mapping = {
 
 
 def map_to_internal(misp_attribute, action, logger=None):
-    """Maps the given MISP attribute to the threatbus intel format.
-        @param misp_attribute A MISP attribute
-        @param action A string from MISP, describing the action for the attribute (either 'add' or 'delete')
-        @return the mapped intel item or None
+    """
+    Maps the given MISP attribute to the threatbus intel format.
+    @param misp_attribute A MISP attribute
+    @param action A string from MISP, describing the action for the attribute (either 'add' or 'delete')
+    @return the mapped intel item or None
     """
     # parse MISP attribute
     if not misp_attribute:
@@ -87,15 +89,20 @@ def map_to_internal(misp_attribute, action, logger=None):
     return Intel(
         datetime.fromtimestamp(int(misp_attribute["timestamp"])),
         str(misp_attribute["id"]),
-        IntelData(indicator, misp_intel_type_mapping[intel_type], source="MISP",),
+        IntelData(
+            indicator,
+            misp_intel_type_mapping[intel_type],
+            source="MISP",
+        ),
         operation,
     )
 
 
 def map_to_misp(sighting):
-    """Maps the threatbus sighting format to a MISP sighting.
-        @param sighting A threatbus Sighting object
-        @return the mapped MISP sighting object or None
+    """
+    Maps the threatbus sighting format to a MISP sighting.
+    @param sighting A threatbus Sighting object
+    @return the mapped MISP sighting object or None
     """
     if not sighting or not isinstance(sighting, Sighting):
         return None

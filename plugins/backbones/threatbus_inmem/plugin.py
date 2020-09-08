@@ -16,8 +16,8 @@ def validate_config(config):
 
 def provision(logger, inq):
     """Provisions all messages that arrive on the inq to all subscribers of that topic.
-        @param logger A logging.logger object
-        @param inq The in-Queue to read messages from
+    @param logger A logging.logger object
+    @param inq The in-Queue to read messages from
     """
     global subscriptions, lock
     while True:

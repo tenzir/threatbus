@@ -17,10 +17,10 @@ class ThreatBus:
 
     def request_snapshot(self, topic, dst_q, time_delta):
         """Request a snapshot from all registered apps for a given topic.
-            @param topic The topic for which the snapshot is requested
-            @param dst_q A queue that should be used to forward all snapshot
-                data to
-            @param time_delta A timedelta object to mark the snapshot size
+        @param topic The topic for which the snapshot is requested
+        @param dst_q A queue that should be used to forward all snapshot
+            data to
+        @param time_delta A timedelta object to mark the snapshot size
         """
         # Threat Bus follows a hierarchical pub-sub structure. Subscriptions
         # to 'threatbus' must hence result in snapshots for both, intel
@@ -46,10 +46,10 @@ class ThreatBus:
 
     def subscribe(self, topic, q, time_delta=None):
         """Accepts a new subscription for a given topic and queue pointer.
-            Forwards that subscription to all managed backbones.
-            @param topic Subscribe to this topic
-            @param q A queue object to forward all messages for the given topics
-            @param time_delta A timedelta object to mark the snapshot size
+        Forwards that subscription to all managed backbones.
+        @param topic Subscribe to this topic
+        @param q A queue object to forward all messages for the given topics
+        @param time_delta A timedelta object to mark the snapshot size
         """
         assert isinstance(topic, str), "topic must be string"
         self.backbones.subscribe(topic=topic, q=q)

@@ -23,8 +23,9 @@ def validate_config(config):
 
 
 def receive_intel_from_backbone(watched_queue, cif, config):
-    """Reports / publishes intel items back to the given CIF endpoint.
-        @param watched_queue The py queue from which to read messages to submit on to CIF
+    """
+    Reports / publishes intel items back to the given CIF endpoint.
+    @param watched_queue The py queue from which to read messages to submit on to CIF
     """
     global logger
     if not cif:

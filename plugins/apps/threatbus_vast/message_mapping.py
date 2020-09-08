@@ -1,4 +1,5 @@
 from datetime import timedelta
+from dateutil import parser
 from threatbus.data import Intel, IntelType, Sighting, Subscription, Unsubscription
 import json
 import ipaddress
@@ -10,6 +11,7 @@ to_vast_intel = {
     IntelType.DOMAIN: "domain",
     IntelType.DOMAIN_IP: "domain",
     IntelType.URL: "url",
+    IntelType.URI: "url",
 }
 
 threatbus_reference = "threatbus__"
@@ -17,7 +19,7 @@ threatbus_reference = "threatbus__"
 
 def map_management_message(msg):
     """Maps a management message to an actionable instruction for threatbus.
-        @param msg The message that was received, as python dictionary
+    @param msg The message that was received, as python dictionary
     """
     action = msg.get("action", None)
     topic = msg.get("topic", None)
@@ -31,7 +33,7 @@ def map_management_message(msg):
 
 def map_intel_to_vast(intel: Intel):
     """Maps an Intel item to a VAST compatible format;
-        @param intel The item to map
+    @param intel The item to map
     """
     if not type(intel).__name__.lower() == "intel":
         return None
@@ -40,7 +42,7 @@ def map_intel_to_vast(intel: Intel):
         return None
 
     indicator = intel.data["indicator"][0]  # indicators are tuples in Threat Bus
-    if vast_type == "ADDR" and ipaddress.ip_address(indicator).version == 6:
+    if vast_type == "ip" and ipaddress.ip_address(indicator).version == 6:
         vast_type = "ipv6"
 
     return json.dumps(
@@ -55,14 +57,17 @@ def map_intel_to_vast(intel: Intel):
 
 def map_vast_sighting(msg):
     """Maps a VAST sighting to Threat Bus internal format
-        @param msg The raw sighting from VAST (dict)
+    @param msg The raw sighting from VAST (dict)
     """
     if not isinstance(msg, dict):
         return None
     ts = msg.get("ts", None)
+    if type(ts) is str:
+        ts = parser.parse(ts)
     ref = msg.get("reference", "")
+    context = msg.get("context", {})
     if not ts or not ref or not len(ref) > len(threatbus_reference):
         return None
     ref = ref[len(threatbus_reference) :]
-    context = {"source": "VAST"}
+    context["source"] = "VAST"
     return Sighting(ts, ref, context)

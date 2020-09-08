@@ -15,6 +15,7 @@ warnings.simplefilter("ignore")  # pymisp produces urllib warnings
 
 """MISP - Open Source Threat Intelligence Platform - plugin for Threat Bus"""
 
+
 plugin_name = "misp"
 misp = None
 lock = threading.Lock()
@@ -44,8 +45,9 @@ def validate_config(config):
 
 
 def publish_sightings(outq):
-    """Reports / publishes true-positive sightings of intelligence items back to the given MISP endpoint.
-        @param outq The queue from which to forward messages to MISP 
+    """
+    Reports / publishes true-positive sightings of intelligence items back to the given MISP endpoint.
+    @param outq The queue from which to forward messages to MISP
     """
     global logger, misp, lock
     if not misp:
@@ -59,12 +61,14 @@ def publish_sightings(outq):
         lock.acquire()
         misp.add_sighting(misp_sighting)
         lock.release()
+        outq.task_done()
 
 
 def receive_kafka(kafka_config, inq):
-    """Binds a Kafka consumer to the the given host/port. Forwards all received messages to the inq.
-        @param kafka_config A configuration object for Kafka binding
-        @param inq The queue to which intel items from MISP are forwarded to
+    """
+    Binds a Kafka consumer to the the given host/port. Forwards all received messages to the inq.
+    @param kafka_config A configuration object for Kafka binding
+    @param inq The queue to which intel items from MISP are forwarded to
     """
     consumer = Consumer(kafka_config["config"].get(dict))
     consumer.subscribe(kafka_config["topics"].get(list))
@@ -92,11 +96,11 @@ def receive_kafka(kafka_config, inq):
 
 
 def receive_zmq(zmq_config, inq):
-    """Binds a ZMQ poller to the the given host/port. Forwards all received messages to the inq.
-        @param zmq_config A configuration object for ZeroMQ binding
-        @param inq The queue to which intel items from MISP are forwarded to
     """
-
+    Binds a ZMQ poller to the the given host/port. Forwards all received messages to the inq.
+    @param zmq_config A configuration object for ZeroMQ binding
+    @param inq The queue to which intel items from MISP are forwarded to
+    """
     socket = zmq.Context().socket(zmq.SUB)
     socket.connect(f"tcp://{zmq_config['host']}:{zmq_config['port']}")
     # TODO: allow reception of more topics, i.e. handle events.

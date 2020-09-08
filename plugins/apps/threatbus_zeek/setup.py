@@ -25,7 +25,9 @@ setup(
     ],
     description="A plugin to enable threatbus communication with Zeek network monitor.",
     entry_points={"threatbus.app": ["zeek = threatbus_zeek.plugin"]},
-    install_requires=["threatbus>=2020.04.29",],
+    install_requires=[
+        "threatbus>=2020.04.29",
+    ],
     keywords=["threatbus", "Zeek", "intrusion detection", "IDS", "broker", "plugin"],
     license="BSD 3-clause",
     long_description=long_description,

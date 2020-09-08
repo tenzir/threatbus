@@ -74,8 +74,8 @@ from_zeek_intel = {
 
 def map_management_message(broker_data, module_namespace):
     """Maps a management message to an actionable instruction for threatbus.
-        @param broker_data The raw data that was received via broker
-        @param module_namespace A Zeek namespace to accept events from
+    @param broker_data The raw data that was received via broker
+    @param module_namespace A Zeek namespace to accept events from
     """
     event = broker.zeek.Event(broker_data)
     name, args = event.name(), event.args()
@@ -89,7 +89,7 @@ def map_management_message(broker_data, module_namespace):
 
 def map_broker_intel_to_internal(intel_dict):
     """Maps a intel dict with zeek Intel::Type values to the threatbus.data.IntelData Type
-        @param intel_dict The data to map into Threat Bus format
+    @param intel_dict The data to map into Threat Bus format
     """
     zeek_type = intel_dict.get("intel_type", None)
     intel_type = from_zeek_intel.get(zeek_type, None)
@@ -102,8 +102,8 @@ def map_broker_intel_to_internal(intel_dict):
 
 def map_to_internal(broker_data, module_namespace):
     """Maps a broker message, based on the event name, to the internal format.
-        @param broker_data The raw data that was received via broker
-        @param module_namespace A Zeek namespace to accept events from
+    @param broker_data The raw data that was received via broker
+    @param module_namespace A Zeek namespace to accept events from
     """
     event = broker.zeek.Event(broker_data)
     name, args = event.name(), event.args()
@@ -125,7 +125,7 @@ def map_to_internal(broker_data, module_namespace):
 
 def map_intel_data_to_broker(intel_data):
     """Maps threatbus.data.IntelData to a broker compatible type and zeek compatible Intel::Type values.
-        @param intel_data The Threat Bus intel data to map
+    @param intel_data The Threat Bus intel data to map
     """
     zeek_type = to_zeek_intel.get(intel_data["intel_type"], None)
     if not zeek_type:
@@ -155,15 +155,16 @@ def map_intel_data_to_broker(intel_data):
 
 def map_to_broker(msg, module_namespace):
     """Maps the internal message format to a broker message.
-        @param msg The message that shall be converted
-        @param module_namespace A Zeek namespace to use for event sending
-        @return The mapped broker event or None
+    @param msg The message that shall be converted
+    @param module_namespace A Zeek namespace to use for event sending
+    @return The mapped broker event or None
     """
     msg_type = type(msg).__name__.lower()
     if msg_type == "sighting":
         # convert sighting to zeek event
         return broker.zeek.Event(
-            f"{module_namespace}::sighting", (msg.ts, str(msg.intel), msg.context),
+            f"{module_namespace}::sighting",
+            (msg.ts, str(msg.intel), msg.context),
         )
     elif msg_type == "intel":
         # convert intel to zeek event

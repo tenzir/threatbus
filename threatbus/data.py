@@ -41,6 +41,7 @@ class IntelType(Enum):
     DOMAIN = auto()
     DOMAIN_IP = auto()
     URL = auto()
+    URI = auto()
     USERAGENT = auto()
     MD5 = auto()
     MALWARESAMPLE = auto()
@@ -78,8 +79,8 @@ class IntelType(Enum):
 
 class IntelData(dict):
     """Threat Bus intel data is a dictionary with at least two keys: 'indicator' and 'intel_type'.
-        The 'indicator' is a tuple of strings, defining the IoC(s)
-        The 'intel_type' is a threatbus.data.IntelType
+    The 'indicator' is a tuple of strings, defining the IoC(s)
+    The 'intel_type' is a threatbus.data.IntelType
     """
 
     def __init__(self, indicator, intel_type: IntelType, *args, **kw):
