@@ -14,6 +14,7 @@ test: unit-tests integration-tests
 
 .PHONY: unit-tests
 unit-tests:
+	python -m unittest discover threatbus
 	python -m unittest discover plugins/apps
 	python -m unittest discover plugins/backbones
 

@@ -1,6 +1,9 @@
+import copy
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from dateutil import parser
 from enum import auto, Enum, unique
+import json
 
 
 @dataclass
@@ -112,3 +115,78 @@ class Sighting:
     ts: datetime
     intel: str
     context: dict
+
+
+class IntelEncoder(json.JSONEncoder):
+    """
+    Encodes Intel objects to JSON strings
+    """
+
+    def default(self, intel: Intel):
+        if type(intel) is not Intel:
+            # let the base class default method raise the TypeError
+            return json.JSONEncoder.default(self, intel)
+        data = copy.deepcopy(intel.data)
+        data["indicator"] = list(intel.data["indicator"])
+        data["intel_type"] = int(intel.data["intel_type"].value)
+        return {
+            "ts": str(intel.ts),
+            "id": str(intel.id),
+            "data": data,
+            "operation": str(intel.operation.value),
+        }
+
+
+class IntelDecoder(json.JSONDecoder):
+    """
+    Decodes JSON strings to Intel objects
+    """
+
+    def __init__(self, *args, **kwargs):
+        json.JSONDecoder.__init__(self, object_hook=self.object_hook, *args, **kwargs)
+
+    def object_hook(self, dct: dict):
+        if "intel_type" in dct and "indicator" in dct:
+            # parse IntelData
+            intel_type = IntelType(int(dct.pop("intel_type")))
+            indicator = tuple(dct.pop("indicator"))
+            return IntelData(indicator, intel_type, **dct)
+        elif "ts" in dct and "id" in dct and "data" in dct and "operation" in dct:
+            # parse Intel
+            return Intel(
+                parser.parse(dct["ts"]),
+                dct["id"],
+                dct["data"],
+                Operation(dct["operation"]),
+            )
+        return dct
+
+
+class SightingEncoder(json.JSONEncoder):
+    """
+    Encodes Sighting objects to JSON strings
+    """
+
+    def default(self, sighting: Sighting):
+        if type(sighting) is not Sighting:
+            # let the base class default method raise the TypeError
+            return json.JSONEncoder.default(self, sighting)
+        return {
+            "ts": str(sighting.ts),
+            "intel": sighting.intel,
+            "context": sighting.context,
+        }
+
+
+class SightingDecoder(json.JSONDecoder):
+    """
+    Decodes JSON strings to Sighting objects
+    """
+
+    def __init__(self, *args, **kwargs):
+        json.JSONDecoder.__init__(self, object_hook=self.object_hook, *args, **kwargs)
+
+    def object_hook(self, dct: dict):
+        if "ts" in dct and "intel" in dct and "context" in dct:
+            return Sighting(parser.parse(dct["ts"]), dct["intel"], dct["context"])
+        return dct

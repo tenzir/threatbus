@@ -16,7 +16,8 @@ class ThreatBus:
         self.inq = Queue()
 
     def request_snapshot(self, topic, dst_q, time_delta):
-        """Request a snapshot from all registered apps for a given topic.
+        """
+        Request a snapshot from all registered apps for a given topic.
         @param topic The topic for which the snapshot is requested
         @param dst_q A queue that should be used to forward all snapshot
             data to
