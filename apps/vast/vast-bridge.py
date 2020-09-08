@@ -107,8 +107,13 @@ def ioc_to_query(intel):
     if type_ == "ip" or type_ == "ipv6":
         return str(ioc)
     if type_ == "url":
+        # TODO: use field annotations, once implemented (ch17531)
         return f'"{ioc}" in url'
     if type_ == "domain":
+        # Currently, uses VAST's suffix-based field matching. Targets every
+        # schema with fieldnames that end in `domain`, `host`, or `hostname`
+        # (Zeek and Suricata)
+        # TODO: use field annotations, once implemented (ch17531)
         return f'"{ioc}" in domain || "{ioc}" in host || "{ioc}" in hostname'
     return None
 
