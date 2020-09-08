@@ -1,6 +1,11 @@
-import threading
 from collections import defaultdict
+import json
+import pika
+from socket import gethostname
+import threading
 import threatbus
+from threatbus.data import IntelEncoder, IntelDecoder, SightingEncoder, SightingDecoder
+
 
 """RabbitMQ backbone plugin for Threat Bus"""
 
@@ -8,33 +13,116 @@ plugin_name = "rabbitmq"
 
 subscriptions = defaultdict(set)
 lock = threading.Lock()
+exchange_intel = "threatbus-intel"
+exchange_sightings = "threatbus-sighting"
 
 
 def validate_config(config):
-    return True
+    assert config, "config must not be None"
+    config["host"].get(str)
+    config["port"].get(int)
 
 
-def provision(inq):
-    """
-    Provisions all messages that arrive on the inq to all subscribers of that topic.
-    @param inq The in-Queue to read messages from
-    """
-    pass
+def provision(topic, msg):
+    global subscriptions, lock
+    logger.debug(f"Relaying message from RabbitMQ: {msg}")
+    lock.acquire()
+    for t in filter(lambda t: str(topic).startswith(str(t)), subscriptions.keys()):
+        for outq in subscriptions[t]:
+            outq.put(msg)
+    lock.release()
+
+
+def provision_intel(channel, method_frame, header_frame, body):
+    try:
+        msg = json.loads(body, cls=IntelDecoder)
+    except Exception as e:
+        logger.error(f"Error decoding intel message {body}: {e}")
+        channel.basic_ack(delivery_tag=method_frame.delivery_tag)
+        return
+    provision("threatbus/intel", msg)
+    channel.basic_ack(delivery_tag=method_frame.delivery_tag)
+
+
+def provision_sighting(channel, method_frame, header_frame, body):
+    try:
+        msg = json.loads(body, cls=SightingDecoder)
+    except Exception as e:
+        logger.error(f"Error decoding sighting message {body}: {e}")
+        channel.basic_ack(delivery_tag=method_frame.delivery_tag)
+        return
+    provision("threatbus/sightings", msg)
+    channel.basic_ack(delivery_tag=method_frame.delivery_tag)
+
+
+def consume_rabbitmq(host, port):
+    connection = pika.BlockingConnection(pika.ConnectionParameters(host, port))
+    channel = connection.channel()
+
+    intel_queue = f"threatbus-intel-{gethostname()}"
+    channel.exchange_declare(exchange=exchange_intel, exchange_type="fanout")
+    channel.queue_declare(intel_queue, durable=True, auto_delete=False)
+    channel.queue_bind(exchange=exchange_intel, queue=intel_queue)
+    channel.basic_consume(intel_queue, provision_intel)
+
+    sightings_queue = f"threatbus-sightings-{gethostname()}"
+    channel.exchange_declare(exchange=exchange_sightings, exchange_type="fanout")
+    channel.queue_declare(sightings_queue, durable=True, auto_delete=False)
+    channel.queue_bind(exchange=exchange_sightings, queue=sightings_queue)
+    channel.basic_consume(sightings_queue, provision_sighting)
+
+    try:
+        channel.start_consuming()
+    except (KeyboardInterrupt, pika.exceptions.ConnectionClosedByBroker):
+        channel.stop_consuming()
+        connection.close()
+
+
+def publish_rabbitmq(host, port, inq):
+    connection = pika.BlockingConnection(pika.ConnectionParameters(host, port))
+    channel = connection.channel()
+    channel.exchange_declare(exchange=exchange_intel, exchange_type="fanout")
+    channel.exchange_declare(exchange=exchange_sightings, exchange_type="fanout")
+
+    while True:
+        msg = inq.get(block=True)
+        msg_type = type(msg).__name__.lower()
+        exchange = None
+        encoded = None
+        if msg_type == "intel":
+            exchange = exchange_intel
+            encoded = json.dumps(msg, cls=IntelEncoder)
+        elif msg_type == "sighting":
+            exchange = exchange_sightings
+            encoded = json.dumps(msg, cls=SightingEncoder)
+        if not encoded:
+            logger.warn(f"Unable to encode message: {msg}")
+            continue
+        logger.debug(f"Forwarding message to RabbitMQ: {msg}")
+        channel.basic_publish(exchange=exchange, routing_key="", body=encoded)
 
 
 @threatbus.backbone
 def provision_p2p(src_q, dst_q):
+    # TODO
     pass
 
 
 @threatbus.backbone
 def subscribe(topic, q):
-    pass
+    global subscriptions, lock
+    lock.acquire()
+    subscriptions[topic].add(q)
+    lock.release()
 
 
 @threatbus.backbone
 def unsubscribe(topic, q):
-    pass
+    global subscriptions, lock
+    lock.acquire()
+    if q in subscriptions[topic]:
+        subscriptions[topic].remove(q)
+    lock.release()
 
 
 @threatbus.backbone
@@ -46,5 +134,10 @@ def run(config, logging, inq):
         validate_config(config)
     except Exception as e:
         logger.fatal("Invalid config for plugin {}: {}".format(plugin_name, str(e)))
-    threading.Thread(target=provision, args=(inq,), daemon=True).start()
+    host = config["host"].get(str)
+    port = config["port"].get(int)
+    threading.Thread(target=consume_rabbitmq, args=(host, port), daemon=True).start()
+    threading.Thread(
+        target=publish_rabbitmq, args=(host, port, inq), daemon=True
+    ).start()
     logger.info("RabbitMQ backbone started.")
