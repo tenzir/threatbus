@@ -131,7 +131,7 @@ def receive_zmq(zmq_config, inq):
 def snapshot(snapshot_type, result_q, time_delta):
     global logger, misp, lock
     if snapshot_type != MessageType.INTEL:
-        logger.debug(f"Sighting snapshot feature not yet implemented.")
+        logger.debug("Sighting snapshot feature not yet implemented.")
         return  # TODO sighting snapshot not yet implemented
 
     if not misp:

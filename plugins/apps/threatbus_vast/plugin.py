@@ -156,4 +156,4 @@ def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
         args=(config["zmq"], subscribe_callback, unsubscribe_callback),
         daemon=True,
     ).start()
-    logger.info(f"VAST plugin started")
+    logger.info("VAST plugin started")
