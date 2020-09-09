@@ -9,7 +9,7 @@ import zmq
 
 from threatbus_misp.message_mapping import map_to_internal, map_to_misp
 import threatbus
-from threatbus.data import MessageType
+from threatbus.data import MessageType, SnapshotEnvelope
 
 warnings.simplefilter("ignore")  # pymisp produces urllib warnings
 
@@ -128,18 +128,20 @@ def receive_zmq(zmq_config, inq):
 
 
 @threatbus.app
-def snapshot(snapshot_type, result_q, time_delta):
+def snapshot(snapshot_request, result_q):
     global logger, misp, lock
-    if snapshot_type != MessageType.INTEL:
+    if snapshot_request.snapshot_type != MessageType.INTEL:
         logger.debug("Sighting snapshot feature not yet implemented.")
         return  # TODO sighting snapshot not yet implemented
 
     if not misp:
         return
-    logger.debug(f"Executing intel snapshot for time delta {time_delta}")
+    logger.debug(f"Executing intel snapshot for time delta {snapshot_request.snapshot}")
     lock.acquire()
     data = misp.search(
-        controller="attributes", to_ids=True, date_from=datetime.now() - time_delta
+        controller="attributes",
+        to_ids=True,
+        date_from=datetime.now() - snapshot_request.snapshot,
     )
     lock.release()
     if not data:
@@ -147,7 +149,11 @@ def snapshot(snapshot_type, result_q, time_delta):
     for attr in data["Attribute"]:
         intel = map_to_internal(attr, "add", logger)
         if intel:
-            result_q.put(intel)
+            result_q.put(
+                SnapshotEnvelope(
+                    snapshot_request.snapshot_type, snapshot_request.snapshot_id, intel
+                )
+            )
 
 
 @threatbus.app
