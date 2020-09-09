@@ -4,7 +4,20 @@ import pika
 from socket import gethostname
 import threading
 import threatbus
-from threatbus.data import IntelEncoder, IntelDecoder, SightingEncoder, SightingDecoder
+from threatbus.data import (
+    Intel,
+    Sighting,
+    SnapshotRequest,
+    SnapshotEnvelope,
+    IntelEncoder,
+    IntelDecoder,
+    SightingEncoder,
+    SightingDecoder,
+    SnapshotRequestEncoder,
+    SnapshotRequestDecoder,
+    SnapshotEnvelopeEncoder,
+    SnapshotEnvelopeDecoder,
+)
 
 
 """RabbitMQ backbone plugin for Threat Bus"""
@@ -15,6 +28,8 @@ subscriptions = defaultdict(set)
 lock = threading.Lock()
 exchange_intel = "threatbus-intel"
 exchange_sightings = "threatbus-sighting"
+exchange_snapshot_requests = "threatbus-snapshot-requests"
+exchange_snapshot_envelopes = "threatbus-snapshot-envelopes"
 
 
 def validate_config(config):
@@ -55,6 +70,28 @@ def provision_sighting(channel, method_frame, header_frame, body):
     channel.basic_ack(delivery_tag=method_frame.delivery_tag)
 
 
+def provision_snapshot_request(channel, method_frame, header_frame, body):
+    try:
+        msg = json.loads(body, cls=SnapshotRequestDecoder)
+    except Exception as e:
+        logger.error(f"Error decoding SnapshotRequest {body}: {e}")
+        channel.basic_ack(delivery_tag=method_frame.delivery_tag)
+        return
+    provision("threatbus/snapshotrequest", msg)
+    channel.basic_ack(delivery_tag=method_frame.delivery_tag)
+
+
+def provision_snapshot_envelope(channel, method_frame, header_frame, body):
+    try:
+        msg = json.loads(body, cls=SnapshotEnvelopeDecoder)
+    except Exception as e:
+        logger.error(f"Error decoding SnapshotEnvelope {body}: {e}")
+        channel.basic_ack(delivery_tag=method_frame.delivery_tag)
+        return
+    provision("threatbus/snapshotenvelope", msg)
+    channel.basic_ack(delivery_tag=method_frame.delivery_tag)
+
+
 def consume_rabbitmq(host, port):
     connection = pika.BlockingConnection(pika.ConnectionParameters(host, port))
     channel = connection.channel()
@@ -71,6 +108,26 @@ def consume_rabbitmq(host, port):
     channel.queue_bind(exchange=exchange_sightings, queue=sightings_queue)
     channel.basic_consume(sightings_queue, provision_sighting)
 
+    snapshot_request_queue = f"threatbus-snapshot-requests-{gethostname()}"
+    channel.exchange_declare(
+        exchange=exchange_snapshot_requests, exchange_type="fanout"
+    )
+    channel.queue_declare(snapshot_request_queue, durable=True, auto_delete=False)
+    channel.queue_bind(
+        exchange=exchange_snapshot_requests, queue=snapshot_request_queue
+    )
+    channel.basic_consume(snapshot_request_queue, provision_snapshot_request)
+
+    snapshot_envelope_queue = f"threatbus-snapshot-envelopes-{gethostname()}"
+    channel.exchange_declare(
+        exchange=exchange_snapshot_envelopes, exchange_type="fanout"
+    )
+    channel.queue_declare(snapshot_envelope_queue, durable=True, auto_delete=False)
+    channel.queue_bind(
+        exchange=exchange_snapshot_envelopes, queue=snapshot_envelope_queue
+    )
+    channel.basic_consume(snapshot_envelope_queue, provision_snapshot_envelope)
+
     try:
         channel.start_consuming()
     except (KeyboardInterrupt, pika.exceptions.ConnectionClosedByBroker):
@@ -86,15 +143,20 @@ def publish_rabbitmq(host, port, inq):
 
     while True:
         msg = inq.get(block=True)
-        msg_type = type(msg).__name__.lower()
         exchange = None
         encoded = None
-        if msg_type == "intel":
+        if type(msg) == Intel:
             exchange = exchange_intel
             encoded = json.dumps(msg, cls=IntelEncoder)
-        elif msg_type == "sighting":
+        elif type(msg) == Sighting:
             exchange = exchange_sightings
             encoded = json.dumps(msg, cls=SightingEncoder)
+        elif type(msg) == SnapshotRequest:
+            exchange = exchange_snapshot_requests
+            encoded = json.dumps(msg, cls=SnapshotRequestEncoder)
+        elif type(msg) == SnapshotEnvelope:
+            exchange = exchange_snapshot_envelopes
+            encoded = json.dumps(msg, cls=SnapshotEnvelopeEncoder)
         if not encoded:
             logger.warn(f"Unable to encode message: {msg}")
             continue
