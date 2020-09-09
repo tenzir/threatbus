@@ -32,13 +32,6 @@ def provision(inq):
 
 
 @threatbus.backbone
-def provision_p2p(src_q, dst_q):
-    while not src_q.empty():
-        msg = src_q.get(timeout=5)
-        dst_q.put(msg)
-
-
-@threatbus.backbone
 def subscribe(topic, q):
     global subscriptions, lock
     lock.acquire()

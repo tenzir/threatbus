@@ -165,12 +165,6 @@ def publish_rabbitmq(host, port, inq):
 
 
 @threatbus.backbone
-def provision_p2p(src_q, dst_q):
-    # TODO
-    pass
-
-
-@threatbus.backbone
 def subscribe(topic, q):
     global subscriptions, lock
     lock.acquire()
