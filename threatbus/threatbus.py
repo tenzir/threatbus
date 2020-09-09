@@ -4,7 +4,9 @@ import pluggy
 from queue import Queue
 import time
 from threatbus import appspecs, backbonespecs, logger
-from threatbus.data import MessageType
+from threatbus.data import MessageType, SnapshotRequest, SnapshotEnvelope
+from threading import Lock
+from uuid import uuid4
 
 
 class ThreatBus:
@@ -13,11 +15,37 @@ class ThreatBus:
         self.apps = apps
         self.config = config
         self.logger = logger
-        self.inq = Queue()
+        self.inq = Queue()  # fan-in everything, provisioned by backbone
+        self.snapshot_q = Queue()
+        self.lock = Lock()
+        self.snapshots = dict()
+
+    def handle_snapshots(self):
+        """
+        Waits to handle snapshot requests or envelopes. Forwards new requests to
+        all implementing app plugins. Forwards envelopes to the requesting app
+        or discards them accordingly.
+        """
+        while True:
+            msg = self.snapshot_q.get(block=True)
+            if type(msg) is SnapshotRequest:
+                self.logger.debug(f"Received SnapshotRequest: {msg}")
+                self.apps.snapshot(snapshot_request=msg, result_q=self.inq)
+            elif type(msg) is SnapshotEnvelope:
+                self.logger.debug(f"Received SnapshotEnvelope: {msg}")
+                if msg.snapshot_id not in self.snapshots:
+                    continue
+                self.snapshots[msg.snapshot_id].put(msg.body)
+            else:
+                self.logger.warn(
+                    f"Received message with unknown type on snapshot topic: {msg}"
+                )
+            self.snapshot_q.task_done()
 
     def request_snapshot(self, topic, dst_q, time_delta):
         """
-        Request a snapshot from all registered apps for a given topic.
+        Create a new SnapshotRequest and push it to the inq, so that the
+        backbones can provision it.
         @param topic The topic for which the snapshot is requested
         @param dst_q A queue that should be used to forward all snapshot
             data to
@@ -39,14 +67,15 @@ class ThreatBus:
             self.logger.info(
                 f"Requesting snapshot from all plugins for message type {mt.name} and time delta {time_delta}"
             )
-            self.apps.snapshot(
-                snapshot_type=mt, result_q=snapshot_q, time_delta=time_delta
-            )
-        if message_types:
-            self.backbones.provision_p2p(src_q=snapshot_q, dst_q=dst_q)
+            snapshot_id = str(uuid4())
+            self.snapshots[snapshot_id] = dst_q  # store queue of requester
+            req = SnapshotRequest(mt, snapshot_id, time_delta)
+
+            self.inq.put(req)
 
     def subscribe(self, topic, q, time_delta=None):
-        """Accepts a new subscription for a given topic and queue pointer.
+        """
+        Accepts a new subscription for a given topic and queue pointer.
         Forwards that subscription to all managed backbones.
         @param topic Subscribe to this topic
         @param q A queue object to forward all messages for the given topics
@@ -58,7 +87,10 @@ class ThreatBus:
             self.request_snapshot(topic, q, time_delta)
 
     def unsubscribe(self, topic, q):
-        """Removes subscription for a given topic and queue pointer from all managed backbones."""
+        """
+        Removes subscription for a given topic and queue pointer from all
+        managed backbones.
+        """
         assert isinstance(topic, str), "topic must be string"
         self.backbones.unsubscribe(topic=topic, q=q)
 
@@ -75,8 +107,9 @@ class ThreatBus:
         self.backbones.run(
             config=self.config["plugins"]["backbones"], logging=logging, inq=self.inq
         )
-        while True:
-            time.sleep(1)
+        self.subscribe("threatbus/snapshotrequest", self.snapshot_q)
+        self.subscribe("threatbus/snapshotenvelope", self.snapshot_q)
+        self.handle_snapshots()
 
 
 def validate_config(config):
