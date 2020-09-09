@@ -28,7 +28,7 @@ setup(
     install_requires=[
         "threatbus>=2020.04.29",
         "pyzmq>=19",
-        "pyvast>=2020.03.26",
+        "pyvast>=2020.08.28",
         "python-dateutil>=2.8.1",
     ],
     keywords=[
