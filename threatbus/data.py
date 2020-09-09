@@ -117,6 +117,20 @@ class Sighting:
     context: dict
 
 
+@dataclass()
+class SnapshotEnvelope:
+    snapshot_type: MessageType
+    snapshot_id: str
+    body: Intel or Sighting
+
+
+@dataclass
+class SnapshotRequest:
+    snapshot_type: MessageType
+    snapshot_id: str
+    snapshot: timedelta
+
+
 class IntelEncoder(json.JSONEncoder):
     """
     Encodes Intel objects to JSON strings
@@ -189,4 +203,92 @@ class SightingDecoder(json.JSONDecoder):
     def object_hook(self, dct: dict):
         if "ts" in dct and "intel" in dct and "context" in dct:
             return Sighting(parser.parse(dct["ts"]), dct["intel"], dct["context"])
+        return dct
+
+
+class SnapshotRequestEncoder(json.JSONEncoder):
+    """
+    Encodes SnapshotRequest objects to JSON strings
+    """
+
+    def default(self, req: SnapshotRequest):
+        if type(req) is not SnapshotRequest:
+            # let the base class default method raise the TypeError
+            return json.JSONEncoder.default(self, req)
+        return {
+            "snapshot_type": int(req.snapshot_type.value),
+            "snapshot_id": str(req.snapshot_id),
+            "snapshot": int(req.snapshot.total_seconds()),
+        }
+
+
+class SnapshotRequestDecoder(json.JSONDecoder):
+    """
+    Decodes JSON strings to SnapshotRequest objects
+    """
+
+    def __init__(self, *args, **kwargs):
+        json.JSONDecoder.__init__(self, object_hook=self.object_hook, *args, **kwargs)
+
+    def object_hook(self, dct: dict):
+        if "snapshot_type" in dct and "snapshot_id" in dct and "snapshot" in dct:
+            return SnapshotRequest(
+                MessageType(int(dct["snapshot_type"])),
+                dct["snapshot_id"],
+                timedelta(seconds=dct["snapshot"]),
+            )
+        return dct
+
+
+class SnapshotEnvelopeEncoder(json.JSONEncoder):
+    """
+    Encodes SnapshotEnvelope objects to JSON strings
+    """
+
+    def default(self, env: SnapshotEnvelope):
+        if type(env) is not SnapshotEnvelope:
+            # let the base class default method raise the TypeError
+            return json.JSONEncoder.default(self, env)
+        encoder = None
+        if type(env.body) is Intel:
+            encoder = IntelEncoder
+        elif type(env.body) is Sighting:
+            encoder = SightingEncoder
+        else:
+            # let the base class default method raise the TypeError
+            return json.JSONEncoder.default(self, env)
+        return {
+            "snapshot_type": int(env.snapshot_type.value),
+            "snapshot_id": str(env.snapshot_id),
+            "body": encoder.default(self, env.body),
+        }
+
+
+class SnapshotEnvelopeDecoder(json.JSONDecoder):
+    """
+    Decodes JSON strings to SnapshotEnvelope objects
+    """
+
+    def __init__(self, *args, **kwargs):
+        json.JSONDecoder.__init__(self, object_hook=self.object_hook, *args, **kwargs)
+
+    def object_hook(self, dct: dict):
+        if "snapshot_type" in dct and "snapshot_id" in dct and "body" in dct:
+            snapshot_type = MessageType(int(dct["snapshot_type"]))
+            return SnapshotEnvelope(
+                snapshot_type,
+                dct["snapshot_id"],
+                dct["body"],
+            )
+        if (
+            "intel_type" in dct
+            and "indicator" in dct
+            or "ts" in dct
+            and "id" in dct
+            and "data" in dct
+            and "operation" in dct
+        ):
+            return IntelDecoder.object_hook(self, dct)
+        elif "ts" in dct and "intel" in dct and "context" in dct:
+            return SightingDecoder.object_hook(self, dct)
         return dct

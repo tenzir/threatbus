@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import unittest
 import json
 
@@ -6,12 +6,19 @@ from data import (
     Intel,
     IntelData,
     IntelType,
-    Sighting,
+    MessageType,
     Operation,
+    Sighting,
+    SnapshotEnvelope,
+    SnapshotRequest,
     IntelEncoder,
     IntelDecoder,
     SightingEncoder,
     SightingDecoder,
+    SnapshotRequestEncoder,
+    SnapshotRequestDecoder,
+    SnapshotEnvelopeEncoder,
+    SnapshotEnvelopeDecoder,
 )
 
 
@@ -60,6 +67,19 @@ class TestJsonConversions(unittest.TestCase):
         }
         self.sighting = Sighting(self.ts, self.intel_id, self.sighting_context)
 
+        self.snapshot_id = "SNAPSHOT_UUID"
+        self.snapshot = timedelta(days=42, hours=23, minutes=13, seconds=37)
+        self.snapshot_request = SnapshotRequest(
+            MessageType.SIGHTING, self.snapshot_id, self.snapshot
+        )
+
+        self.snapshot_envelope_intel = SnapshotEnvelope(
+            MessageType.INTEL, self.snapshot_id, self.intel
+        )
+        self.snapshot_envelope_sighting = SnapshotEnvelope(
+            MessageType.SIGHTING, self.snapshot_id, self.sighting
+        )
+
     def test_valid_intel_encoding(self):
         encoded = json.dumps(self.intel, cls=IntelEncoder)
         # encoding cannot be compared as string, because order of the fileds in
@@ -107,3 +127,69 @@ class TestJsonConversions(unittest.TestCase):
         encoded = json.dumps(self.sighting, cls=SightingEncoder)
         read_back = json.loads(encoded, cls=SightingDecoder)
         self.assertEqual(read_back, self.sighting)
+
+    def test_valid_snapshot_request_encoding(self):
+        encoded = json.dumps(self.snapshot_request, cls=SnapshotRequestEncoder)
+        # encoding cannot be compared as string, because order of the fileds in
+        # the string representation is not fixed.
+        # We cast the JSON back to a simple python dict and them compare values
+        py_dict = json.loads(encoded)
+        self.assertEqual(py_dict["snapshot_type"], MessageType.SIGHTING.value)
+        self.assertEqual(py_dict["snapshot_id"], self.snapshot_id)
+        self.assertEqual(py_dict["snapshot"], self.snapshot.total_seconds())
+
+    def test_valid_snapshot_request_decoding(self):
+        encoded = f'{{"snapshot_type": {MessageType.SIGHTING.value}, "snapshot_id": "{self.snapshot_id}", "snapshot": {self.snapshot.total_seconds()}}}'
+        read_back = json.loads(encoded, cls=SnapshotRequestDecoder)
+        self.assertEqual(read_back, self.snapshot_request)
+
+    def test_snapshot_request_encoding_roundtrip(self):
+        encoded = json.dumps(self.snapshot_request, cls=SnapshotRequestEncoder)
+        read_back = json.loads(encoded, cls=SnapshotRequestDecoder)
+        self.assertEqual(read_back, self.snapshot_request)
+
+    def test_valid_snapshot_envelope_encoding(self):
+        encoded_envelope_intel = json.dumps(
+            self.snapshot_envelope_intel, cls=SnapshotEnvelopeEncoder
+        )
+        encoded_envelope_sighting = json.dumps(
+            self.snapshot_envelope_sighting, cls=SnapshotEnvelopeEncoder
+        )
+        # encoding cannot be compared as string, because order of the fileds in
+        # the string representation is not fixed.
+        # We cast the JSON back to a simple python dict and them compare values
+        py_dict = json.loads(encoded_envelope_intel)
+        self.assertEqual(py_dict["snapshot_type"], MessageType.INTEL.value)
+        self.assertEqual(py_dict["snapshot_id"], self.snapshot_id)
+        self.assertEqual(py_dict["body"]["ts"], str(self.ts))
+        self.assertEqual(py_dict["body"]["id"], self.intel_id)
+        self.assertEqual(py_dict["body"]["operation"], self.operation.value)
+        self.assertEqual(py_dict["body"]["data"]["indicator"][0], self.indicator)
+        self.assertEqual(py_dict["body"]["data"]["intel_type"], self.intel_type.value)
+
+        py_dict = json.loads(encoded_envelope_sighting)
+        self.assertEqual(py_dict["snapshot_type"], MessageType.SIGHTING.value)
+        self.assertEqual(py_dict["snapshot_id"], self.snapshot_id)
+        self.assertEqual(py_dict["body"]["ts"], str(self.ts))
+        self.assertEqual(py_dict["body"]["intel"], self.intel_id)
+        self.assertEqual(py_dict["body"]["context"], self.sighting_context)
+
+    def test_valid_snapshot_envelope_decoding(self):
+        encoded_envelope_intel = f'{{"snapshot_type": {MessageType.INTEL.value}, "snapshot_id": "{self.snapshot_id}", "body": {{"ts": "{self.ts}", "id": "{self.intel_id}", "data": {{"foo": 23, "more_args": "MORE ARGS", "indicator": ["{self.indicator}"], "intel_type": "{self.intel_type.value}"}}, "operation": "{self.operation.value}"}}}}'
+        read_back = json.loads(encoded_envelope_intel, cls=SnapshotEnvelopeDecoder)
+        self.assertEqual(read_back, self.snapshot_envelope_intel)
+
+        encoded_envelope_sighting = f'{{"snapshot_type": {MessageType.SIGHTING.value}, "snapshot_id": "{self.snapshot_id}", "body": {{"ts": "{self.ts}", "intel": "{self.intel_id}", "context": {json.dumps(self.sighting_context)}}}}}'
+        read_back = json.loads(encoded_envelope_sighting, cls=SnapshotEnvelopeDecoder)
+        self.assertEqual(read_back, self.snapshot_envelope_sighting)
+
+    def test_snapshot_envelope_encoding_roundtrip(self):
+        encoded = json.dumps(self.snapshot_envelope_intel, cls=SnapshotEnvelopeEncoder)
+        read_back = json.loads(encoded, cls=SnapshotEnvelopeDecoder)
+        self.assertEqual(read_back, self.snapshot_envelope_intel)
+
+        encoded = json.dumps(
+            self.snapshot_envelope_sighting, cls=SnapshotEnvelopeEncoder
+        )
+        read_back = json.loads(encoded, cls=SnapshotEnvelopeDecoder)
+        self.assertEqual(read_back, self.snapshot_envelope_sighting)
