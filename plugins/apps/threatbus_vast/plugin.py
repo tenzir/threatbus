@@ -103,15 +103,19 @@ def pub_zmq(zmq_config):
 
     while True:
         lock.acquire()
-        for topic, q in subscriptions.items():
+        subs_copy = subscriptions.copy()
+        lock.release()
+        for topic, q in subs_copy.items():
             if q.empty():
                 continue
             msg = q.get()
             if not msg:
                 continue
             intel = map_intel_to_vast(msg)
-            socket.send((f"{topic} {intel}").encode())
-        lock.release()
+            if intel:
+                socket.send((f"{topic} {intel}").encode())
+                logger.debug(f"Published {intel} on topic {topic}")
+            q.task_done()
         time.sleep(0.05)
 
 

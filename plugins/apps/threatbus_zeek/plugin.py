@@ -1,9 +1,5 @@
 import broker
-from threatbus_zeek.message_mapping import (
-    map_to_broker,
-    map_to_internal,
-    map_management_message,
-)
+from copy import copy
 from queue import Queue
 import random
 import select
@@ -11,6 +7,11 @@ import string
 import threading
 import threatbus
 from threatbus.data import Subscription, Unsubscription
+from threatbus_zeek.message_mapping import (
+    map_to_broker,
+    map_to_internal,
+    map_management_message,
+)
 import time
 
 """Zeek network monitor - plugin for Threat Bus"""
@@ -60,13 +61,14 @@ def manage_subscription(
             lock.release()
 
 
-def publish(logger, module_namespace, ep):
-    """Publishes messages for all subscriptions in a round-robin fashion to via broker.
-    @param logger A logging.logger object
+def publish(module_namespace, ep):
+    """
+    Publishes messages for all subscriptions in a round-robin fashion to via
+    broker.
     @param module_namespace A Zeek namespace to use for event sending
     @param ep The broker endpoint used for publishing
     """
-    global subscriptions, lock
+    global subscriptions, lock, logger
     while True:
         lock.acquire()
         for topic, q in subscriptions.items():
@@ -76,21 +78,23 @@ def publish(logger, module_namespace, ep):
             if not msg:
                 continue
             event = map_to_broker(msg, module_namespace)
-            ep.publish(topic, event)
-            logger.debug(f"Published {msg} on topic {topic}")
+            if event:
+                ep.publish(topic, event)
+                logger.debug(f"Published {msg} on topic {topic}")
+            q.task_done()
         lock.release()
         time.sleep(0.05)
 
 
-def manage(logger, module_namespace, ep, subscribe_callback, unsubscribe_callback):
+def manage(module_namespace, ep, subscribe_callback, unsubscribe_callback):
     """Binds a broker subscriber to the given endpoint. Only listens for
     management messages, such as un/subscriptions of new clients.
-    @param logger A logging.logger object
     @param module_namespace A Zeek namespace to accept events from
     @param ep The broker endpoint used for listening
     @param subscribe_callback The callback to invoke for new subscriptions
     @param unsubscribe_callback The callback to invoke for revoked subscriptions
     """
+    global logger
     sub = ep.make_subscriber("threatbus/manage")
     while True:
         ready = select.select([sub.fd()], [], [])
@@ -107,7 +111,7 @@ def manage(logger, module_namespace, ep, subscribe_callback, unsubscribe_callbac
             )
 
 
-def listen(logger, module_namespace, ep, inq):
+def listen(module_namespace, ep, inq):
     """Binds a broker subscriber to the given endpoint. Forwards all received
     intel and sightings to the inq.
     @param logger A logging.logger object
@@ -116,6 +120,7 @@ def listen(logger, module_namespace, ep, inq):
     @param inq The queue to forward messages to
     """
     sub = ep.make_subscriber(["threatbus/intel", "threatbus/sighting"])
+    global logger
     while True:
         ready = select.select([sub.fd()], [], [])
         if not ready[0]:
@@ -128,6 +133,7 @@ def listen(logger, module_namespace, ep, inq):
 
 @threatbus.app
 def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
+    global logger
     logger = threatbus.logger.setup(logging, __name__)
     config = config[plugin_name]
     try:
@@ -144,15 +150,11 @@ def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
     ep = broker.Endpoint(broker.Configuration(broker_opts))
     ep.listen(host, port)
 
-    threading.Thread(
-        target=listen, args=(logger, namespace, ep, inq), daemon=True
-    ).start()
-
+    threading.Thread(target=listen, args=(namespace, ep, inq), daemon=True).start()
     threading.Thread(
         target=manage,
-        args=(logger, namespace, ep, subscribe_callback, unsubscribe_callback),
+        args=(namespace, ep, subscribe_callback, unsubscribe_callback),
         daemon=True,
     ).start()
-
-    threading.Thread(target=publish, args=(logger, namespace, ep), daemon=True).start()
+    threading.Thread(target=publish, args=(namespace, ep), daemon=True).start()
     logger.info("Zeek plugin started")

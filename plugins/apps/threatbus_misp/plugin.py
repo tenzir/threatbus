@@ -101,6 +101,7 @@ def receive_zmq(zmq_config, inq):
     @param zmq_config A configuration object for ZeroMQ binding
     @param inq The queue to which intel items from MISP are forwarded to
     """
+    global logger
     socket = zmq.Context().socket(zmq.SUB)
     socket.connect(f"tcp://{zmq_config['host']}:{zmq_config['port']}")
     # TODO: allow reception of more topics, i.e. handle events.

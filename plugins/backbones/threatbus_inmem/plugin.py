@@ -29,6 +29,7 @@ def provision(inq):
             for outq in subscriptions[t]:
                 outq.put(msg)
         lock.release()
+        inq.task_done()
 
 
 @threatbus.backbone
