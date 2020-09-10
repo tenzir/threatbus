@@ -1,6 +1,7 @@
 from collections import defaultdict
 import json
 import pika
+from retry import retry
 from socket import gethostname
 import threading
 import threatbus
@@ -128,7 +129,16 @@ def __provision_snapshot_envelope(channel, method_frame, header_frame, body):
     channel.basic_ack(delivery_tag=method_frame.delivery_tag)
 
 
+@retry(delay=5)
 def consume_rabbitmq(host, port):
+    """
+    Connects to RabbitMQ on the given host/port endpoint. Registers callbacks to
+    consumes all messages and initiates further provisioning.
+    @param host The RabbitMQ hostname or IP address
+    @param port The RabbitMQ port
+    """
+    global logger
+    logger.debug("Connecting RabbitMQ consumer...")
     connection = pika.BlockingConnection(pika.ConnectionParameters(host, port))
     channel = connection.channel()
 
@@ -166,42 +176,69 @@ def consume_rabbitmq(host, port):
 
     try:
         channel.start_consuming()
-    except (KeyboardInterrupt, pika.exceptions.ConnectionClosedByBroker):
+    except KeyboardInterrupt:
         channel.stop_consuming()
         connection.close()
+    except Exception as e:
+        logger.error(f"Consumer lost connection to RabbitMQ: {e}")
+        raise e  # let @retry handle the reconnect
 
 
+@retry(delay=5)
 def publish_rabbitmq(host, port, inq):
     """
     Connects to RabbitMQ on the given host/port endpoint. Fowards all messages
     from the `inq`, based on their type, to the appropriate RabbitMQ exchange.
+    @param host The RabbitMQ hostname or IP address
+    @param port The RabbitMQ port
+    @param inq A Queue object to read messages from and publish them to RabbitMQ
     """
+    global logger
+    logger.debug("Connecting RabbitMQ publisher...")
     connection = pika.BlockingConnection(pika.ConnectionParameters(host, port))
     channel = connection.channel()
     channel.exchange_declare(exchange=exchange_intel, exchange_type="fanout")
     channel.exchange_declare(exchange=exchange_sightings, exchange_type="fanout")
-    global logger
+    channel.exchange_declare(
+        exchange=exchange_snapshot_requests, exchange_type="fanout"
+    )
+    channel.exchange_declare(
+        exchange=exchange_snapshot_envelopes, exchange_type="fanout"
+    )
     while True:
         msg = inq.get(block=True)
         exchange = None
         encoded = None
-        if type(msg) == Intel:
-            exchange = exchange_intel
-            encoded = json.dumps(msg, cls=IntelEncoder)
-        elif type(msg) == Sighting:
-            exchange = exchange_sightings
-            encoded = json.dumps(msg, cls=SightingEncoder)
-        elif type(msg) == SnapshotRequest:
-            exchange = exchange_snapshot_requests
-            encoded = json.dumps(msg, cls=SnapshotRequestEncoder)
-        elif type(msg) == SnapshotEnvelope:
-            exchange = exchange_snapshot_envelopes
-            encoded = json.dumps(msg, cls=SnapshotEnvelopeEncoder)
-        if not encoded:
-            logger.warn(f"Unable to encode message: {msg}")
+        try:
+            if type(msg) == Intel:
+                exchange = exchange_intel
+                encoded = json.dumps(msg, cls=IntelEncoder)
+            elif type(msg) == Sighting:
+                exchange = exchange_sightings
+                encoded = json.dumps(msg, cls=SightingEncoder)
+            elif type(msg) == SnapshotRequest:
+                exchange = exchange_snapshot_requests
+                encoded = json.dumps(msg, cls=SnapshotRequestEncoder)
+            elif type(msg) == SnapshotEnvelope:
+                exchange = exchange_snapshot_envelopes
+                encoded = json.dumps(msg, cls=SnapshotEnvelopeEncoder)
+        except Exception as e:
+            logger.warn(f"Discarding unparsable message {msg}: {e}")
             continue
         logger.debug(f"Forwarding message to RabbitMQ: {msg}")
-        channel.basic_publish(exchange=exchange, routing_key="", body=encoded)
+        try:
+            channel.basic_publish(exchange=exchange, routing_key="", body=encoded)
+            inq.task_done()
+        except KeyboardInterrupt:
+            connection.close()
+            break
+        except Exception as e:
+            # push back message
+            logger.error(f"Failed to send, pushing back message: {msg}")
+            logger.error(f"Publisher lost connection to RabbitMQ: {e}")
+            if msg:
+                inq.put(msg)
+                raise e  # let @retry handle the reconnect
 
 
 @threatbus.backbone
