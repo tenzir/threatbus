@@ -2,7 +2,6 @@ import argparse
 import confuse
 import pluggy
 from queue import Queue
-import time
 from threatbus import appspecs, backbonespecs, logger
 from threatbus.data import MessageType, SnapshotRequest, SnapshotEnvelope
 from threading import Lock
@@ -62,7 +61,6 @@ class ThreatBus:
             message_types.append(MessageType.SIGHTING)
         elif topic.endswith("intel"):
             message_types.append(MessageType.INTEL)
-        snapshot_q = Queue()  # fan-in queue for this particular snapshot
         for mt in message_types:
             self.logger.info(
                 f"Requesting snapshot from all plugins for message type {mt.name} and time delta {time_delta}"

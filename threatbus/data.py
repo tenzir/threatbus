@@ -157,9 +157,9 @@ class IntelDecoder(json.JSONDecoder):
     """
 
     def __init__(self, *args, **kwargs):
-        json.JSONDecoder.__init__(self, object_hook=self.object_hook, *args, **kwargs)
+        json.JSONDecoder.__init__(self, object_hook=self.decode_hook, *args, **kwargs)
 
-    def object_hook(self, dct: dict):
+    def decode_hook(self, dct: dict):
         if "intel_type" in dct and "indicator" in dct:
             # parse IntelData
             intel_type = IntelType(int(dct.pop("intel_type")))
@@ -198,9 +198,9 @@ class SightingDecoder(json.JSONDecoder):
     """
 
     def __init__(self, *args, **kwargs):
-        json.JSONDecoder.__init__(self, object_hook=self.object_hook, *args, **kwargs)
+        json.JSONDecoder.__init__(self, object_hook=self.decode_hook, *args, **kwargs)
 
-    def object_hook(self, dct: dict):
+    def decode_hook(self, dct: dict):
         if "ts" in dct and "intel" in dct and "context" in dct:
             return Sighting(parser.parse(dct["ts"]), dct["intel"], dct["context"])
         return dct
@@ -228,9 +228,9 @@ class SnapshotRequestDecoder(json.JSONDecoder):
     """
 
     def __init__(self, *args, **kwargs):
-        json.JSONDecoder.__init__(self, object_hook=self.object_hook, *args, **kwargs)
+        json.JSONDecoder.__init__(self, object_hook=self.decode_hook, *args, **kwargs)
 
-    def object_hook(self, dct: dict):
+    def decode_hook(self, dct: dict):
         if "snapshot_type" in dct and "snapshot_id" in dct and "snapshot" in dct:
             return SnapshotRequest(
                 MessageType(int(dct["snapshot_type"])),
@@ -270,9 +270,9 @@ class SnapshotEnvelopeDecoder(json.JSONDecoder):
     """
 
     def __init__(self, *args, **kwargs):
-        json.JSONDecoder.__init__(self, object_hook=self.object_hook, *args, **kwargs)
+        json.JSONDecoder.__init__(self, object_hook=self.decode_hook, *args, **kwargs)
 
-    def object_hook(self, dct: dict):
+    def decode_hook(self, dct: dict):
         if "snapshot_type" in dct and "snapshot_id" in dct and "body" in dct:
             snapshot_type = MessageType(int(dct["snapshot_type"]))
             return SnapshotEnvelope(
@@ -288,7 +288,7 @@ class SnapshotEnvelopeDecoder(json.JSONDecoder):
             and "data" in dct
             and "operation" in dct
         ):
-            return IntelDecoder.object_hook(self, dct)
+            return IntelDecoder.decode_hook(self, dct)
         elif "ts" in dct and "intel" in dct and "context" in dct:
-            return SightingDecoder.object_hook(self, dct)
+            return SightingDecoder.decode_hook(self, dct)
         return dct

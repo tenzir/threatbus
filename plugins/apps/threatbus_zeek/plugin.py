@@ -1,5 +1,4 @@
 import broker
-from copy import copy
 from queue import Queue
 import random
 import select
