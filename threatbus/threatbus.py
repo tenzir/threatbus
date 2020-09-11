@@ -111,11 +111,11 @@ class ThreatBus:
 
 
 def validate_config(config):
-    config["logging"]["console"].get(bool)
-    config["logging"]["file"].get(bool)
-    config["logging"]["console_verbosity"].get(str)
-    config["logging"]["file_verbosity"].get(str)
-    config["logging"]["filename"].get(str)
+    if config["logging"]["console"].get(bool):
+        config["logging"]["console_verbosity"].get(str)
+    if config["logging"]["file"].get(bool):
+        config["logging"]["file_verbosity"].get(str)
+        config["logging"]["filename"].get(str)
 
 
 def start(config):
