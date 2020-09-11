@@ -1,10 +1,6 @@
 logging:
-  console: true
-  console_verbosity: DEBUG
+  console: false
   file: false
-  file_verbosity: DEBUG
-  filename: threatbus.log
-
 
 plugins:
   backbones:

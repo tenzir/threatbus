@@ -1,9 +1,11 @@
-from datetime import datetime
 import broker
+import confuse
+from datetime import datetime
 import os
 import queue
 import subprocess
 import threading
+from threatbus import start
 import time
 import unittest
 
@@ -25,7 +27,7 @@ def RunZeek():
                 "run",
                 "--net=host",
                 "--rm",
-                "--name=zeek",
+                "--name=zeek-int",
                 "-v",
                 f"{trace_file}:/trace.pcap",
                 "-v",
@@ -37,56 +39,55 @@ def RunZeek():
                 "/trace.pcap",
                 "/opt/zeek/share/zeek/site/threatbus.zeek",
                 "--",
-                "Tenzir::log_operations=T",
+                "Tenzir::log_operations=F",
             ]
         )
     except subprocess.CalledProcessError:
         return False
 
 
-class TestRoundtrips(unittest.TestCase):
-    def test_zeek_plugin_message_roundtrip(self):
-        """
-        Backend agnostic message passing screnario. Sends a fixed amount of
-        messages via the threatbus Zeek plugin, subscribes to threatbus, and
-        checks if the initially sent messages can be retrieved back.
-        """
-        result_q = queue.Queue()
-        items = 5
-        rec = threading.Thread(
-            target=zeek_receiver.forward, args=(items, result_q), daemon=False
+def StopZeek():
+    try:
+        return subprocess.Popen(
+            [
+                "docker",
+                "kill",
+                "zeek-int",
+            ]
         )
-        rec.start()
-        zeek_sender.send_generic("threatbus/intel", items)
-        rec.join()
+    except subprocess.CalledProcessError:
+        return False
 
-        self.assertEqual(result_q.qsize(), items)
-        for _ in range(items):
-            event = result_q.get()
-            self.assertIsNotNone(event)
-            result_q.task_done()
-        self.assertEqual(0, result_q.qsize())
-        result_q.join()
+
+class TestZeekSightingReports(unittest.TestCase):
+    def setUp(self):
+        config = confuse.Configuration("threatbus")
+        config.set_file("config_integration_test.yaml")
+        self.threatbus = threading.Thread(
+            target=start,
+            args=(config,),
+            daemon=True,
+        )
+        self.threatbus.start()
+        time.sleep(1)
 
     def test_intel_sighting_roundtrip(self):
         """
         Backend agnostic routrip screnario, that starts a Zeek
         subprocess. Zeek is started using the threatbus.zeek "app" script.
-        The test sends an intelligence item via threatbus. The Zeek
+        The test sends an intelligence item via Threat Bus. The Zeek
         subprocess reads a PCAP trace which contains that known threat
         intelligence. The integration test subscribes to the sightings topic
-        and verifies that Zeek reports sighted threat intelligence items.
+        and verifies that Zeek reports sighted threat intelligence back.
         """
-
         # start a receiver that pushes exactly 1 item to a result queue
         result_q = queue.Queue()
         rec = threading.Thread(
             target=zeek_receiver.forward,
             args=(1, result_q, "threatbus/sighting"),
-            daemon=False,
+            daemon=True,
         )
         rec.start()
-
         # spawn a zeek subprocess that uses the `apps/threatbus.zeek` script
         zeek_process = RunZeek()
         if not zeek_process:
@@ -101,11 +102,8 @@ class TestRoundtrips(unittest.TestCase):
         zeek_sender.send("threatbus/intel", intel)
 
         # wait for zeek to report sighting of the intel
-        sighting = result_q.get(block=True)
-        print("have sighting", sighting)
+        sighting = result_q.get(timeout=10)
         result_q.task_done()
-        result_q.join()
-        rec.join()
         zeek_process.kill()
 
         self.assertIsNotNone(sighting)
@@ -115,3 +113,7 @@ class TestRoundtrips(unittest.TestCase):
         self.assertTrue(type(args[0]).__name__ == "datetime")
         self.assertEqual(args[1], intel_id)
         self.assertEqual(args[2], {"noisy": False})
+
+        rec.join()
+        result_q.join()
+        self.assertTrue(StopZeek())
