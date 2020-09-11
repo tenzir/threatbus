@@ -22,7 +22,7 @@ setup(
     ],
     description="A RabbitMQ backbone for threatbus.",
     entry_points={"threatbus.backbone": ["rabbitmq = threatbus_rabbitmq.plugin"]},
-    install_requires=["threatbus>=2020.07.28", "pika>=1.1.0", "retry"],
+    install_requires=["threatbus>=2020.09.30", "pika>=1.1.0", "retry"],
     keywords=["threatbus", "plugin"],
     license="BSD 3-clause",
     long_description=long_description,
