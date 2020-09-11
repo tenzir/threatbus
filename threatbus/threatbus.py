@@ -118,7 +118,12 @@ def validate_config(config):
     config["logging"]["filename"].get(str)
 
 
-def main():
+def start(config):
+    try:
+        validate_config(config)
+    except Exception as e:
+        raise ValueError("Invalid config: {}".format(str(e)))
+
     backbones = pluggy.PluginManager("threatbus.backbone")
     backbones.add_hookspecs(backbonespecs)
     backbones.load_setuptools_entrypoints("threatbus.backbone")
@@ -126,19 +131,6 @@ def main():
     apps = pluggy.PluginManager("threatbus.app")
     apps.add_hookspecs(appspecs)
     apps.load_setuptools_entrypoints("threatbus.app")
-
-    config = confuse.Configuration("threatbus")
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", "-c", help="path to a configuration file")
-    args = parser.parse_args()
-    config.set_args(args)
-    if args.config:
-        config.set_file(args.config)
-
-    try:
-        validate_config(config)
-    except Exception as e:
-        raise ValueError("Invalid config: {}".format(str(e)))
 
     tb_logger = logger.setup(config["logging"], "threatbus")
     configured_apps = set(config["plugins"]["apps"].keys())
@@ -156,6 +148,17 @@ def main():
 
     bus = ThreatBus(backbones.hook, apps.hook, tb_logger, config)
     bus.run()
+
+
+def main():
+    config = confuse.Configuration("threatbus")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", "-c", help="path to a configuration file")
+    args = parser.parse_args()
+    config.set_args(args)
+    if args.config:
+        config.set_file(args.config)
+    start(config)
 
 
 if __name__ == "__main__":
