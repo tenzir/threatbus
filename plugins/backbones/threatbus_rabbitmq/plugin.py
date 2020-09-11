@@ -46,12 +46,12 @@ def provision(topic, msg):
     @param msg The message to provision
     """
     global subscriptions, lock, logger
-    logger.debug(f"Relaying message from RabbitMQ: {msg}")
     lock.acquire()
     for t in filter(lambda t: str(topic).startswith(str(t)), subscriptions.keys()):
         for outq in subscriptions[t]:
             outq.put(msg)
     lock.release()
+    logger.debug(f"Relayed message from RabbitMQ: {msg}")
 
 
 def __decode(msg, decoder):
@@ -95,7 +95,7 @@ def __provision_sighting(channel, method_frame, header_frame, body):
     """
     msg = __decode(body, SightingDecoder)
     if msg:
-        provision("threatbus/sightings", msg)
+        provision("threatbus/sighting", msg)
     channel.basic_ack(delivery_tag=method_frame.delivery_tag)
 
 
@@ -225,9 +225,9 @@ def publish_rabbitmq(host, port, inq):
         except Exception as e:
             logger.warn(f"Discarding unparsable message {msg}: {e}")
             continue
-        logger.debug(f"Forwarding message to RabbitMQ: {msg}")
         try:
             channel.basic_publish(exchange=exchange, routing_key="", body=encoded)
+            logger.debug(f"Forwarded message to RabbitMQ: {msg}")
             inq.task_done()
         except KeyboardInterrupt:
             connection.close()

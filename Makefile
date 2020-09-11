@@ -1,3 +1,6 @@
+colon := :
+$(colon) := :
+
 .PHONY: all
 all: format build dist test
 
@@ -20,11 +23,15 @@ unit-tests:
 
 .PHONY: integration-tests
 integration-tests:
+	-docker kill tb-int rabbit-int
 	docker build . -t threatbus-integration-test
 	docker run -td --name=tb-int --rm -p 47761:47761 threatbus-integration-test -c config_integration_test.yaml
+	docker pull rabbitmq$(:)3
+	docker run -d --rm --hostname=test-rabbit --name=rabbit-int -p 35672$(:)5672 rabbitmq$(:)3
 	-python -m unittest tests/integration/test_zeek_inmem.py
+	-python -m unittest tests/integration/test_rabbitmq.py
 	-${RM} {broker,intel,reporter,weird}.log
-	docker kill tb-int
+	docker kill tb-int rabbit-int
 
 .PHONY: clean
 clean:
