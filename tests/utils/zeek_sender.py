@@ -1,7 +1,7 @@
 #!/usr/bin/python
-from datetime import datetime
 import broker
-import sys
+from datetime import datetime
+import select
 import time
 
 
@@ -11,15 +11,16 @@ def send(topic, broker_event):
     status_subscriber = ep.make_status_subscriber(True)
     ep.peer("127.0.0.1", 47761)
 
-    # blocking operation. wait until you get a status.
+    fd_sets = select.select([status_subscriber.fd()], [], [])
+    if not fd_sets[0]:
+        print("Peering with remote machine failed")
+        return
     status = status_subscriber.get()
-
     if type(status) != broker.Status or status.code() != broker.SC.PeerAdded:
-        print("peering with remote machine failed")
-        sys.exit(1)
+        print("Threat Bus subscription failed")
+        return
 
     ep.publish(topic, broker_event)
-
     time.sleep(0.1)
 
 
@@ -28,12 +29,14 @@ def send_generic(topic, items):
     status_subscriber = ep.make_status_subscriber(True)
     ep.peer("127.0.0.1", 47761)
 
-    # blocking operation. wait until you get a status.
+    fd_sets = select.select([status_subscriber.fd()], [], [])
+    if not fd_sets[0]:
+        print("Peering with remote machine failed")
+        return
     status = status_subscriber.get()
-
     if type(status) != broker.Status or status.code() != broker.SC.PeerAdded:
-        print("peering with remote machine failed")
-        sys.exit(1)
+        print("Threat Bus subscription failed")
+        return
 
     for i in range(items):
         data = {
@@ -46,7 +49,7 @@ def send_generic(topic, items):
         # topic.
         ep.publish(topic, event)
 
-    ## apparently the receiver will not receive everything, if the sending process exits too early. Thus we wait here (just for the demo sake)
+    # apparently the receiver will not receive everything, if the sending process exits too early.
     time.sleep(1)
 
 
