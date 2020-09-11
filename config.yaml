@@ -7,7 +7,11 @@ logging:
 
 plugins:
   backbones:
-    inmem:
+    #inmem:
+    rabbitmq:
+      host: localhost
+      port: 5672
+
   apps:
     zeek:
       host: "127.0.0.1"
@@ -37,14 +41,14 @@ plugins:
         manage: 13370
         pub: 13371
         sub: 13372
-    cif3:
-      api:
-        host: http://localhost:5000
-        ssl: false
-        token: CIF_TOKEN
-      group: everyone
-      confidence: 7.5
-      tlp: amber
-      tags:
-        - test
-        - malicious
+    #cif3:
+    #  api:
+    #    host: http://localhost:5000
+    #    ssl: false
+    #    token: CIF_TOKEN
+    #  group: everyone
+    #  confidence: 7.5
+    #  tlp: amber
+    #  tags:
+    #    - test
+    #    - malicious
