@@ -12,6 +12,7 @@ from threatbus.data import (
     SnapshotEnvelope,
     SnapshotRequest,
 )
+import time
 import unittest
 
 
@@ -90,6 +91,7 @@ class TestRoundtrips(unittest.TestCase):
         plugin.subscribe("threatbus/sighting", self.outq)
         plugin.subscribe("threatbus/snapshotrequest", self.outq)
         plugin.subscribe("threatbus/snapshotenvelope", self.outq)
+        time.sleep(1)
 
     def test_intel_message_roundtrip(self):
         """
