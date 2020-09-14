@@ -73,7 +73,7 @@ class TestZeekSightingReports(unittest.TestCase):
 
     def test_intel_sighting_roundtrip(self):
         """
-        Backend agnostic routrip screnario, that starts a Zeek
+        Backend-agnostic roundtrip scenario, that starts a Zeek
         subprocess. Zeek is started using the threatbus.zeek "app" script.
         The test sends an intelligence item via Threat Bus. The Zeek
         subprocess reads a PCAP trace which contains that known threat

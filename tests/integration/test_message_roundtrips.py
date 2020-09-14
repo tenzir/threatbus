@@ -22,7 +22,7 @@ class TestMessageRoundtrip(unittest.TestCase):
 
     def test_zeek_plugin_message_roundtrip(self):
         """
-        Backend agnostic message passing screnario. Sends a fixed amount of
+        Backend-agnostic message passing scenario. Sends a fixed amount of
         messages via the threatbus Zeek plugin, subscribes to Threat Bus, and
         checks if the initially sent messages can be retrieved back.
         """
