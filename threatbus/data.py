@@ -119,6 +119,12 @@ class Sighting:
 
 @dataclass()
 class SnapshotEnvelope:
+    """
+    SnapshotEnvelopes are used to wrap intel items or sightings in response to
+    SnapshotRequests. The envelope carries additional information, such as the
+    MessageType and the unique ID of a snapshot.
+    """
+
     snapshot_type: MessageType
     snapshot_id: str
     body: Intel or Sighting
@@ -126,6 +132,13 @@ class SnapshotEnvelope:
 
 @dataclass
 class SnapshotRequest:
+    """
+    Threat Bus creates SnapshotRequests when apps specifically as for a snapshot
+    during subscription. SnapshotRequests are provisioned via the backbones.
+    A request consists of the requested MessageType (either INTEL or SIGHTING),
+    a unique ID, and the snapshot time delta (e.g., 30 days).
+    """
+
     snapshot_type: MessageType
     snapshot_id: str
     snapshot: timedelta
