@@ -42,6 +42,10 @@ Chat with us on [Matrix][chat-url].
 
 ## Getting Started
 
+The `config.yaml.example` file provides a working configuration for Threat Bus
+with all existing application plugins enabled together with the RabbitMQ
+backbone.
+
 The following example shows how to connect [MISP][misp], [Zeek][zeek] via
 Threat Bus. There are more integrations available, so make sure to check out all
 [Threat Bus projects on PyPI](https://pypi.org/search/?q=threatbus).
@@ -49,6 +53,7 @@ Threat Bus. There are more integrations available, so make sure to check out all
 *Start Threat Bus*
 
 ```sh
+mv config.yaml.example config.yaml   # rename example config file
 venv/bin/threatbus -c config.yaml
 ```
 
@@ -91,6 +96,7 @@ pip install threatbus
 pip install threatbus-inmem
 pip install threatbus-misp
 pip install threatbus-zeek
+pip install threatbus-rabbitmq
 pip install threatbus-<plugin_name>
 ```
 

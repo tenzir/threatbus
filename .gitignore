@@ -7,3 +7,5 @@ venv/
 **/*.egg-info/
 *tar.gz
 **/vast.db/
+config.yaml
+
