@@ -10,6 +10,17 @@ plugins:
     rabbitmq:
       host: localhost
       port: 5672
+      username: guest
+      password: guest
+      vhost: /
+      naming_join_pattern: . # symbol to concatenate names with. Example queue-name: threatbus.intel."hostname"
+      queue:
+        name_suffix: "my_suffix" # optional. remove property / set empty to use 'hostname'
+        durable: true
+        auto_delete: false
+        lazy: true
+        exclusive: false
+        max_items: 100000 # optional. remove property / set to 0 to allow infinite length
 
   apps:
     zeek:

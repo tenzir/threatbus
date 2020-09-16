@@ -27,19 +27,48 @@ plugin_name = "rabbitmq"
 
 subscriptions = defaultdict(set)
 lock = threading.Lock()
-exchange_intel = "threatbus-intel"
-exchange_sightings = "threatbus-sighting"
-exchange_snapshot_requests = "threatbus-snapshot-requests"
-exchange_snapshot_envelopes = "threatbus-snapshot-envelopes"
+
+
+def get_queue_name(join_symbol, data_type, suffix=gethostname()):
+    """
+    Returns a queue name accroding to the desired pattern.
+    @param join_symbol The symbol to use when concatenating the name
+    @param data_type The type of data that goes through the queue (e.g., "intel")
+    @param suffix A suffix to append to the name. Default: the hostname
+    """
+    return join_symbol.join(["threatbus", data_type, suffix])
+
+
+def get_exchange_name(join_symbol, data_type):
+    """
+    Returns an exchange name accroding to the desired pattern.
+    @param join_symbol The symbol to use when concatenating the name
+    @param data_type The type of data that goes through the queue (e.g., "intel")
+    @param suffix A suffix to append to the name. Default: the hostname
+    """
+    return join_symbol.join(["threatbus", data_type])
 
 
 def validate_config(config):
     assert config, "config must not be None"
     config["host"].get(str)
     config["port"].get(int)
+    config["username"].get(str)
+    config["password"].get(str)
+    config["vhost"].get(str)
+    config["naming_join_pattern"].get(str)
+    config["queue"].get(dict)
+    config["queue"]["name_suffix"].add("")  # optional
+    config["queue"]["name_suffix"].get(str)
+    config["queue"]["durable"].get(bool)
+    config["queue"]["auto_delete"].get(bool)
+    config["queue"]["lazy"].get(bool)
+    config["queue"]["exclusive"].get(bool)
+    config["queue"]["max_items"].add(0)  # optional
+    config["queue"]["max_items"].get(int)
 
 
-def provision(topic, msg):
+def __provision(topic, msg):
     """
     Provisions the given `msg` to all subscribers of `topic`.
     @param topic The topic string to use for provisioning
@@ -80,7 +109,7 @@ def __provision_intel(channel, method_frame, header_frame, body):
     """
     msg = __decode(body, IntelDecoder)
     if msg:
-        provision("threatbus/intel", msg)
+        __provision("threatbus/intel", msg)
     channel.basic_ack(delivery_tag=method_frame.delivery_tag)
 
 
@@ -95,7 +124,7 @@ def __provision_sighting(channel, method_frame, header_frame, body):
     """
     msg = __decode(body, SightingDecoder)
     if msg:
-        provision("threatbus/sighting", msg)
+        __provision("threatbus/sighting", msg)
     channel.basic_ack(delivery_tag=method_frame.delivery_tag)
 
 
@@ -110,7 +139,7 @@ def __provision_snapshot_request(channel, method_frame, header_frame, body):
     """
     msg = __decode(body, SnapshotRequestDecoder)
     if msg:
-        provision("threatbus/snapshotrequest", msg)
+        __provision("threatbus/snapshotrequest", msg)
     channel.basic_ack(delivery_tag=method_frame.delivery_tag)
 
 
@@ -125,52 +154,71 @@ def __provision_snapshot_envelope(channel, method_frame, header_frame, body):
     """
     msg = __decode(body, SnapshotEnvelopeDecoder)
     if msg:
-        provision("threatbus/snapshotenvelope", msg)
+        __provision("threatbus/snapshotenvelope", msg)
     channel.basic_ack(delivery_tag=method_frame.delivery_tag)
 
 
 @retry(delay=5)
-def consume_rabbitmq(host, port):
+def consume_rabbitmq(conn_params, join_symbol, queue_params):
     """
     Connects to RabbitMQ on the given host/port endpoint. Registers callbacks to
     consumes all messages and initiates further provisioning.
-    @param host The RabbitMQ hostname or IP address
-    @param port The RabbitMQ port
+    @param conn_params Pika.ConnectionParameters to connect to RabbitMQ
+    @param join_symbol The symbol to use when determining queue and exchange names
+    @param queue_params Confuse view of parameters to use for declaring queues
     """
     global logger
     logger.debug("Connecting RabbitMQ consumer...")
-    connection = pika.BlockingConnection(pika.ConnectionParameters(host, port))
+    # RabbitMQ connection
+    connection = pika.BlockingConnection(conn_params)
     channel = connection.channel()
 
-    intel_queue = f"threatbus-intel-{gethostname()}"
+    # create names and parameters
+    exchange_intel = get_exchange_name(join_symbol, "intel")
+    exchange_sighting = get_exchange_name(join_symbol, "sighting")
+    exchange_snapshotrequest = get_exchange_name(join_symbol, "snapshotrequest")
+    exchange_snapshotenvelope = get_exchange_name(join_symbol, "snapshotenvelope")
+    queue_name_suffix = queue_params["name_suffix"].get()
+    queue_name_suffix = queue_name_suffix if queue_name_suffix else gethostname()
+    intel_queue = get_queue_name(join_symbol, "intel", queue_name_suffix)
+    sighting_queue = get_queue_name(join_symbol, "sighting", queue_name_suffix)
+    snapshot_request_queue = get_queue_name(
+        join_symbol, "snapshotrequest", queue_name_suffix
+    )
+    snapshot_envelope_queue = get_queue_name(
+        join_symbol, "snapshotenvelope", queue_name_suffix
+    )
+    queue_mode = "default" if not queue_params["lazy"].get(bool) else "lazy"
+    queue_kwargs = {
+        "durable": queue_params["durable"].get(bool),
+        "exclusive": queue_params["exclusive"].get(bool),
+        "auto_delete": queue_params["auto_delete"].get(bool),
+        "arguments": {"x-queue-mode": queue_mode},
+    }
+    max_items = queue_params["max_items"].get()
+    if max_items:
+        queue_kwargs["arguments"]["x-max-length"] = max_items
+
+    # bind callbacks to RabbitMQ
     channel.exchange_declare(exchange=exchange_intel, exchange_type="fanout")
-    channel.queue_declare(intel_queue, durable=True, auto_delete=False)
+    channel.queue_declare(intel_queue, **queue_kwargs)
     channel.queue_bind(exchange=exchange_intel, queue=intel_queue)
     channel.basic_consume(intel_queue, __provision_intel)
 
-    sightings_queue = f"threatbus-sightings-{gethostname()}"
-    channel.exchange_declare(exchange=exchange_sightings, exchange_type="fanout")
-    channel.queue_declare(sightings_queue, durable=True, auto_delete=False)
-    channel.queue_bind(exchange=exchange_sightings, queue=sightings_queue)
-    channel.basic_consume(sightings_queue, __provision_sighting)
+    channel.exchange_declare(exchange=exchange_sighting, exchange_type="fanout")
+    channel.queue_declare(sighting_queue, **queue_kwargs)
+    channel.queue_bind(exchange=exchange_sighting, queue=sighting_queue)
+    channel.basic_consume(sighting_queue, __provision_sighting)
 
-    snapshot_request_queue = f"threatbus-snapshot-requests-{gethostname()}"
-    channel.exchange_declare(
-        exchange=exchange_snapshot_requests, exchange_type="fanout"
-    )
-    channel.queue_declare(snapshot_request_queue, durable=True, auto_delete=False)
-    channel.queue_bind(
-        exchange=exchange_snapshot_requests, queue=snapshot_request_queue
-    )
+    channel.exchange_declare(exchange=exchange_snapshotrequest, exchange_type="fanout")
+    channel.queue_declare(snapshot_request_queue, **queue_kwargs)
+    channel.queue_bind(exchange=exchange_snapshotrequest, queue=snapshot_request_queue)
     channel.basic_consume(snapshot_request_queue, __provision_snapshot_request)
 
-    snapshot_envelope_queue = f"threatbus-snapshot-envelopes-{gethostname()}"
-    channel.exchange_declare(
-        exchange=exchange_snapshot_envelopes, exchange_type="fanout"
-    )
-    channel.queue_declare(snapshot_envelope_queue, durable=True, auto_delete=False)
+    channel.exchange_declare(exchange=exchange_snapshotenvelope, exchange_type="fanout")
+    channel.queue_declare(snapshot_envelope_queue, **queue_kwargs)
     channel.queue_bind(
-        exchange=exchange_snapshot_envelopes, queue=snapshot_envelope_queue
+        exchange=exchange_snapshotenvelope, queue=snapshot_envelope_queue
     )
     channel.basic_consume(snapshot_envelope_queue, __provision_snapshot_envelope)
 
@@ -185,26 +233,30 @@ def consume_rabbitmq(host, port):
 
 
 @retry(delay=5)
-def publish_rabbitmq(host, port, inq):
+def publish_rabbitmq(conn_params, join_symbol, inq):
     """
-    Connects to RabbitMQ on the given host/port endpoint. Fowards all messages
+    Connects to RabbitMQ on the given host/port endpoint. Forwards all messages
     from the `inq`, based on their type, to the appropriate RabbitMQ exchange.
-    @param host The RabbitMQ hostname or IP address
-    @param port The RabbitMQ port
+    @param conn_params Pika.ConnectionParameters to connect to RabbitMQ
+    @param join_symbol The symbol to use when determining queue and exchange names
     @param inq A Queue object to read messages from and publish them to RabbitMQ
     """
     global logger
     logger.debug("Connecting RabbitMQ publisher...")
-    connection = pika.BlockingConnection(pika.ConnectionParameters(host, port))
+    connection = pika.BlockingConnection(conn_params)
+
+    # create names and parameters
+    exchange_intel = get_exchange_name(join_symbol, "intel")
+    exchange_sighting = get_exchange_name(join_symbol, "sighting")
+    exchange_snapshotrequest = get_exchange_name(join_symbol, "snapshotrequest")
+    exchange_snapshotenvelope = get_exchange_name(join_symbol, "snapshotenvelope")
     channel = connection.channel()
     channel.exchange_declare(exchange=exchange_intel, exchange_type="fanout")
-    channel.exchange_declare(exchange=exchange_sightings, exchange_type="fanout")
-    channel.exchange_declare(
-        exchange=exchange_snapshot_requests, exchange_type="fanout"
-    )
-    channel.exchange_declare(
-        exchange=exchange_snapshot_envelopes, exchange_type="fanout"
-    )
+    channel.exchange_declare(exchange=exchange_sighting, exchange_type="fanout")
+    channel.exchange_declare(exchange=exchange_snapshotrequest, exchange_type="fanout")
+    channel.exchange_declare(exchange=exchange_snapshotenvelope, exchange_type="fanout")
+
+    # forward messages to RabbitMQ
     while True:
         msg = inq.get(block=True)
         exchange = None
@@ -214,13 +266,13 @@ def publish_rabbitmq(host, port, inq):
                 exchange = exchange_intel
                 encoded = json.dumps(msg, cls=IntelEncoder)
             elif type(msg) == Sighting:
-                exchange = exchange_sightings
+                exchange = exchange_sighting
                 encoded = json.dumps(msg, cls=SightingEncoder)
             elif type(msg) == SnapshotRequest:
-                exchange = exchange_snapshot_requests
+                exchange = exchange_snapshotrequest
                 encoded = json.dumps(msg, cls=SnapshotRequestEncoder)
             elif type(msg) == SnapshotEnvelope:
-                exchange = exchange_snapshot_envelopes
+                exchange = exchange_snapshotenvelope
                 encoded = json.dumps(msg, cls=SnapshotEnvelopeEncoder)
         except Exception as e:
             logger.warn(f"Discarding unparsable message {msg}: {e}")
@@ -277,8 +329,20 @@ def run(config, logging, inq):
         logger.fatal("Invalid config for plugin {}: {}".format(plugin_name, str(e)))
     host = config["host"].get(str)
     port = config["port"].get(int)
-    threading.Thread(target=consume_rabbitmq, args=(host, port), daemon=True).start()
+    username = config["username"].get(str)
+    password = config["password"].get(str)
+    vhost = config["vhost"].get(str)
+    credentials = pika.PlainCredentials(username, password)
+    conn_params = pika.ConnectionParameters(host, port, vhost, credentials)
+    name_pattern = config["naming_join_pattern"].get(str)
     threading.Thread(
-        target=publish_rabbitmq, args=(host, port, inq), daemon=True
+        target=consume_rabbitmq,
+        args=(conn_params, name_pattern, config["queue"]),
+        daemon=True,
+    ).start()
+    threading.Thread(
+        target=publish_rabbitmq,
+        args=(conn_params, name_pattern, inq),
+        daemon=True,
     ).start()
     logger.info("RabbitMQ backbone started.")

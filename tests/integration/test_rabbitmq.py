@@ -79,6 +79,16 @@ class TestRoundtrips(unittest.TestCase):
         config["rabbitmq"].add({})
         config["rabbitmq"]["host"] = "localhost"
         config["rabbitmq"]["port"] = 35672
+        config["rabbitmq"]["username"] = "guest"
+        config["rabbitmq"]["password"] = "guest"
+        config["rabbitmq"]["vhost"] = "/"
+        config["rabbitmq"]["naming_join_pattern"] = "."
+        config["rabbitmq"]["queue"].add({})
+        config["rabbitmq"]["queue"]["durable"] = False
+        config["rabbitmq"]["queue"]["auto_delete"] = True
+        config["rabbitmq"]["queue"]["exclusive"] = False
+        config["rabbitmq"]["queue"]["lazy"] = False
+        config["rabbitmq"]["queue"]["max_items"] = 10
         config["console"] = False
         config["file"] = False
 
