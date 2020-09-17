@@ -26,9 +26,9 @@ setup(
     description="A plugin to enable threatbus communication with VAST.",
     entry_points={"threatbus.app": ["vast = threatbus_vast.plugin"]},
     install_requires=[
-        "threatbus>=2020.04.29",
+        "threatbus>=2020.09.30",
         "pyzmq>=19",
-        "pyvast>=2020.03.26",
+        "pyvast>=2020.08.28",
         "python-dateutil>=2.8.1",
     ],
     keywords=[
@@ -45,5 +45,5 @@ setup(
     packages=["threatbus_vast"],
     python_requires=">=3.7",
     url="https://github.com/tenzir/threatbus",
-    version="2020.07.28",
+    version="2020.09.30",
 )

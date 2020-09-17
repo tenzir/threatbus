@@ -1,3 +1,6 @@
+colon := :
+$(colon) := :
+
 .PHONY: all
 all: format build dist test
 
@@ -14,16 +17,20 @@ test: unit-tests integration-tests
 
 .PHONY: unit-tests
 unit-tests:
+	python -m unittest discover threatbus
 	python -m unittest discover plugins/apps
 	python -m unittest discover plugins/backbones
 
 .PHONY: integration-tests
 integration-tests:
-	docker build . -t threatbus-integration-test
-	docker run -td --name=tb-int --rm -p 47761:47761 threatbus-integration-test -c config_integration_test.yaml
-	-python -m unittest tests/integration/test_zeek_inmem.py
+	-docker kill rabbit-int
+	docker pull rabbitmq$(:)3
+	docker run -d --rm --hostname=test-rabbit --name=rabbit-int -p 35672$(:)5672 rabbitmq$(:)3
+	-python -m unittest tests/integration/test_message_roundtrips.py
+	-python -m unittest tests/integration/test_zeek_app.py
+	-python -m unittest tests/integration/test_rabbitmq.py
 	-${RM} {broker,intel,reporter,weird}.log
-	docker kill tb-int
+	docker kill rabbit-int
 
 .PHONY: clean
 clean:
@@ -39,6 +46,7 @@ build:
 	python plugins/apps/threatbus_vast/setup.py build
 	python plugins/apps/threatbus_cif3/setup.py build
 	python plugins/backbones/threatbus_inmem/setup.py build
+	python plugins/backbones/threatbus_rabbitmq/setup.py build
 
 .PHONY: dist
 dist:
@@ -53,6 +61,7 @@ dist:
 	python plugins/apps/threatbus_cif3/setup.py sdist bdist_wheel
 	make clean
 	python plugins/backbones/threatbus_inmem/setup.py sdist bdist_wheel
+	python plugins/backbones/threatbus_rabbitmq/setup.py sdist bdist_wheel
 	make clean
 
 .PHONY: install
@@ -63,6 +72,7 @@ install:
 	python plugins/apps/threatbus_vast/setup.py install
 	python plugins/apps/threatbus_cif3/setup.py install
 	python plugins/backbones/threatbus_inmem/setup.py install
+	python plugins/backbones/threatbus_rabbitmq/setup.py install
 
 .PHONY: dev-mode
 dev-mode:
@@ -72,3 +82,4 @@ dev-mode:
 	python plugins/apps/threatbus_vast/setup.py develop
 	python plugins/apps/threatbus_cif3/setup.py develop
 	python plugins/backbones/threatbus_inmem/setup.py develop
+	python plugins/backbones/threatbus_rabbitmq/setup.py develop

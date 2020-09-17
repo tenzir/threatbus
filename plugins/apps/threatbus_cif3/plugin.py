@@ -77,7 +77,7 @@ def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
         cif.ping()
     except Exception as err:
         logger.error(
-            f"Cannot connect to CIFv3 at {remote}, using SSL: {ssl}. Exiting plugin."
+            f"Cannot connect to CIFv3 at {remote}, using SSL: {ssl}. Exiting plugin. {err}"
         )
         return
 

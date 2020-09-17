@@ -14,12 +14,12 @@ def validate_config(config):
     return True
 
 
-def provision(logger, inq):
-    """Provisions all messages that arrive on the inq to all subscribers of that topic.
-    @param logger A logging.logger object
+def provision(inq):
+    """
+    Provisions all messages that arrive on the inq to all subscribers of that topic.
     @param inq The in-Queue to read messages from
     """
-    global subscriptions, lock
+    global subscriptions, lock, logger
     while True:
         msg = inq.get(block=True)
         logger.debug(f"Backbone got message {msg}")
@@ -29,13 +29,7 @@ def provision(logger, inq):
             for outq in subscriptions[t]:
                 outq.put(msg)
         lock.release()
-
-
-@threatbus.backbone
-def provision_p2p(src_q, dst_q):
-    while not src_q.empty():
-        msg = src_q.get(timeout=5)
-        dst_q.put(msg)
+        inq.task_done()
 
 
 @threatbus.backbone
@@ -64,5 +58,5 @@ def run(config, logging, inq):
         validate_config(config)
     except Exception as e:
         logger.fatal("Invalid config for plugin {}: {}".format(plugin_name, str(e)))
-    threading.Thread(target=provision, args=(logger, inq), daemon=True).start()
+    threading.Thread(target=provision, args=(inq,), daemon=True).start()
     logger.info("In-memory backbone started.")

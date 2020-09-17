@@ -2,9 +2,10 @@ import argparse
 import confuse
 import pluggy
 from queue import Queue
-import time
 from threatbus import appspecs, backbonespecs, logger
-from threatbus.data import MessageType
+from threatbus.data import MessageType, SnapshotRequest, SnapshotEnvelope
+from threading import Lock
+from uuid import uuid4
 
 
 class ThreatBus:
@@ -13,10 +14,37 @@ class ThreatBus:
         self.apps = apps
         self.config = config
         self.logger = logger
-        self.inq = Queue()
+        self.inq = Queue()  # fan-in everything, provisioned by backbone
+        self.snapshot_q = Queue()
+        self.lock = Lock()
+        self.snapshots = dict()
+
+    def handle_snapshots(self):
+        """
+        Waits to handle snapshot requests or envelopes. Forwards new requests to
+        all implementing app plugins. Forwards envelopes to the requesting app
+        or discards them accordingly.
+        """
+        while True:
+            msg = self.snapshot_q.get(block=True)
+            if type(msg) is SnapshotRequest:
+                self.logger.debug(f"Received SnapshotRequest: {msg}")
+                self.apps.snapshot(snapshot_request=msg, result_q=self.inq)
+            elif type(msg) is SnapshotEnvelope:
+                self.logger.debug(f"Received SnapshotEnvelope: {msg}")
+                if msg.snapshot_id not in self.snapshots:
+                    continue
+                self.snapshots[msg.snapshot_id].put(msg.body)
+            else:
+                self.logger.warn(
+                    f"Received message with unknown type on snapshot topic: {msg}"
+                )
+            self.snapshot_q.task_done()
 
     def request_snapshot(self, topic, dst_q, time_delta):
-        """Request a snapshot from all registered apps for a given topic.
+        """
+        Create a new SnapshotRequest and push it to the inq, so that the
+        backbones can provision it.
         @param topic The topic for which the snapshot is requested
         @param dst_q A queue that should be used to forward all snapshot
             data to
@@ -33,19 +61,19 @@ class ThreatBus:
             message_types.append(MessageType.SIGHTING)
         elif topic.endswith("intel"):
             message_types.append(MessageType.INTEL)
-        snapshot_q = Queue()  # fan-in queue for this particular snapshot
         for mt in message_types:
             self.logger.info(
                 f"Requesting snapshot from all plugins for message type {mt.name} and time delta {time_delta}"
             )
-            self.apps.snapshot(
-                snapshot_type=mt, result_q=snapshot_q, time_delta=time_delta
-            )
-        if message_types:
-            self.backbones.provision_p2p(src_q=snapshot_q, dst_q=dst_q)
+            snapshot_id = str(uuid4())
+            self.snapshots[snapshot_id] = dst_q  # store queue of requester
+            req = SnapshotRequest(mt, snapshot_id, time_delta)
+
+            self.inq.put(req)
 
     def subscribe(self, topic, q, time_delta=None):
-        """Accepts a new subscription for a given topic and queue pointer.
+        """
+        Accepts a new subscription for a given topic and queue pointer.
         Forwards that subscription to all managed backbones.
         @param topic Subscribe to this topic
         @param q A queue object to forward all messages for the given topics
@@ -57,7 +85,10 @@ class ThreatBus:
             self.request_snapshot(topic, q, time_delta)
 
     def unsubscribe(self, topic, q):
-        """Removes subscription for a given topic and queue pointer from all managed backbones."""
+        """
+        Removes subscription for a given topic and queue pointer from all
+        managed backbones.
+        """
         assert isinstance(topic, str), "topic must be string"
         self.backbones.unsubscribe(topic=topic, q=q)
 
@@ -74,19 +105,25 @@ class ThreatBus:
         self.backbones.run(
             config=self.config["plugins"]["backbones"], logging=logging, inq=self.inq
         )
-        while True:
-            time.sleep(1)
+        self.subscribe("threatbus/snapshotrequest", self.snapshot_q)
+        self.subscribe("threatbus/snapshotenvelope", self.snapshot_q)
+        self.handle_snapshots()
 
 
 def validate_config(config):
-    config["logging"]["console"].get(bool)
-    config["logging"]["file"].get(bool)
-    config["logging"]["console_verbosity"].get(str)
-    config["logging"]["file_verbosity"].get(str)
-    config["logging"]["filename"].get(str)
+    if config["logging"]["console"].get(bool):
+        config["logging"]["console_verbosity"].get(str)
+    if config["logging"]["file"].get(bool):
+        config["logging"]["file_verbosity"].get(str)
+        config["logging"]["filename"].get(str)
 
 
-def main():
+def start(config):
+    try:
+        validate_config(config)
+    except Exception as e:
+        raise ValueError("Invalid config: {}".format(str(e)))
+
     backbones = pluggy.PluginManager("threatbus.backbone")
     backbones.add_hookspecs(backbonespecs)
     backbones.load_setuptools_entrypoints("threatbus.backbone")
@@ -95,6 +132,25 @@ def main():
     apps.add_hookspecs(appspecs)
     apps.load_setuptools_entrypoints("threatbus.app")
 
+    tb_logger = logger.setup(config["logging"], "threatbus")
+    configured_apps = set(config["plugins"]["apps"].keys())
+    installed_apps = set(dict(apps.list_name_plugin()).keys())
+    for unwanted_app in installed_apps - configured_apps:
+        tb_logger.info(f"Disabling installed, but unconfigured app '{unwanted_app}'")
+        apps.unregister(name=unwanted_app)
+    configured_backbones = set(config["plugins"]["backbones"].keys())
+    installed_backbones = set(dict(backbones.list_name_plugin()).keys())
+    for unwanted_backbones in installed_backbones - configured_backbones:
+        tb_logger.info(
+            f"Disabling installed, but unconfigured backbones '{unwanted_backbones}'"
+        )
+        backbones.unregister(name=unwanted_backbones)
+
+    bus = ThreatBus(backbones.hook, apps.hook, tb_logger, config)
+    bus.run()
+
+
+def main():
     config = confuse.Configuration("threatbus")
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", "-c", help="path to a configuration file")
@@ -102,21 +158,7 @@ def main():
     config.set_args(args)
     if args.config:
         config.set_file(args.config)
-
-    try:
-        validate_config(config)
-    except Exception as e:
-        raise ValueError("Invalid config: {}".format(str(e)))
-
-    tb_logger = logger.setup(config["logging"], "threatbus")
-    configured_apps = set(config["plugins"]["apps"].keys())
-    installed_apps = set(dict(apps.list_name_plugin()).keys())
-    for unwanted_app in installed_apps - configured_apps:
-        tb_logger.info(f"Disabling installed, but unconfigured app '{unwanted_app}'")
-        apps.unregister(name=unwanted_app)
-
-    bus = ThreatBus(backbones.hook, apps.hook, tb_logger, config)
-    bus.run()
+    start(config)
 
 
 if __name__ == "__main__":

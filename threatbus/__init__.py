@@ -1,4 +1,5 @@
 import pluggy
+from .threatbus import ThreatBus, start
 
 app = pluggy.HookimplMarker("threatbus.app")
 """Marker to be imported and used in app-plugins"""

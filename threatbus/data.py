@@ -1,6 +1,9 @@
+import copy
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from dateutil import parser
 from enum import auto, Enum, unique
+import json
 
 
 @dataclass
@@ -112,3 +115,193 @@ class Sighting:
     ts: datetime
     intel: str
     context: dict
+
+
+@dataclass()
+class SnapshotEnvelope:
+    """
+    SnapshotEnvelopes are used to wrap intel items or sightings in response to
+    SnapshotRequests. The envelope carries additional information, such as the
+    MessageType and the unique ID of a snapshot.
+    """
+
+    snapshot_type: MessageType
+    snapshot_id: str
+    body: Intel or Sighting
+
+
+@dataclass
+class SnapshotRequest:
+    """
+    Threat Bus creates SnapshotRequests when apps specifically as for a snapshot
+    during subscription. SnapshotRequests are provisioned via the backbones.
+    A request consists of the requested MessageType (either INTEL or SIGHTING),
+    a unique ID, and the snapshot time delta (e.g., 30 days).
+    """
+
+    snapshot_type: MessageType
+    snapshot_id: str
+    snapshot: timedelta
+
+
+class IntelEncoder(json.JSONEncoder):
+    """
+    Encodes Intel objects to JSON strings
+    """
+
+    def default(self, intel: Intel):
+        if type(intel) is not Intel:
+            # let the base class default method raise the TypeError
+            return json.JSONEncoder.default(self, intel)
+        data = copy.deepcopy(intel.data)
+        data["indicator"] = list(intel.data["indicator"])
+        data["intel_type"] = int(intel.data["intel_type"].value)
+        return {
+            "ts": str(intel.ts),
+            "id": str(intel.id),
+            "data": data,
+            "operation": str(intel.operation.value),
+        }
+
+
+class IntelDecoder(json.JSONDecoder):
+    """
+    Decodes JSON strings to Intel objects
+    """
+
+    def __init__(self, *args, **kwargs):
+        json.JSONDecoder.__init__(self, object_hook=self.decode_hook, *args, **kwargs)
+
+    def decode_hook(self, dct: dict):
+        if "intel_type" in dct and "indicator" in dct:
+            # parse IntelData
+            intel_type = IntelType(int(dct.pop("intel_type")))
+            indicator = tuple(dct.pop("indicator"))
+            return IntelData(indicator, intel_type, **dct)
+        elif "ts" in dct and "id" in dct and "data" in dct and "operation" in dct:
+            # parse Intel
+            return Intel(
+                parser.parse(dct["ts"]),
+                dct["id"],
+                dct["data"],
+                Operation(dct["operation"]),
+            )
+        return dct
+
+
+class SightingEncoder(json.JSONEncoder):
+    """
+    Encodes Sighting objects to JSON strings
+    """
+
+    def default(self, sighting: Sighting):
+        if type(sighting) is not Sighting:
+            # let the base class default method raise the TypeError
+            return json.JSONEncoder.default(self, sighting)
+        return {
+            "ts": str(sighting.ts),
+            "intel": sighting.intel,
+            "context": sighting.context,
+        }
+
+
+class SightingDecoder(json.JSONDecoder):
+    """
+    Decodes JSON strings to Sighting objects
+    """
+
+    def __init__(self, *args, **kwargs):
+        json.JSONDecoder.__init__(self, object_hook=self.decode_hook, *args, **kwargs)
+
+    def decode_hook(self, dct: dict):
+        if "ts" in dct and "intel" in dct and "context" in dct:
+            return Sighting(parser.parse(dct["ts"]), dct["intel"], dct["context"])
+        return dct
+
+
+class SnapshotRequestEncoder(json.JSONEncoder):
+    """
+    Encodes SnapshotRequest objects to JSON strings
+    """
+
+    def default(self, req: SnapshotRequest):
+        if type(req) is not SnapshotRequest:
+            # let the base class default method raise the TypeError
+            return json.JSONEncoder.default(self, req)
+        return {
+            "snapshot_type": int(req.snapshot_type.value),
+            "snapshot_id": str(req.snapshot_id),
+            "snapshot": int(req.snapshot.total_seconds()),
+        }
+
+
+class SnapshotRequestDecoder(json.JSONDecoder):
+    """
+    Decodes JSON strings to SnapshotRequest objects
+    """
+
+    def __init__(self, *args, **kwargs):
+        json.JSONDecoder.__init__(self, object_hook=self.decode_hook, *args, **kwargs)
+
+    def decode_hook(self, dct: dict):
+        if "snapshot_type" in dct and "snapshot_id" in dct and "snapshot" in dct:
+            return SnapshotRequest(
+                MessageType(int(dct["snapshot_type"])),
+                dct["snapshot_id"],
+                timedelta(seconds=dct["snapshot"]),
+            )
+        return dct
+
+
+class SnapshotEnvelopeEncoder(json.JSONEncoder):
+    """
+    Encodes SnapshotEnvelope objects to JSON strings
+    """
+
+    def default(self, env: SnapshotEnvelope):
+        if type(env) is not SnapshotEnvelope:
+            # let the base class default method raise the TypeError
+            return json.JSONEncoder.default(self, env)
+        encoder = None
+        if type(env.body) is Intel:
+            encoder = IntelEncoder
+        elif type(env.body) is Sighting:
+            encoder = SightingEncoder
+        else:
+            # let the base class default method raise the TypeError
+            return json.JSONEncoder.default(self, env)
+        return {
+            "snapshot_type": int(env.snapshot_type.value),
+            "snapshot_id": str(env.snapshot_id),
+            "body": encoder.default(self, env.body),
+        }
+
+
+class SnapshotEnvelopeDecoder(json.JSONDecoder):
+    """
+    Decodes JSON strings to SnapshotEnvelope objects
+    """
+
+    def __init__(self, *args, **kwargs):
+        json.JSONDecoder.__init__(self, object_hook=self.decode_hook, *args, **kwargs)
+
+    def decode_hook(self, dct: dict):
+        if "snapshot_type" in dct and "snapshot_id" in dct and "body" in dct:
+            snapshot_type = MessageType(int(dct["snapshot_type"]))
+            return SnapshotEnvelope(
+                snapshot_type,
+                dct["snapshot_id"],
+                dct["body"],
+            )
+        if (
+            "intel_type" in dct
+            and "indicator" in dct
+            or "ts" in dct
+            and "id" in dct
+            and "data" in dct
+            and "operation" in dct
+        ):
+            return IntelDecoder.decode_hook(self, dct)
+        elif "ts" in dct and "intel" in dct and "context" in dct:
+            return SightingDecoder.decode_hook(self, dct)
+        return dct

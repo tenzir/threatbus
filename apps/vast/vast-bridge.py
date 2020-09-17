@@ -10,7 +10,6 @@ import logging
 from pyvast import VAST
 import random
 from string import ascii_lowercase as letters
-import sys
 import zmq
 
 logger = logging.getLogger(__name__)
@@ -68,7 +67,7 @@ async def start(
     if not pub_endpoint or not sub_endpoint or not topic:
         logger.error("Unparsable subscription reply")
         exit(1)
-    logger.debug(f"Subscription successfull")
+    logger.debug("Subscription successfull")
     atexit.register(unsubscribe, zmq_endpoint, topic)
 
     intel_queue = asyncio.Queue()
@@ -401,6 +400,7 @@ def main():
         "-s",
         dest="snapshot",
         default=0,
+        type=int,
         help="Request intelligence snapshot for past n days",
     )
     parser.add_argument(

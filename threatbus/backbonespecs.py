@@ -26,11 +26,3 @@ def unsubscribe(topic, q):
     @param topic Unsubscribe from this topic (string)
     @param q The queue object that was subscribed to the given topic
     """
-
-
-@hookspec
-def provision_p2p(src_q, dst_q):
-    """Provisions all messages from src_q to dst_q
-    @param src_q The queue to read messages from
-    @param dst_q The queue to write messages to
-    """

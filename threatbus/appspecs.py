@@ -5,7 +5,8 @@ hookspec = pluggy.HookspecMarker("threatbus.app")
 
 @hookspec
 def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
-    """Runs / starts a plugin spec with a configuration object
+    """
+    Runs / starts a plugin spec with a configuration object
     @param config A configuration object for the app
     @param logging A configuration object for the logger
     @param inq A queue in which this plugin puts incoming messages
@@ -17,10 +18,11 @@ def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
 
 
 @hookspec
-def snapshot(snapshot_type, result_q, time_delta):
-    """Requests a snapshot from the implementing plugin. Snapshot are returned
-    up to the requested earliest date. Results are put to the result_q.
-    @param snapshot_type @see threatbus.data.MessageType
+def snapshot(snapshot_request, result_q):
+    """
+    Perform a snapshot, based on the given `snapshot_request`. Snapshots are
+    collected up to the requested earliest date. Results of the type
+    threatbus.data.SnapshotEnvelope are put to the result_q.
+    @param snapshot_request @see threatbus.data.SnapshotRequest
     @param result_q Snapshot results are forwarded to this queue
-    @param time_delta A datetime.timedelta object to mark the snapshot size
     """

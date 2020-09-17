@@ -30,6 +30,7 @@ setup(
         "confuse>=1.0",
         "pluggy>=0.13",
         "black>=19.10b",
+        "python-dateutil>=2.8.1",
     ],
     keywords=[
         "threatbus",
@@ -46,5 +47,5 @@ setup(
     python_requires=">=3.7",
     setup_requires=["setuptools", "wheel"],
     url="https://github.com/tenzir/threatbus",
-    version="2020.07.28",
+    version="2020.09.30",
 )

@@ -25,7 +25,7 @@ setup(
     ],
     description="A plugin to enable indicators to be submitted to CIFv3 in real-time",
     entry_points={"threatbus.app": ["cif3 = threatbus_cif3.plugin"]},
-    install_requires=["cifsdk>3.0.0rc4,<4.0"],
+    install_requires=["threatbus>=2020.09.30", "cifsdk>3.0.0rc4,<4.0"],
     keywords=[
         "cif",
         "cifv3",
@@ -47,5 +47,5 @@ setup(
     packages=["threatbus_cif3"],
     python_requires=">=3.6",
     url="https://github.com/tenzir/threatbus",
-    version="2020.07.28",
+    version="2020.09.30",
 )

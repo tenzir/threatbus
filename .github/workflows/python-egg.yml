@@ -18,21 +18,44 @@ jobs:
     - uses: actions/checkout@v2
       with:
         ref: ${{ github.ref }}
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v1
+    - name: Setup Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
     - name: Set up Dist Environment
       run: |
         python -m pip install --upgrade pip
-        pip install wheel setuptools
+        python -m pip install wheel setuptools
     - name: Install Application and Plugins
       run: |
         make clean build
     - name: Package Application and Plugins
       run: |
         make clean dist
-  
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    container: fixel/zeek:broker-latest
+      # The image is based on Debian-10 and has `zeek/broker` pre-installed
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: ${{ github.ref }}
+    - name: Set up Dist Environment
+      run: |
+        apt-get -qq update
+        apt-get -qqy install python3-pip 
+        update-alternatives --install /usr/bin/python python /usr/bin/python3 1
+        python -m pip install --upgrade pip
+        python -m pip install wheel setuptools
+    - name: Install Application and Plugins
+      run: |
+        make dev-mode
+    - name: Run Unit Tests
+      run: |
+        make unit-tests
+
   docker-release:
     name: Publish to DockerHub
     if: github.ref == 'refs/heads/master' || github.event.action == 'published'
@@ -68,7 +91,7 @@ jobs:
     - name: Set up Dist Environment
       run: |
         python -m pip install --upgrade pip
-        pip install wheel setuptools twine
+        python -m pip install wheel setuptools twine
     - name: Package Application and Plugins
       run: |
         make clean dist
