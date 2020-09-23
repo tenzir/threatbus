@@ -1,5 +1,5 @@
-Threat Bus VAST Plugin
-======================
+Threat Bus App Plugin for ZMQ Protocol
+======================================
 
 <h4 align="center">
 
@@ -9,7 +9,12 @@ Threat Bus VAST Plugin
 
 </h4>
 
-A Threat Bus plugin that enables communication with [VAST](https://github.com/tenzir/vast).
+A Threat Bus plugin that enables communication with any application that can
+communicate via [ZeroMQ].
+
+
+TODO:
+describe ports /sockets and features
 
 
 ## Installation

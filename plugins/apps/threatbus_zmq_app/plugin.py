@@ -3,31 +3,35 @@ from queue import Queue
 import random
 import string
 import threading
-from threatbus_vast.message_mapping import (
-    map_management_message,
-    map_intel_to_vast,
-    map_vast_sighting,
-)
+from threatbus_zmq_app.message_mapping import map_management_message
 import threatbus
-from threatbus.data import Subscription, Unsubscription
+from threatbus.data import (
+    Subscription,
+    Unsubscription,
+    IntelEncoder,
+    SightingDecoder,
+    Sighting,
+)
 import time
 import zmq
 
 
-"""VAST network telemetry engine - plugin for Threat Bus"""
+"""
+ZeroMQ application plugin for Threat Bus.
+Allows to connect any app via ZeroMQ that adheres to the Threat Bus ZMQ protocol.
+"""
 
-plugin_name = "vast"
+plugin_name = "zmq-app"
 lock = threading.Lock()
 subscriptions = dict()
 
 
 def validate_config(config):
     assert config, "config must not be None"
-    config["zmq"].get(dict)
-    config["zmq"]["host"].get(str)
-    config["zmq"]["manage"].get(int)
-    config["zmq"]["pub"].get(int)
-    config["zmq"]["sub"].get(int)
+    config["host"].get(str)
+    config["manage"].get(int)
+    config["pub"].get(int)
+    config["sub"].get(int)
 
 
 def rand_string(length):
@@ -38,8 +42,7 @@ def rand_string(length):
 
 def receive_management(zmq_config, subscribe_callback, unsubscribe_callback):
     """
-    Management endpoint to handle (un)subscriptions of VAST-bridge
-    instances.
+    Management endpoint to handle (un)subscriptions of apps.
     @param zmq_config Config object for the ZeroMQ endpoints
     @param subscribe_callback Callback from Threat Bus to unsubscribe new apps
     @param unsubscribe_callback Callback from Threat Bus to unsubscribe apps
@@ -111,10 +114,9 @@ def pub_zmq(zmq_config):
             msg = q.get()
             if not msg:
                 continue
-            intel = map_intel_to_vast(msg)
-            if intel:
-                socket.send((f"{topic} {intel}").encode())
-                logger.debug(f"Published {intel} on topic {topic}")
+            intel_json = json.dumps(msg, cls=IntelEncoder)
+            socket.send((f"{topic} {intel_json}").encode())
+            logger.debug(f"Published {intel_json} on topic {topic}")
             q.task_done()
         time.sleep(0.05)
 
@@ -124,7 +126,7 @@ def sub_zmq(zmq_config, inq):
     context = zmq.Context()
     socket = context.socket(zmq.SUB)
     socket.bind(f"tcp://{zmq_config['host']}:{zmq_config['sub']}")
-    socket.setsockopt(zmq.SUBSCRIBE, b"vast/sightings")
+    socket.setsockopt(zmq.SUBSCRIBE, b"sightings")
 
     poller = zmq.Poller()
     poller.register(socket, zmq.POLLIN)
@@ -134,9 +136,11 @@ def sub_zmq(zmq_config, inq):
         if socket in socks and socks[socket] == zmq.POLLIN:
             try:
                 _, msg = socket.recv().decode().split(" ", 1)
-                msg = json.loads(msg)
-                sighting = map_vast_sighting(msg)
-                if not sighting:
+                sighting = json.loads(msg, cls=SightingDecoder)
+                if type(sighting) is not Sighting:
+                    logger.warn(
+                        f"Ignoring unknown message type, expected Sighting: {type(sighting)}"
+                    )
                     continue
                 inq.put(sighting)
             except Exception as e:
@@ -153,11 +157,11 @@ def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
         validate_config(config)
     except Exception as e:
         logger.fatal("Invalid config for plugin {}: {}".format(plugin_name, str(e)))
-    threading.Thread(target=pub_zmq, args=(config["zmq"],), daemon=True).start()
-    threading.Thread(target=sub_zmq, args=(config["zmq"], inq), daemon=True).start()
+    threading.Thread(target=pub_zmq, args=(config,), daemon=True).start()
+    threading.Thread(target=sub_zmq, args=(config, inq), daemon=True).start()
     threading.Thread(
         target=receive_management,
-        args=(config["zmq"], subscribe_callback, unsubscribe_callback),
+        args=(config, subscribe_callback, unsubscribe_callback),
         daemon=True,
     ).start()
-    logger.info("VAST plugin started")
+    logger.info("ZeroMQ app plugin started")
