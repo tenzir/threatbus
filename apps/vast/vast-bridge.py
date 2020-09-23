@@ -7,9 +7,18 @@ import coloredlogs
 from datetime import datetime
 import json
 import logging
+from message_mapping import (
+    get_vast_intel_type,
+    get_ioc,
+    matcher_result_to_threatbus_sighting,
+    query_result_to_threatbus_sighting,
+    to_vast_ioc,
+    to_vast_query,
+)
 from pyvast import VAST
 import random
 from string import ascii_lowercase as letters
+from threatbus.data import Intel, IntelDecoder, SightingEncoder, Operation
 import zmq
 
 logger = logging.getLogger(__name__)
@@ -96,42 +105,6 @@ async def start(
         await asyncio.gather(receive_intel_task, report_sightings_task, match_task)
 
 
-def ioc_to_query(intel):
-    """
-    Creates a VAST query from an intel IoC item. See the Threat Bus VAST plugin,
-    `message_mapping.py`, for details of possible IoC `type`s.
-    """
-    ioc = intel.get("ioc", None)
-    type_ = intel.get("type", None)
-    if type_ == "ip" or type_ == "ipv6":
-        return str(ioc)
-    if type_ == "url":
-        # TODO: use field annotations, once implemented (ch17531)
-        return f'"{ioc}" in url'
-    if type_ == "domain":
-        # Currently, uses VAST's suffix-based field matching. Targets every
-        # schema with fieldnames that end in `domain`, `host`, or `hostname`
-        # (Zeek and Suricata)
-        # TODO: use field annotations, once implemented (ch17531)
-        return f'"{ioc}" in domain || "{ioc}" in host || "{ioc}" in hostname'
-    return None
-
-
-def query_result_to_sighting(query_result, intel):
-    """
-    Creates a VAST sighting (json string) in the format of the live-matcher from
-    a VAST query result.
-    @param query_result The query result to convert
-    @param intel The intel item that the sighting refers to
-    """
-    return {
-        "ts": str(datetime.now()),
-        "reference": intel.get("reference", ""),
-        "ioc": intel.get("ioc", ""),
-        "context": json.loads(query_result),
-    }
-
-
 async def receive_intel(pub_endpoint, topic, intel_queue):
     """
     Starts a zmq subscriber on the given endpoint and listens for new intel
@@ -152,11 +125,10 @@ async def receive_intel(pub_endpoint, topic, intel_queue):
         if socket in socks and socks[socket] == zmq.POLLIN:
             try:
                 _, msg = socket.recv().decode().split(" ", 1)
-                intel = json.loads(msg)
             except Exception as e:
                 logger.error(f"Error decoding message: {e}")
                 continue
-            await intel_queue.put(intel)
+            await intel_queue.put(msg)
         else:
             await asyncio.sleep(0.05)  # free event loop for other tasks
 
@@ -174,40 +146,46 @@ async def match_intel(cmd, vast_endpoint, intel_queue, sightings_queue, retro_ma
     global logger
     vast = VAST(binary=cmd, endpoint=vast_endpoint)
     while True:
-        intel = await intel_queue.get()
-        operation = intel.pop("operation", None)
-        if operation == "ADD":
+        msg = await intel_queue.get()
+        intel = json.loads(msg, cls=IntelDecoder)
+        if type(intel) is not Intel:
+            logger.warn(f"Ignoring unknown message type, expected Intel: {type(intel)}")
+            continue
+        if intel.operation == Operation.ADD:
             if retro_match:
-                query = ioc_to_query(intel)
+                query = to_vast_query(intel)
                 if not query:
                     continue
                 proc = await vast.export().json(query).exec()
                 while not proc.stdout.at_eof():
                     line = (await proc.stdout.readline()).decode().rstrip()
                     if line:
-                        sighting = query_result_to_sighting(line, intel)
+                        sighting = query_result_to_threatbus_sighting(line, intel)
                         await sightings_queue.put(sighting)
                 logger.debug(f"Finished retro-matching for intel: {intel}")
             else:
-                proc = (
-                    await vast.import_()
-                    .json(type="intel.indicator")
-                    .exec(stdin=json.dumps(intel))
-                )
-                await proc.wait()
-                logger.debug(f"Ingested intel for live matching: {intel}")
-        elif operation == "REMOVE":
-            if not retro_match:
-                global matcher_name
-                ioc = intel.get("ioc", None)
-                type_ = intel.get("type", None)
-                if not ioc or not type_:
-                    logger.error(
-                        f"Cannot remove intel with missing required fields 'ioc' or 'type': {intel}"
+                ioc = to_vast_ioc(intel)
+                if not ioc:
+                    logger.warn(
+                        f"Unable to convert Intel to VAST compatible IoC: {intel}"
                     )
                     continue
-                await vast.matcher().ioc_remove(matcher_name, ioc, type_).exec()
-                logger.debug(f"Removed indicator {intel}")
+                proc = await vast.import_().json(type="intel.indicator").exec(stdin=ioc)
+                await proc.wait()
+                logger.debug(f"Ingested intel for live matching: {intel}")
+        elif intel.operation == Operation.REMOVE:
+            if retro_match:
+                continue
+            intel_type = get_vast_intel_type(intel)
+            ioc = get_ioc(intel)
+            if not ioc or not intel_type:
+                logger.error(
+                    f"Cannot remove intel with missing intel_type or indicator: {intel}"
+                )
+                continue
+            global matcher_name
+            await vast.matcher().ioc_remove(matcher_name, ioc, intel_type).exec()
+            logger.debug(f"Removed indicator {intel}")
         else:
             logger.warning(f"Unsupported operation for indicator: {intel}")
         intel_queue.task_done()
@@ -233,8 +211,8 @@ async def live_match_vast(cmd, vast_endpoint, sightings_queue):
                 # TODO reconnect
             continue
         try:
-            sighting = data.decode("utf-8").rstrip()
-            sighting = json.loads(sighting)
+            vast_sighting = data.decode("utf-8").rstrip()
+            sighting = matcher_result_to_threatbus_sighting(json.loads(sighting))
             await sightings_queue.put(sighting)
         except Exception as e:
             logger.error(f"Cannot parse sighting-output from VAST: {data}", e)
@@ -292,7 +270,7 @@ async def report_sightings(
     else:
         socket = zmq.Context().socket(zmq.PUB)
         socket.connect(f"tcp://{sub_endpoint}")
-        topic = "vast/sightings"
+        topic = "sightings"
         logger.info(f"Forwarding sightings to Threat Bus at {sub_endpoint}/{topic}")
     while True:
         sighting = await sightings_queue.get()
@@ -315,7 +293,7 @@ async def report_sightings(
             else:
                 await invoke_cmd_for_context(sink, context)
         else:
-            socket.send_string(f"{topic} {json.dumps(sighting)}")
+            socket.send_string(f"{topic} {json.dumps(sighting, cls=SightingEncoder)}")
         sightings_queue.task_done()
         logger.debug(f"Reported sighting: {sighting}")
 
