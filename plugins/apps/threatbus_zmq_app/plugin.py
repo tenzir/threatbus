@@ -8,9 +8,12 @@ import threatbus
 from threatbus.data import (
     Subscription,
     Unsubscription,
+    Intel,
+    IntelDecoder,
     IntelEncoder,
-    SightingDecoder,
     Sighting,
+    SightingDecoder,
+    SightingEncoder,
 )
 import time
 import zmq
@@ -65,7 +68,7 @@ def receive_management(zmq_config, subscribe_callback, unsubscribe_callback):
             continue
         task = map_management_message(msg)
 
-        if isinstance(task, Subscription):
+        if type(task) is Subscription:
             # point-to-point topic and queue for that particular subscription
             p2p_topic = task.topic + rand_string(rand_suffix_length)
             p2p_q = Queue()
@@ -84,7 +87,7 @@ def receive_management(zmq_config, subscribe_callback, unsubscribe_callback):
             subscriptions[p2p_topic] = p2p_q
             lock.release()
             subscribe_callback(task.topic, p2p_q, task.snapshot)
-        elif isinstance(task, Unsubscription):
+        elif type(task) is Unsubscription:
             logger.debug(f"Received unsubscription from topic {task.topic}")
             threatbus_topic = task.topic[: len(task.topic) - rand_suffix_length]
             p2p_q = subscriptions.get(task.topic, None)
@@ -93,12 +96,16 @@ def receive_management(zmq_config, subscribe_callback, unsubscribe_callback):
                 lock.acquire()
                 del subscriptions[task.topic]
                 lock.release()
-            socket.send_string("Success")
+            socket.send_json({"status": "success"})
         else:
-            socket.send_string("Unknown request")
+            socket.send_json({"status": "unknown request"})
 
 
 def pub_zmq(zmq_config):
+    """
+    Publshes messages to all registered subscribers via ZeroMQ.
+    @param zmq_config ZeroMQ configuration properties
+    """
     global subscriptions, lock, logger
     context = zmq.Context()
     socket = context.socket(zmq.PUB)
@@ -108,25 +115,43 @@ def pub_zmq(zmq_config):
         lock.acquire()
         subs_copy = subscriptions.copy()
         lock.release()
+        # the queues are filled by the backbone, the plugin distributes all
+        # messages in round-robin fashion to all subscribers
         for topic, q in subs_copy.items():
             if q.empty():
                 continue
             msg = q.get()
             if not msg:
                 continue
-            intel_json = json.dumps(msg, cls=IntelEncoder)
-            socket.send((f"{topic} {intel_json}").encode())
-            logger.debug(f"Published {intel_json} on topic {topic}")
+            if type(msg) is Intel:
+                encoded = json.dumps(msg, cls=IntelEncoder)
+            elif type(msg) is Sighting:
+                encoded = json.dumps(msg, cls=SightingEncoder)
+            else:
+                logger.warn(
+                    f"Skipping unknown message type '{type(msg)}' for topic subscription {topic}."
+                )
+                continue
+            socket.send((f"{topic} {encoded}").encode())
+            logger.debug(f"Published {encoded} on topic {topic}")
             q.task_done()
         time.sleep(0.05)
 
 
 def sub_zmq(zmq_config, inq):
+    """
+    Forwards messages, that are received via ZeroMQ from connected applications,
+    to the plugin's in-queue.
+    @param zmq_config ZeroMQ configuration properties
+    """
     global logger
     context = zmq.Context()
     socket = context.socket(zmq.SUB)
     socket.bind(f"tcp://{zmq_config['host']}:{zmq_config['sub']}")
-    socket.setsockopt(zmq.SUBSCRIBE, b"sightings")
+    intel_topic = "threatbus/intel"
+    sighting_topic = "threatbus/sighting"
+    socket.setsockopt(zmq.SUBSCRIBE, intel_topic.encode())
+    socket.setsockopt(zmq.SUBSCRIBE, sighting_topic.encode())
 
     poller = zmq.Poller()
     poller.register(socket, zmq.POLLIN)
@@ -135,14 +160,22 @@ def sub_zmq(zmq_config, inq):
         socks = dict(poller.poll(timeout=None))
         if socket in socks and socks[socket] == zmq.POLLIN:
             try:
-                _, msg = socket.recv().decode().split(" ", 1)
-                sighting = json.loads(msg, cls=SightingDecoder)
-                if type(sighting) is not Sighting:
-                    logger.warn(
-                        f"Ignoring unknown message type, expected Sighting: {type(sighting)}"
-                    )
-                    continue
-                inq.put(sighting)
+                topic, msg = socket.recv().decode().split(" ", 1)
+                if topic == intel_topic:
+                    decoded = json.loads(msg, cls=IntelDecoder)
+                    if type(decoded) is not Intel:
+                        logger.warn(
+                            f"Ignoring unknown message type, expected Intel: {type(decoded)}"
+                        )
+                        continue
+                elif topic == sighting_topic:
+                    decoded = json.loads(msg, cls=SightingDecoder)
+                    if type(decoded) is not Sighting:
+                        logger.warn(
+                            f"Ignoring unknown message type, expected Sighting: {type(decoded)}"
+                        )
+                        continue
+                inq.put(decoded)
             except Exception as e:
                 logger.error(f"Error decoding message: {e}")
                 continue

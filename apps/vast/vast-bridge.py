@@ -275,7 +275,7 @@ async def report_sightings(
     else:
         socket = zmq.Context().socket(zmq.PUB)
         socket.connect(f"tcp://{sub_endpoint}")
-        topic = "sightings"
+        topic = "threatbus/sighting"
         logger.info(f"Forwarding sightings to Threat Bus at {sub_endpoint}/{topic}")
     while True:
         sighting = await sightings_queue.get()
