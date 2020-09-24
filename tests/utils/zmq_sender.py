@@ -13,7 +13,7 @@ def send(topic, msg, host="127.0.0.1", port=50000, bind=True):
     else:
         socket.connect(f"tcp://{host}:{port}")
         time.sleep(0.5)
-    print(f"send string: {topic} {msg}")
+    # print(f"send string: {topic} {msg}")
     socket.send_string(f"{topic} {msg}")
     time.sleep(0.5)
 
