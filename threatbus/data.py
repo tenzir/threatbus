@@ -115,6 +115,7 @@ class Sighting:
     ts: datetime
     intel: str
     context: dict
+    ioc: tuple or None
 
 
 @dataclass()
@@ -202,6 +203,7 @@ class SightingEncoder(json.JSONEncoder):
             "ts": str(sighting.ts),
             "intel": sighting.intel,
             "context": sighting.context,
+            "ioc": list(sighting.ioc) if sighting.ioc else None,
         }
 
 
@@ -215,7 +217,10 @@ class SightingDecoder(json.JSONDecoder):
 
     def decode_hook(self, dct: dict):
         if "ts" in dct and "intel" in dct and "context" in dct:
-            return Sighting(parser.parse(dct["ts"]), dct["intel"], dct["context"])
+            ioc = dct.get("ioc", None)
+            if ioc:
+                ioc = tuple(ioc)
+            return Sighting(parser.parse(dct["ts"]), dct["intel"], dct["context"], ioc)
         return dct
 
 

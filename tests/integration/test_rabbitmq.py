@@ -59,7 +59,9 @@ class TestRoundtrips(unittest.TestCase):
             "_extra": {"vast-ioc": "172.31.129.17"},
             "source": "VAST",
         }
-        self.sighting = Sighting(self.ts, self.intel_id, self.sighting_context)
+        self.sighting = Sighting(
+            self.ts, self.intel_id, self.sighting_context, (self.indicator,)
+        )
 
         self.snapshot_id = "SNAPSHOT_UUID"
         self.snapshot = timedelta(days=42, hours=23, minutes=13, seconds=37)

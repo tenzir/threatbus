@@ -102,7 +102,7 @@ class TestMessageMapping(unittest.TestCase):
 
     def test_valid_sighting(self):
         context = {"last_seen": 1234, "count": 13}
-        sighting = Sighting(self.ts, self.id, context)
+        sighting = Sighting(self.ts, self.id, context, None)
         broker_msg = map_to_broker(sighting, self.module_namespace)
         self.assertEqual(broker_msg.name(), self.module_namespace + "::sighting")
         self.assertEqual(broker_msg.args(), [(self.ts, self.id, context)])

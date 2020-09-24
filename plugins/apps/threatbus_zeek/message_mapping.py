@@ -111,7 +111,7 @@ def map_to_internal(broker_data, module_namespace):
     name = name[name.startswith(module_namespace) and len(module_namespace) :]
     if name == "sighting" and len(args) == 3:
         # convert args to sighting
-        return Sighting(args[0], str(args[1]), args[2])
+        return Sighting(args[0], str(args[1]), args[2], None)
     elif name == "intel" and len(args) >= 3:
         # convert args to intel
         op = Operation.ADD

@@ -18,7 +18,7 @@ from message_mapping import (
 from pyvast import VAST
 import random
 from string import ascii_lowercase as letters
-from threatbus.data import Intel, IntelDecoder, SightingEncoder, Operation
+from threatbus.data import Intel, IntelDecoder, Sighting, SightingEncoder, Operation
 import zmq
 
 logger = logging.getLogger(__name__)
@@ -161,6 +161,9 @@ async def match_intel(cmd, vast_endpoint, intel_queue, sightings_queue, retro_ma
                     line = (await proc.stdout.readline()).decode().rstrip()
                     if line:
                         sighting = query_result_to_threatbus_sighting(line, intel)
+                        if not sighting:
+                            logger.warn(f"Could not parse VAST query result: {line}")
+                            continue
                         await sightings_queue.put(sighting)
                 logger.debug(f"Finished retro-matching for intel: {intel}")
             else:
@@ -210,12 +213,12 @@ async def live_match_vast(cmd, vast_endpoint, sightings_queue):
                 logger.error("Lost connection to VAST, cannot live-match.")
                 # TODO reconnect
             continue
-        try:
-            vast_sighting = data.decode("utf-8").rstrip()
-            sighting = matcher_result_to_threatbus_sighting(json.loads(sighting))
-            await sightings_queue.put(sighting)
-        except Exception as e:
-            logger.error(f"Cannot parse sighting-output from VAST: {data}", e)
+        vast_sighting = data.decode("utf-8").rstrip()
+        sighting = matcher_result_to_threatbus_sighting(vast_sighting)
+        if not sighting:
+            logger.warn(f"Cannot parse sighting-output from VAST: {data}", e)
+            continue
+        await sightings_queue.put(sighting)
 
 
 async def invoke_cmd_for_context(cmd, context, ioc="%ioc"):
@@ -230,6 +233,8 @@ async def invoke_cmd_for_context(cmd, context, ioc="%ioc"):
     @param context The context (python dict) to forward as JSON
     @param ioc The value to replace '%ioc' with in the `cmd` string
     """
+    if not ioc:
+        ioc = "%ioc"
     cmd = cmd.replace("%ioc", ioc)
     proc = await asyncio.create_subprocess_exec(
         *cmd.split(" "),
@@ -274,24 +279,30 @@ async def report_sightings(
         logger.info(f"Forwarding sightings to Threat Bus at {sub_endpoint}/{topic}")
     while True:
         sighting = await sightings_queue.get()
-        if transform_cmd and sighting.get("context", None):
+        if type(sighting) is not Sighting:
+            logger.warn(
+                f"Ignoring unknown message type, expected Sighting: {type(sighting)}"
+            )
+            continue
+        if transform_cmd and sighting.context:
+            ioc = sighting.ioc[0] if sighting.ioc else None
             context_str = await invoke_cmd_for_context(
-                transform_cmd, sighting.get("context"), sighting.get("ioc", None)
+                transform_cmd, sighting.context, ioc
             )
             try:
                 context = json.loads(context_str)
-                sighting["context"] = context
+                sighting.context = context
             except Exception as e:
                 logger.error(
                     f"Cannot parse transformed sighting context (expecting JSON): {context_str}",
                     e,
                 )
+                continue
         if sink:
-            context = sighting.get("context", {})
             if sink.lower() == "stdout":
-                print(json.dumps(context))
+                print(json.dumps(sighting.context))
             else:
-                await invoke_cmd_for_context(sink, context)
+                await invoke_cmd_for_context(sink, sighting.context)
         else:
             socket.send_string(f"{topic} {json.dumps(sighting, cls=SightingEncoder)}")
         sightings_queue.task_done()
