@@ -49,13 +49,16 @@ class ThreatBus:
                 )
             self.snapshot_q.task_done()
 
-    def request_snapshot(self, topic: str, dst_q: Queue, time_delta: timedelta):
+    def request_snapshot(
+        self, topic: str, dst_q: Queue, snapshot_id: str, time_delta: timedelta
+    ):
         """
         Create a new SnapshotRequest and push it to the inq, so that the
         backbones can provision it.
         @param topic The topic for which the snapshot is requested
         @param dst_q A queue that should be used to forward all snapshot
             data to
+        @param snapshot_id The UUID of the requested snapshot
         @param time_delta A timedelta object to mark the snapshot size
         """
         # Threat Bus follows a hierarchical pub-sub structure. Subscriptions
@@ -73,7 +76,6 @@ class ThreatBus:
             self.logger.info(
                 f"Requesting snapshot from all plugins for message type {mt.name} and time delta {time_delta}"
             )
-            snapshot_id = str(uuid4())
             self.snapshots[snapshot_id] = dst_q  # store queue of requester
             req = SnapshotRequest(mt, snapshot_id, time_delta)
 
@@ -86,11 +88,16 @@ class ThreatBus:
         @param topic Subscribe to this topic
         @param q A queue object to forward all messages for the given topics
         @param time_delta A timedelta object to mark the snapshot size
+        @return Returns the UUID for the requested snapshot, or None in case no
+            snapshot was requested.
         """
         assert isinstance(topic, str), "topic must be string"
         self.backbones.subscribe(topic=topic, q=q)
-        if time_delta:
-            self.request_snapshot(topic, q, time_delta)
+        if not time_delta:
+            return None
+        snapshot_id = str(uuid4())
+        self.request_snapshot(topic, q, snapshot_id, time_delta)
+        return snapshot_id
 
     def unsubscribe(self, topic: str, q: Queue):
         """
