@@ -41,21 +41,21 @@ def setup_logging(level):
 
 
 async def start(
-    cmd,
-    vast_endpoint,
-    zmq_endpoint,
-    snapshot,
-    retro_match,
-    transform_cmd=None,
-    sink=None,
+    cmd: str,
+    vast_endpoint: str,
+    zmq_endpoint: str,
+    snapshot: int,
+    retro_match: bool,
+    transform_cmd: str = None,
+    sink: str = None,
 ):
     """
     Starts the bridge between the two given endpoints. Subscribes the
     configured VAST instance for threat intelligence (IoCs) and reports new
     intelligence to Threat Bus.
     @param cmd The vast binary command to use with PyVAST
-    @param vast_endpoint The endpoint of a running vast node
-    @param zmq_endpoint The ZMQ management endpoint of Threat Bus
+    @param vast_endpoint The endpoint of a running vast node ('host:port')
+    @param zmq_endpoint The ZMQ management endpoint of Threat Bus ('host:port')
     @param snapshot An integer value to request n days of past intel items
     @param transform_cmd The command to use to transform Sighting context with
     @param sink Forward sighting context to this sink (subprocess) instead of
@@ -67,16 +67,22 @@ async def start(
 
     logger.debug(f"Calling Threat Bus management endpoint {zmq_endpoint}")
     reply = subscribe(zmq_endpoint, "threatbus/intel", snapshot)
-    if not reply or not isinstance(reply, dict):
-        logger.error("Subsription unsuccessful")
+    if not reply or type(reply) is not dict:
+        logger.error("Subscription failed")
         exit(1)
     pub_endpoint = reply.get("pub_endpoint", None)
     sub_endpoint = reply.get("sub_endpoint", None)
     topic = reply.get("topic", None)
-    if not pub_endpoint or not sub_endpoint or not topic:
-        logger.error("Unparsable subscription reply")
+    status = reply.get("status", None)
+    if (
+        not status
+        or status != "success"
+        or not pub_endpoint
+        or not sub_endpoint
+        or not topic
+    ):
+        logger.error("Subscription failed")
         exit(1)
-    logger.debug("Subscription successfull")
     atexit.register(unsubscribe, zmq_endpoint, topic)
 
     intel_queue = asyncio.Queue()
@@ -105,7 +111,7 @@ async def start(
         await asyncio.gather(receive_intel_task, report_sightings_task, match_task)
 
 
-async def receive_intel(pub_endpoint, topic, intel_queue):
+async def receive_intel(pub_endpoint: str, topic: str, intel_queue: asyncio.Queue):
     """
     Starts a zmq subscriber on the given endpoint and listens for new intel
     items on the given topic. Enqueues all received IoCs on the intel_queue.
@@ -133,12 +139,18 @@ async def receive_intel(pub_endpoint, topic, intel_queue):
             await asyncio.sleep(0.05)  # free event loop for other tasks
 
 
-async def match_intel(cmd, vast_endpoint, intel_queue, sightings_queue, retro_match):
+async def match_intel(
+    cmd: str,
+    vast_endpoint: str,
+    intel_queue: asyncio.Queue,
+    sightings_queue: asyncio.Queue,
+    retro_match: bool,
+):
     """
     Reads from the intel_queue and matches all IoCs, either via VAST's
     live-matching or retro-matching.
     @param cmd The vast binary command to use with PyVAST
-    @param vast_endpoint The endpoint of a running vast node
+    @param vast_endpoint The endpoint of a running vast node ('host:port')
     @param intel_queue The queue to read new IoCs from
     @param sightings_queue The queue to put new sightings into
     @param retro_match Boolean flag to use retro-matching over live-matching
@@ -194,7 +206,7 @@ async def match_intel(cmd, vast_endpoint, intel_queue, sightings_queue, retro_ma
         intel_queue.task_done()
 
 
-async def live_match_vast(cmd, vast_endpoint, sightings_queue):
+async def live_match_vast(cmd: str, vast_endpoint: str, sightings_queue: asyncio.Queue):
     """
     Starts a VAST matcher. Enqueues all matches from VAST to the
     sightings_queue.
@@ -221,7 +233,7 @@ async def live_match_vast(cmd, vast_endpoint, sightings_queue):
         await sightings_queue.put(sighting)
 
 
-async def invoke_cmd_for_context(cmd, context, ioc="%ioc"):
+async def invoke_cmd_for_context(cmd: str, context: dict, ioc: str = "%ioc"):
     """
     Invoke a command as subprocess for the given context. The command string is
     treated as template string and occurences of "%ioc" are replaced with the
@@ -230,7 +242,7 @@ async def invoke_cmd_for_context(cmd, context, ioc="%ioc"):
     @param cmd The command, including flags, to invoke as subprocess. cmd is
         treated as template string and occurrences of '%ioc' are replaced with
         the actually matched IoC.
-    @param context The context (python dict) to forward as JSON
+    @param context The context to forward as JSON
     @param ioc The value to replace '%ioc' with in the `cmd` string
     """
     if not ioc:
@@ -252,7 +264,10 @@ async def invoke_cmd_for_context(cmd, context, ioc="%ioc"):
 
 
 async def report_sightings(
-    sub_endpoint, sightings_queue, transform_cmd=None, sink=None
+    sub_endpoint: str,
+    sightings_queue: asyncio.Queue,
+    transform_cmd: str = None,
+    sink: str = None,
 ):
     """
     Starts a ZeroMQ publisher on the given endpoint and publishes sightings from
@@ -309,21 +324,20 @@ async def report_sightings(
         logger.debug(f"Reported sighting: {sighting}")
 
 
-def subscribe(endpoint, topic, snapshot, timeout=5):
+def send_manage_message(endpoint: str, action: dict, timeout: int = 5):
     """
-    Subscribes the vast-bridge to the Threat Bus for the given topic.
-    Requests an optional snapshot of past intelligence data.
-    @param endpoint The ZMQ management endpoint of Threat Bus
-    @param topic The topic to subscribe to
-    @param snapshot An integer value to request n days of past intel items
+    Sends a 'management' message, following the threatbus-zmq-app protocol to
+    either subscribe or unsubscribe this instance of the VAST bridge to/from
+    Threat Bus.
+    @param endpoint A host:port string to connect to via ZeroMQ
+    @param action The message to send as JSON
     @param timeout The period after which the connection attempt is aborted
     """
-    subscription = {"action": "subscribe", "topic": topic, "snapshot": snapshot}
     context = zmq.Context()
     socket = context.socket(zmq.REQ)
     socket.setsockopt(zmq.LINGER, 0)
     socket.connect(f"tcp://{endpoint}")
-    socket.send_json(subscription)
+    socket.send_json(action)
     poller = zmq.Poller()
     poller.register(socket, zmq.POLLIN)
 
@@ -335,7 +349,22 @@ def subscribe(endpoint, topic, snapshot, timeout=5):
     return reply
 
 
-def unsubscribe(endpoint, topic, timeout=5):
+def subscribe(endpoint: str, topic: str, snapshot: int, timeout: int = 5):
+    """
+    Subscribes the vast-bridge to the Threat Bus for the given topic.
+    Requests an optional snapshot of past intelligence data.
+    @param endpoint The ZMQ management endpoint of Threat Bus ('host:port')
+    @param topic The topic to subscribe to
+    @param snapshot An integer value to request n days of past intel items
+    @param timeout The period after which the connection attempt is aborted
+    """
+    global logger
+    logger.info(f"Subscribing to topic '{topic}'...")
+    action = {"action": "subscribe", "topic": topic, "snapshot": snapshot}
+    return send_manage_message(endpoint, action, timeout)
+
+
+def unsubscribe(endpoint: str, topic: str, timeout: int = 5):
     """
     Unsubscribes the vast-bridge from Threat Bus for the given topic.
     @param endpoint The ZMQ management endpoint of Threat Bus
@@ -343,22 +372,11 @@ def unsubscribe(endpoint, topic, timeout=5):
     @param timeout The period after which the connection attempt is aborted
     """
     global logger
-    logger.info("Unsubscribing...")
-    unsub = {"action": "unsubscribe", "topic": topic}
-    context = zmq.Context()
-    socket = context.socket(zmq.REQ)
-    socket.setsockopt(zmq.LINGER, 0)
-    socket.connect(f"tcp://{endpoint}")
-    socket.send_json(unsub)
-    poller = zmq.Poller()
-    poller.register(socket, zmq.POLLIN)
-
-    reply = "Unsuccessful"
-    if poller.poll(timeout * 1000):
-        reply = socket.recv_string()
-    socket.close()
-    context.term()
+    logger.info(f"Unsubscribing from topic '{topic}' ...")
+    action = {"action": "unsubscribe", "topic": topic}
+    reply = send_manage_message(endpoint, action, timeout)
     logger.info(f"Unsubscription: {reply}")
+    return reply
 
 
 def main():
