@@ -1,3 +1,4 @@
+from confuse import Subview
 import json
 from queue import Queue
 import random
@@ -6,16 +7,22 @@ import threading
 from threatbus_zmq_app.message_mapping import map_management_message
 import threatbus
 from threatbus.data import (
-    Subscription,
-    Unsubscription,
     Intel,
     IntelDecoder,
     IntelEncoder,
+    MessageType,
     Sighting,
     SightingDecoder,
     SightingEncoder,
+    SnapshotEnvelope,
+    SnapshotEnvelopeDecoder,
+    SnapshotRequest,
+    SnapshotRequestEncoder,
+    Subscription,
+    Unsubscription,
 )
 import time
+from typing import Callable, Dict, Tuple
 import zmq
 
 
@@ -25,11 +32,14 @@ Allows to connect any app via ZeroMQ that adheres to the Threat Bus ZMQ protocol
 """
 
 plugin_name = "zmq-app"
-lock = threading.Lock()
-subscriptions = dict()
+subscriptions_lock = threading.Lock()
+subscriptions: Dict[str, Tuple[str, Queue]] = dict()  # p2p_topic => (topic, queue)
+snapshots_lock = threading.Lock()
+snapshots: Dict[str, str] = dict()  # snapshot_id => topic
+p2p_topic_prefix_length = 32  # length of random topic prefix
 
 
-def validate_config(config):
+def validate_config(config: Subview):
     assert config, "config must not be None"
     config["host"].get(str)
     config["manage"].get(int)
@@ -37,25 +47,26 @@ def validate_config(config):
     config["sub"].get(int)
 
 
-def rand_string(length):
+def rand_string(length: int):
     """Generates a pseudo-random string with the requested length"""
     letters = string.ascii_lowercase
     return "".join(random.choice(letters) for i in range(length))
 
 
-def receive_management(zmq_config, subscribe_callback, unsubscribe_callback):
+def receive_management(
+    zmq_config: Subview, subscribe_callback: Callable, unsubscribe_callback: Callable
+):
     """
     Management endpoint to handle (un)subscriptions of apps.
     @param zmq_config Config object for the ZeroMQ endpoints
     @param subscribe_callback Callback from Threat Bus to unsubscribe new apps
     @param unsubscribe_callback Callback from Threat Bus to unsubscribe apps
     """
-    global logger, lock, subscriptions
+    global logger, subscriptions_lock, subscriptions, snapshots_lock, snapshots
 
     context = zmq.Context()
     socket = context.socket(zmq.REP)  # REP socket for point-to-point reply
     socket.bind(f"tcp://{zmq_config['host']}:{zmq_config['manage']}")
-    rand_prefix_length = 10
     pub_endpoint = f"{zmq_config['host']}:{zmq_config['pub']}"
     sub_endpoint = f"{zmq_config['host']}:{zmq_config['sub']}"
 
@@ -70,9 +81,9 @@ def receive_management(zmq_config, subscribe_callback, unsubscribe_callback):
 
         if type(task) is Subscription:
             # point-to-point topic and queue for that particular subscription
-            p2p_topic = rand_string(rand_prefix_length) + task.topic
+            p2p_topic = rand_string(p2p_topic_prefix_length)
             p2p_q = Queue()
-            logger.debug(
+            logger.info(
                 f"Received subscription for topic {task.topic}, snapshot {task.snapshot}"
             )
             # send success message for reconnecting
@@ -84,45 +95,50 @@ def receive_management(zmq_config, subscribe_callback, unsubscribe_callback):
                     "status": "success",
                 }
             )
-            lock.acquire()
-            subscriptions[p2p_topic] = p2p_q
-            lock.release()
-            subscribe_callback(task.topic, p2p_q, task.snapshot)
+            subscriptions_lock.acquire()
+            subscriptions[p2p_topic] = (task.topic, p2p_q)
+            subscriptions_lock.release()
+            snapshot_id = subscribe_callback(task.topic, p2p_q, task.snapshot)
+            if snapshot_id:
+                # remember that this snapshot was requested by this particular
+                # subscriber (identified by unique topic), so it is not asked to
+                # execute it's own request
+                snapshots_lock.acquire()
+                snapshots[snapshot_id] = p2p_topic
+                snapshots_lock.release()
         elif type(task) is Unsubscription:
-            if not len(task.topic) > rand_prefix_length:
-                logger.warn("Skipping invalid unsubscription")
+            logger.info(f"Received unsubscription from topic {task.topic}")
+            threatbus_topic, p2p_q = subscriptions.get(task.topic, (None, None))
+            if not p2p_q:
+                logger.warn("No one was subscribed for that topic. Skipping.")
                 socket.send_json({"status": "unsuccess"})
                 continue
-            threatbus_topic = task.topic[rand_prefix_length:]
-            logger.debug(f"Received unsubscription from topic {threatbus_topic}")
-            p2p_q = subscriptions.get(task.topic, None)
-            if p2p_q:
-                unsubscribe_callback(threatbus_topic, p2p_q)
-                lock.acquire()
-                del subscriptions[task.topic]
-                lock.release()
+            unsubscribe_callback(threatbus_topic, p2p_q)
+            subscriptions_lock.acquire()
+            del subscriptions[task.topic]
+            subscriptions_lock.release()
             socket.send_json({"status": "success"})
         else:
             socket.send_json({"status": "unknown request"})
 
 
-def pub_zmq(zmq_config):
+def pub_zmq(zmq_config: Subview):
     """
     Publshes messages to all registered subscribers via ZeroMQ.
     @param zmq_config ZeroMQ configuration properties
     """
-    global subscriptions, lock, logger
+    global subscriptions, subscriptions_lock, logger
     context = zmq.Context()
     socket = context.socket(zmq.PUB)
     socket.bind(f"tcp://{zmq_config['host']}:{zmq_config['pub']}")
 
     while True:
-        lock.acquire()
+        subscriptions_lock.acquire()
         subs_copy = subscriptions.copy()
-        lock.release()
+        subscriptions_lock.release()
         # the queues are filled by the backbone, the plugin distributes all
         # messages in round-robin fashion to all subscribers
-        for topic, q in subs_copy.items():
+        for topic, (_, q) in subs_copy.items():
             if q.empty():
                 continue
             msg = q.get()
@@ -130,8 +146,13 @@ def pub_zmq(zmq_config):
                 continue
             if type(msg) is Intel:
                 encoded = json.dumps(msg, cls=IntelEncoder)
+                topic += "intel"
             elif type(msg) is Sighting:
                 encoded = json.dumps(msg, cls=SightingEncoder)
+                topic += "sighting"
+            elif type(msg) is SnapshotRequest:
+                encoded = json.dumps(msg, cls=SnapshotRequestEncoder)
+                topic += "snapshotrequest"
             else:
                 logger.warn(
                     f"Skipping unknown message type '{type(msg)}' for topic subscription {topic}."
@@ -143,7 +164,7 @@ def pub_zmq(zmq_config):
         time.sleep(0.05)
 
 
-def sub_zmq(zmq_config, inq):
+def sub_zmq(zmq_config: Subview, inq: Queue):
     """
     Forwards messages, that are received via ZeroMQ from connected applications,
     to the plugin's in-queue.
@@ -155,8 +176,10 @@ def sub_zmq(zmq_config, inq):
     socket.bind(f"tcp://{zmq_config['host']}:{zmq_config['sub']}")
     intel_topic = "threatbus/intel"
     sighting_topic = "threatbus/sighting"
+    snapshotenvelope_topic = "threatbus/snapshotenvelope"
     socket.setsockopt(zmq.SUBSCRIBE, intel_topic.encode())
     socket.setsockopt(zmq.SUBSCRIBE, sighting_topic.encode())
+    socket.setsockopt(zmq.SUBSCRIBE, snapshotenvelope_topic.encode())
 
     poller = zmq.Poller()
     poller.register(socket, zmq.POLLIN)
@@ -180,6 +203,14 @@ def sub_zmq(zmq_config, inq):
                             f"Ignoring unknown message type, expected Sighting: {type(decoded)}"
                         )
                         continue
+                elif topic == snapshotenvelope_topic:
+                    decoded = json.loads(msg, cls=SnapshotEnvelopeDecoder)
+                    if type(decoded) is not SnapshotEnvelope:
+                        logger.warn(
+                            f"Ignoring unknown message type, expected SnapshotEnvelope: {type(decoded)}"
+                        )
+                        continue
+
                 inq.put(decoded)
             except Exception as e:
                 logger.error(f"Error decoding message: {e}")
@@ -187,7 +218,32 @@ def sub_zmq(zmq_config, inq):
 
 
 @threatbus.app
-def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
+def snapshot(snapshot_request: SnapshotRequest, result_q: Queue):
+    global logger, snapshots, snapshots_lock, subscriptions, subscriptions_lock
+    logger.info(f"Executing snapshot for time delta {snapshot_request.snapshot}")
+
+    snapshots_lock.acquire()
+    requester = snapshots.get(snapshot_request.snapshot_id, None)
+    snapshots_lock.release()
+
+    subscriptions_lock.acquire()
+    subs_copy = subscriptions.copy()
+    subscriptions_lock.release()
+    # push the request into every subscribed queue, except the requester's
+    for topic, (_, q) in subs_copy.items():
+        if topic == requester:
+            continue
+        q.put(snapshot_request)
+
+
+@threatbus.app
+def run(
+    config: Subview,
+    logging: Subview,
+    inq: Queue,
+    subscribe_callback: Callable,
+    unsubscribe_callback: Callable,
+):
     global logger
     logger = threatbus.logger.setup(logging, __name__)
     config = config[plugin_name]
