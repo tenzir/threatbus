@@ -24,14 +24,14 @@ unit-tests:
 
 .PHONY: integration-tests
 integration-tests:
-	-docker kill rabbit-int
-	docker pull rabbitmq$(:)3
-	docker run -d --rm --hostname=test-rabbit --name=rabbit-int -p 35672$(:)5672 rabbitmq$(:)3
+	-docker kill rabbit-int > /dev/null 2>&1
+	docker pull rabbitmq$(:)3 > /dev/null 2>&1
+	docker run -d --rm --hostname=test-rabbit --name=rabbit-int -p 35672$(:)5672 rabbitmq$(:)3 > /dev/null 2>&1
 	-python -m unittest tests/integration/test_message_roundtrips.py
 	-python -m unittest tests/integration/test_zeek_app.py
 	-python -m unittest tests/integration/test_rabbitmq.py
 	-${RM} {broker,intel,reporter,weird}.log
-	docker kill rabbit-int
+	docker kill rabbit-int > /dev/null 2>&1
 
 .PHONY: clean
 clean:
