@@ -31,7 +31,7 @@ plugins:
       api:
         host: https://localhost
         ssl: false
-        key: NpwGjzaWY7sQxovURfOORCFqz7eshxqDWhbARH3E
+        key: MISP_API_KEY
       zmq:
         host: localhost
         port: 50000
@@ -45,7 +45,7 @@ plugins:
       #    bootstrap.servers: "localhost:9092"
       #    group.id: "threatbus"
       #    auto.offset.reset: "earliest"
-    zmq_app:
+    zmq-app:
       host: "127.0.0.1"
       manage: 13370
       pub: 13371
