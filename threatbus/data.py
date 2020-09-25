@@ -86,7 +86,7 @@ class IntelData(dict):
     The 'intel_type' is a threatbus.data.IntelType
     """
 
-    def __init__(self, indicator, intel_type: IntelType, *args, **kw):
+    def __init__(self, indicator: str or tuple, intel_type: IntelType, *args, **kw):
         super(IntelData, self).__init__(*args, **kw)
         assert indicator, "Intel indicator must be set"
         assert (

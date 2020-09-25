@@ -1,5 +1,7 @@
 import argparse
 import confuse
+from datetime import timedelta
+from logging import Logger
 import pluggy
 from queue import Queue
 from threatbus import appspecs, backbonespecs, logger
@@ -9,7 +11,13 @@ from uuid import uuid4
 
 
 class ThreatBus:
-    def __init__(self, backbones, apps, logger, config):
+    def __init__(
+        self,
+        backbones: pluggy.hooks._HookRelay,
+        apps: pluggy.hooks._HookRelay,
+        logger: Logger,
+        config: confuse.Subview,
+    ):
         self.backbones = backbones
         self.apps = apps
         self.config = config
@@ -41,7 +49,7 @@ class ThreatBus:
                 )
             self.snapshot_q.task_done()
 
-    def request_snapshot(self, topic, dst_q, time_delta):
+    def request_snapshot(self, topic: str, dst_q: Queue, time_delta: timedelta):
         """
         Create a new SnapshotRequest and push it to the inq, so that the
         backbones can provision it.
@@ -71,7 +79,7 @@ class ThreatBus:
 
             self.inq.put(req)
 
-    def subscribe(self, topic, q, time_delta=None):
+    def subscribe(self, topic: str, q: Queue, time_delta: timedelta = None):
         """
         Accepts a new subscription for a given topic and queue pointer.
         Forwards that subscription to all managed backbones.
@@ -84,7 +92,7 @@ class ThreatBus:
         if time_delta:
             self.request_snapshot(topic, q, time_delta)
 
-    def unsubscribe(self, topic, q):
+    def unsubscribe(self, topic: str, q: Queue):
         """
         Removes subscription for a given topic and queue pointer from all
         managed backbones.
@@ -110,7 +118,7 @@ class ThreatBus:
         self.handle_snapshots()
 
 
-def validate_config(config):
+def validate_config(config: confuse.Subview):
     if config["logging"]["console"].get(bool):
         config["logging"]["console_verbosity"].get(str)
     if config["logging"]["file"].get(bool):
@@ -118,7 +126,7 @@ def validate_config(config):
         config["logging"]["filename"].get(str)
 
 
-def start(config):
+def start(config: confuse.Subview):
     try:
         validate_config(config)
     except Exception as e:

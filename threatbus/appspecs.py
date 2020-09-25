@@ -1,10 +1,20 @@
 import pluggy
+from confuse import Subview
+from queue import Queue
+from typing import Callable
+from threatbus.data import SnapshotRequest
 
 hookspec = pluggy.HookspecMarker("threatbus.app")
 
 
 @hookspec
-def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
+def run(
+    config: Subview,
+    logging: Subview,
+    inq: Queue,
+    subscribe_callback: Callable,
+    unsubscribe_callback: Callable,
+):
     """
     Runs / starts a plugin spec with a configuration object
     @param config A configuration object for the app
@@ -18,7 +28,7 @@ def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
 
 
 @hookspec
-def snapshot(snapshot_request, result_q):
+def snapshot(snapshot_request: SnapshotRequest, result_q: Queue):
     """
     Perform a snapshot, based on the given `snapshot_request`. Snapshots are
     collected up to the requested earliest date. Results of the type

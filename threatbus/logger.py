@@ -1,9 +1,10 @@
 import coloredlogs
+from confuse import Subview
 import logging
 import sys
 
 
-def setup(config, name):
+def setup(config: Subview, name: str):
     fmt = "%(asctime)s %(levelname)-8s [%(name)s] %(message)s"
     colored_formatter = coloredlogs.ColoredFormatter(fmt)
     plain_formatter = logging.Formatter(fmt)
