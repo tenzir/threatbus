@@ -55,7 +55,7 @@ def receive_management(zmq_config, subscribe_callback, unsubscribe_callback):
     context = zmq.Context()
     socket = context.socket(zmq.REP)  # REP socket for point-to-point reply
     socket.bind(f"tcp://{zmq_config['host']}:{zmq_config['manage']}")
-    rand_suffix_length = 10
+    rand_prefix_length = 10
     pub_endpoint = f"{zmq_config['host']}:{zmq_config['pub']}"
     sub_endpoint = f"{zmq_config['host']}:{zmq_config['sub']}"
 
@@ -70,7 +70,7 @@ def receive_management(zmq_config, subscribe_callback, unsubscribe_callback):
 
         if type(task) is Subscription:
             # point-to-point topic and queue for that particular subscription
-            p2p_topic = task.topic + rand_string(rand_suffix_length)
+            p2p_topic = rand_string(rand_prefix_length) + task.topic
             p2p_q = Queue()
             logger.debug(
                 f"Received subscription for topic {task.topic}, snapshot {task.snapshot}"
@@ -81,6 +81,7 @@ def receive_management(zmq_config, subscribe_callback, unsubscribe_callback):
                     "topic": p2p_topic,
                     "pub_endpoint": pub_endpoint,
                     "sub_endpoint": sub_endpoint,
+                    "status": "success",
                 }
             )
             lock.acquire()
@@ -88,8 +89,12 @@ def receive_management(zmq_config, subscribe_callback, unsubscribe_callback):
             lock.release()
             subscribe_callback(task.topic, p2p_q, task.snapshot)
         elif type(task) is Unsubscription:
-            logger.debug(f"Received unsubscription from topic {task.topic}")
-            threatbus_topic = task.topic[: len(task.topic) - rand_suffix_length]
+            if not len(task.topic) > rand_prefix_length:
+                logger.warn("Skipping invalid unsubscription")
+                socket.send_json({"status": "unsuccess"})
+                continue
+            threatbus_topic = task.topic[rand_prefix_length:]
+            logger.debug(f"Received unsubscription from topic {threatbus_topic}")
             p2p_q = subscriptions.get(task.topic, None)
             if p2p_q:
                 unsubscribe_callback(threatbus_topic, p2p_q)
