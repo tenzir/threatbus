@@ -91,10 +91,8 @@ async def start(
         report_sightings(sub_endpoint, sightings_queue, transform_cmd, sink)
     )
     atexit.register(report_sightings_task.cancel)
-    receive_intel_task = asyncio.create_task(
-        receive_intel(pub_endpoint, topic, intel_queue)
-    )
-    atexit.register(receive_intel_task.cancel)
+    receive_task = asyncio.create_task(receive(pub_endpoint, topic, intel_queue))
+    atexit.register(receive_task.cancel)
     match_task = asyncio.create_task(
         match_intel(cmd, vast_endpoint, intel_queue, sightings_queue, retro_match)
     )
@@ -105,18 +103,19 @@ async def start(
         )
         atexit.register(live_match_vast_task.cancel)
         await asyncio.gather(
-            receive_intel_task, report_sightings_task, match_task, live_match_vast_task
+            receive_task, report_sightings_task, match_task, live_match_vast_task
         )
     else:
-        await asyncio.gather(receive_intel_task, report_sightings_task, match_task)
+        await asyncio.gather(receive_task, report_sightings_task, match_task)
 
 
-async def receive_intel(pub_endpoint: str, topic: str, intel_queue: asyncio.Queue):
+async def receive(pub_endpoint: str, topic: str, intel_queue: asyncio.Queue):
     """
-    Starts a zmq subscriber on the given endpoint and listens for new intel
-    items on the given topic. Enqueues all received IoCs on the intel_queue.
+    Starts a zmq subscriber on the given endpoint and listens for new messages
+    that are published on the given topic (zmq prefix matching). Depending on
+    the topic suffix, Intel items (IoCs) are enqueued to the intel_queue.
     @param pub_endpoint A host:port string to connect to via zmq
-    @param topic The topic to subscribe to get intelligence items
+    @param topic The topic-prefix to subscribe to get intelligence items
     @param intel_queue The queue to put arriving IoCs into
     """
     global logger
@@ -125,14 +124,19 @@ async def receive_intel(pub_endpoint: str, topic: str, intel_queue: asyncio.Queu
     socket.setsockopt(zmq.SUBSCRIBE, topic.encode())
     poller = zmq.Poller()
     poller.register(socket, zmq.POLLIN)
-    logger.info(f"Receiving intelligence items on {pub_endpoint}/{topic}")
+    logger.info(f"Receiving via ZMQ on topic {pub_endpoint}/{topic}")
     while True:
-        socks = dict(poller.poll(timeout=10))
+        socks = dict(poller.poll(timeout=100))
         if socket in socks and socks[socket] == zmq.POLLIN:
             try:
-                _, msg = socket.recv().decode().split(" ", 1)
+                topic, msg = socket.recv().decode().split(" ", 1)
             except Exception as e:
                 logger.error(f"Error decoding message: {e}")
+                continue
+            # the topic is suffixed with the message type
+            if not topic.endswith("intel"):
+                # vast bridge is not (yet) interested in Sightings or SnapshotRequests
+                logger.debug(f"Skipping unsupported message: {msg}")
                 continue
             await intel_queue.put(msg)
         else:
@@ -159,7 +163,11 @@ async def match_intel(
     vast = VAST(binary=cmd, endpoint=vast_endpoint)
     while True:
         msg = await intel_queue.get()
-        intel = json.loads(msg, cls=IntelDecoder)
+        try:
+            intel = json.loads(msg, cls=IntelDecoder)
+        except Exception as e:
+            logger.warn(f"Error decoding intel item {msg}: {e}")
+            continue
         if type(intel) is not Intel:
             logger.warn(f"Ignoring unknown message type, expected Intel: {type(intel)}")
             continue
