@@ -54,9 +54,7 @@ def publish_sightings(outq):
         return
     while True:
         sighting = outq.get(block=True)
-        logger.debug(
-            f"report sighting for intel id {sighting.intel} seen at {sighting.ts}"
-        )
+        logger.debug(f"Reporting sighting: {sighting}")
         misp_sighting = map_to_misp(sighting)
         lock.acquire()
         misp.add_sighting(misp_sighting)
@@ -137,7 +135,7 @@ def snapshot(snapshot_request, result_q):
 
     if not misp:
         return
-    logger.debug(f"Executing intel snapshot for time delta {snapshot_request.snapshot}")
+    logger.info(f"Executing intel snapshot for time delta {snapshot_request.snapshot}")
     lock.acquire()
     data = misp.search(
         controller="attributes",
