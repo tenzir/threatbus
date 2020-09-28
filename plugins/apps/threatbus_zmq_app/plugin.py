@@ -81,31 +81,35 @@ def receive_management(
 
         if type(task) is Subscription:
             # point-to-point topic and queue for that particular subscription
-            p2p_topic = rand_string(p2p_topic_prefix_length)
-            p2p_q = Queue()
-            logger.info(
-                f"Received subscription for topic {task.topic}, snapshot {task.snapshot}"
-            )
-            # send success message for reconnecting
-            socket.send_json(
-                {
-                    "topic": p2p_topic,
-                    "pub_endpoint": pub_endpoint,
-                    "sub_endpoint": sub_endpoint,
-                    "status": "success",
-                }
-            )
-            subscriptions_lock.acquire()
-            subscriptions[p2p_topic] = (task.topic, p2p_q)
-            subscriptions_lock.release()
-            snapshot_id = subscribe_callback(task.topic, p2p_q, task.snapshot)
-            if snapshot_id:
-                # remember that this snapshot was requested by this particular
-                # subscriber (identified by unique topic), so it is not asked to
-                # execute it's own request
-                snapshots_lock.acquire()
-                snapshots[snapshot_id] = p2p_topic
-                snapshots_lock.release()
+            try:
+                p2p_topic = rand_string(p2p_topic_prefix_length)
+                p2p_q = Queue()
+                logger.info(
+                    f"Received subscription for topic {task.topic}, snapshot {task.snapshot}"
+                )
+                subscriptions_lock.acquire()
+                subscriptions[p2p_topic] = (task.topic, p2p_q)
+                subscriptions_lock.release()
+                snapshot_id = subscribe_callback(task.topic, p2p_q, task.snapshot)
+                if snapshot_id:
+                    # remember that this snapshot was requested by this particular
+                    # subscriber (identified by unique topic), so it is not asked to
+                    # execute it's own request
+                    snapshots_lock.acquire()
+                    snapshots[snapshot_id] = p2p_topic
+                    snapshots_lock.release()
+                # send success message for reconnecting
+                socket.send_json(
+                    {
+                        "topic": p2p_topic,
+                        "pub_endpoint": pub_endpoint,
+                        "sub_endpoint": sub_endpoint,
+                        "status": "success",
+                    }
+                )
+            except Exception as e:
+                logger.error(f"Error handling subscription request {task}: {e}")
+                socket.send_json({"status": "unsuccess"})
         elif type(task) is Unsubscription:
             logger.info(f"Received unsubscription from topic {task.topic}")
             threatbus_topic, p2p_q = subscriptions.get(task.topic, (None, None))
