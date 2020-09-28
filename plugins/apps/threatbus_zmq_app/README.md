@@ -13,10 +13,6 @@ A Threat Bus plugin that enables communication with any application that can
 communicate via [ZeroMQ].
 
 
-TODO:
-describe ports /sockets and features
-
-
 ## Installation
 
 ```sh
@@ -25,11 +21,11 @@ pip install threatbus-vast
 
 ## Configuration
 
-The plugin uses ZeroMQ to communicate with the
+The plugin uses ZeroMQ to communicate with applications, like the
 [VAST bridge](https://github.com/tenzir/threatbus/tree/master/apps/vast). The
-plugin serves as a ZeroMQ endpoint for the bridge to connect with. It uses three
-endpoints. One for managing subscriptions (and thus snapshot requests). The
-other two endpoints are for plain pub-sub operations.
+plugin serves three ZeroMQ endpoints to connect with. One endpoint for managing
+subscriptions (and thus snapshot requests). The other two endpoints are plainly
+for pub-sub operations.
 
 ```yaml
 ...
@@ -42,9 +38,122 @@ plugins:
 ...
 ```
 
-Initially, the bridge only needs to know the `manage` endpoint. The plugin and
-the vast-bridge negotiate all other internals for pub-sub message exchange at
-runtime.
+Initially, apps that want to connect with this plugin only need to know the
+`manage` endpoint. The plugin and the app negotiate all other internals for
+pub-sub message exchange at runtime. See the protocol definition below for
+details.
+
+## Management Protocol
+
+Subscriptions and unsubscriptions are referred to as `management`. All
+management messages are JSON formatted and exchanged via the `manage` ZMQ
+endpoint, that the plugin exposes.
+
+The manage endpoint uses the
+[ZeroMQ Request/Reply](https://learning-0mq-with-pyzmq.readthedocs.io/en/latest/pyzmq/patterns/client_server.html)
+pattern for message exchange. That means, all messages get an immediate response
+from the server. With each JSON reply, the zmq-app Threat Bus plugin sends a
+`status` field that indicates the success of the requested operation.
+
+### Subscribe at the Plugin
+
+To subscribe to Threat Bus via the zmq-app plugin, an app needs to send a JSON
+struct as follows to the `manage` endpoint of the plugin:
+
+```
+{
+  "action": "subscribe",
+  "topic": <TOPIC>,       # either 'threatbus/sighting' or 'threatbus/intel'
+  "snapshot": <SNAPSHOT>  # number of days for a snapshot, 0 for no snapshot
+}
+```
+In response, the app will either receive a `success` or `unsuccess` response.
+
+- Unsuccess response:
+  ```
+  {
+    "status": "unsuccess"
+  }
+  ```
+- Success response:
+  ```
+  {
+    "topic": <P2P_TOPIC>,
+    "pub_endpoint": 13371,
+    "sub_endpoint": 13372,
+    "status": "success",
+  }
+  ```
+
+  The `pub_endpoint` and `sub_endpoint` are the port numbers that are configured
+  in the Threat Bus plugin config. The app can access these endpoints following
+  the [ZeroMQ Pub/Sub](https://learning-0mq-with-pyzmq.readthedocs.io/en/latest/pyzmq/patterns/pubsub.html)
+  pattern. The plugin will publish messages on the `pub_endpoint` and accept
+  messages on the `sub_endpoint`.
+
+  The `topic` field of the response contains a unique topic for the client. That
+  topic _must_ be used to receive messages. The unique topic is a 32 characters
+  wide random string and guarantees that other subscribers won't accidentally
+  see traffic that should only be visible to the new client.
+  
+  For more details see below at `Pub/Sub via ZeroMQ`.
+
+### Unsubscribe from the Plugin
+
+To unsubscribe a connected app, it has to send a JSON struct to the `manage`
+endpoint of the plugin, as follows:
+
+```
+{
+  "action": "unsubscribe",
+  "topic": <P2P_TOPIC>       # the 32-characters random topic that the got during subscription handshake
+}
+```
+
+In response, the app will either receive a `success` or `unsuccess` response.
+
+- Unsuccess response:
+  ```
+  {
+    "status": "unsuccess"
+  }
+  ```
+- Success response:
+  ```
+  {
+    "status": "success"
+  }
+  ```
+
+### Pub/Sub via ZeroMQ
+
+Once an app has subscribed to Threat Bus via using the `manage` endpoint of the
+zmq-app plugin, it got a unique, random `p2p_topic` (see above). Threat Bus
+(the zmq-app) uses this topic to publish all kinds of messages to the plugin, be
+it `Intel`, `Sightings` or `SnapshotRequests`.
+
+ZeroMQ uses [prefix matching](https://zeromq.org/socket-api/#topics) for pub/sub
+connections. The zmq-app plugin leverages this feature to indicate the type of
+each sent message to the subscriber. Hence, app can simply match the topic
+suffix to determine the message type.
+
+For example, all `Intel` items will always be sent on the topic
+`p2p_topic + "intel"`, all `SnapshotRequest` items on the topic
+`p2p_topic + "snapshotrequest"` and so forth.
+
+### Snapshots
+
+Threat Bus' [snapshot](https://docs.tenzir.com/threatbus/features/snapshotting)
+feature allows apps to request a snapshot during subscription. But snapshots
+also should be provided by apps when Threat Bus requests it. This is done via
+messages of the type `SnapshotRequest`.
+
+`SnapshotRequests` are received like any other messages, via the `p2p_topic`. In
+case the app wants to provide this feature, it must handle message of this type
+(see above for an explanation of topic suffix matching).
+
+Once the snapshot is handled, the app should use the `SnapshotEnvelope` message
+type to send back messages to the plugin.
 
 ## License
 
