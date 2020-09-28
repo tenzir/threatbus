@@ -50,7 +50,7 @@ def receive(n: int, topics: list):
             topic, message = raw.decode("utf-8").split(" ", 1)
             yield (topic, message)
     for topic in p2p_topics:
-        res = send_manage_message("unsubscribe", topic)
+        send_manage_message("unsubscribe", topic)
 
 
 def forward(n: int, topics: list, q: Queue):

@@ -10,7 +10,6 @@ from threatbus.data import (
     Intel,
     IntelDecoder,
     IntelEncoder,
-    MessageType,
     Sighting,
     SightingDecoder,
     SightingEncoder,
