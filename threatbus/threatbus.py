@@ -110,6 +110,11 @@ class ThreatBus:
     def run(self):
         self.logger.info("Starting plugins...")
         logging = self.config["logging"]
+        self.backbones.run(
+            config=self.config["plugins"]["backbones"], logging=logging, inq=self.inq
+        )
+        self.subscribe("threatbus/snapshotrequest", self.snapshot_q)
+        self.subscribe("threatbus/snapshotenvelope", self.snapshot_q)
         self.apps.run(
             config=self.config["plugins"]["apps"],
             logging=logging,
@@ -117,11 +122,6 @@ class ThreatBus:
             subscribe_callback=self.subscribe,
             unsubscribe_callback=self.unsubscribe,
         )
-        self.backbones.run(
-            config=self.config["plugins"]["backbones"], logging=logging, inq=self.inq
-        )
-        self.subscribe("threatbus/snapshotrequest", self.snapshot_q)
-        self.subscribe("threatbus/snapshotenvelope", self.snapshot_q)
         self.handle_snapshots()
 
 
