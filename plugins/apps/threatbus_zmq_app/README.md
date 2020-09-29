@@ -67,12 +67,12 @@ struct as follows to the `manage` endpoint of the plugin:
   "snapshot": <SNAPSHOT>  # number of days for a snapshot, 0 for no snapshot
 }
 ```
-In response, the app will either receive a `success` or `unsuccess` response.
+In response, the app will either receive a `success` or `error` response.
 
-- Unsuccess response:
+- Error response:
   ```
   {
-    "status": "unsuccess"
+    "status": "error"
   }
   ```
 - Success response:
@@ -111,12 +111,12 @@ endpoint of the plugin, as follows:
 }
 ```
 
-In response, the app will either receive a `success` or `unsuccess` response.
+In response, the app will either receive a `success` or `error` response.
 
-- Unsuccess response:
+- Error response:
   ```
   {
-    "status": "unsuccess"
+    "status": "error"
   }
   ```
 - Success response:

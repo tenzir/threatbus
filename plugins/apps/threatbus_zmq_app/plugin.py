@@ -108,13 +108,13 @@ def receive_management(
                 )
             except Exception as e:
                 logger.error(f"Error handling subscription request {task}: {e}")
-                socket.send_json({"status": "unsuccess"})
+                socket.send_json({"status": "error"})
         elif type(task) is Unsubscription:
             logger.info(f"Received unsubscription from topic {task.topic}")
             threatbus_topic, p2p_q = subscriptions.get(task.topic, (None, None))
             if not p2p_q:
                 logger.warn("No one was subscribed for that topic. Skipping.")
-                socket.send_json({"status": "unsuccess"})
+                socket.send_json({"status": "error"})
                 continue
             unsubscribe_callback(threatbus_topic, p2p_q)
             subscriptions_lock.acquire()
