@@ -126,7 +126,9 @@ async def receive(pub_endpoint: str, topic: str, intel_queue: asyncio.Queue):
     poller.register(socket, zmq.POLLIN)
     logger.info(f"Receiving via ZMQ on topic {pub_endpoint}/{topic}")
     while True:
-        socks = dict(poller.poll(timeout=100))
+        socks = dict(
+            poller.poll(timeout=100)
+        )  # note that smaller timeouts may increase CPU load
         if socket in socks and socks[socket] == zmq.POLLIN:
             try:
                 topic, msg = socket.recv().decode().split(" ", 1)
