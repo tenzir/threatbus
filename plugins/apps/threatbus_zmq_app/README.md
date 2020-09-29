@@ -24,7 +24,7 @@ pip install threatbus-vast
 The plugin uses ZeroMQ to communicate with applications, like the
 [VAST bridge](https://github.com/tenzir/threatbus/tree/master/apps/vast). The
 plugin serves three ZeroMQ endpoints to connect with. One endpoint for managing
-subscriptions (and thus snapshot requests). The other two endpoints are plainly
+subscriptions (and thus snapshot requests). The other two endpoints exist
 for pub-sub operations.
 
 ```yaml
@@ -47,7 +47,7 @@ details.
 
 Subscriptions and unsubscriptions are referred to as `management`. All
 management messages are JSON formatted and exchanged via the `manage` ZMQ
-endpoint, that the plugin exposes.
+endpoint that the plugin exposes.
 
 The manage endpoint uses the
 [ZeroMQ Request/Reply](https://learning-0mq-with-pyzmq.readthedocs.io/en/latest/pyzmq/patterns/client_server.html)
@@ -128,7 +128,7 @@ In response, the app will either receive a `success` or `unsuccess` response.
 ### Pub/Sub via ZeroMQ
 
 Once an app has subscribed to Threat Bus via using the `manage` endpoint of the
-zmq-app plugin, it got a unique, random `p2p_topic` (see above). Threat Bus
+zmq-app plugin, it has a unique, random `p2p_topic` (see above). Threat Bus
 (the zmq-app) uses this topic to publish all kinds of messages to the plugin, be
 it `Intel`, `Sightings` or `SnapshotRequests`.
 

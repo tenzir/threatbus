@@ -169,7 +169,7 @@ def pub_zmq(zmq_config: Subview):
 
 def sub_zmq(zmq_config: Subview, inq: Queue):
     """
-    Forwards messages, that are received via ZeroMQ from connected applications,
+    Forwards messages that are received via ZeroMQ from connected applications
     to the plugin's in-queue.
     @param zmq_config ZeroMQ configuration properties
     """

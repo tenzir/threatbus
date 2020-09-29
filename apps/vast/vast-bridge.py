@@ -54,7 +54,7 @@ async def start(
     configured VAST instance for threat intelligence (IoCs) and reports new
     intelligence to Threat Bus.
     @param cmd The vast binary command to use with PyVAST
-    @param vast_endpoint The endpoint of a running vast node ('host:port')
+    @param vast_endpoint The endpoint of a running VAST node ('host:port')
     @param zmq_endpoint The ZMQ management endpoint of Threat Bus ('host:port')
     @param snapshot An integer value to request n days of past intel items
     @param transform_cmd The command to use to transform Sighting context with
@@ -115,7 +115,7 @@ async def receive(pub_endpoint: str, topic: str, intel_queue: asyncio.Queue):
     that are published on the given topic (zmq prefix matching). Depending on
     the topic suffix, Intel items (IoCs) are enqueued to the intel_queue.
     @param pub_endpoint A host:port string to connect to via zmq
-    @param topic The topic-prefix to subscribe to get intelligence items
+    @param topic The topic prefix to subscribe to intelligence items
     @param intel_queue The queue to put arriving IoCs into
     """
     global logger
@@ -166,7 +166,7 @@ async def match_intel(
         try:
             intel = json.loads(msg, cls=IntelDecoder)
         except Exception as e:
-            logger.warn(f"Error decoding intel item {msg}: {e}")
+            logger.warn(f"Failed to decode intel item {msg}: {e}")
             continue
         if type(intel) is not Intel:
             logger.warn(f"Ignoring unknown message type, expected Intel: {type(intel)}")
