@@ -47,9 +47,9 @@ plugins:
       #    auto.offset.reset: "earliest"
     zmq-app:
       host: "127.0.0.1"
-      manage: 13370
-      pub: 13371
-      sub: 13372
+      manage: 13370 # the port used for management messages
+      pub: 13371 # the port used to publish messages to connected apps
+      sub: 13372 # the port used to receive messages from connected apps
     cif3:
       api:
         host: http://localhost:5000
