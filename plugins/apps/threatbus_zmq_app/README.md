@@ -32,9 +32,9 @@ for pub-sub operations.
 plugins:
   zmq-app:
     host: "127.0.0.1"
-        manage: 13370
-        pub: 13371
-        sub: 13372
+    manage: 13370
+    pub: 13371
+    sub: 13372
 ...
 ```
 
