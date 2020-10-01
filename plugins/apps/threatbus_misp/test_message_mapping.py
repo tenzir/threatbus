@@ -54,5 +54,5 @@ class TestMessageMapping(unittest.TestCase):
         )
 
     def test_valid_inputs(self):
-        sighting = Sighting(self.ts, self.id, {})
+        sighting = Sighting(self.ts, self.id, {}, (self.indicator,))
         self.assertIsNotNone(map_to_misp(sighting))

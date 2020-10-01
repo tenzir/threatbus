@@ -34,7 +34,8 @@ def provision(inq):
 
 @threatbus.backbone
 def subscribe(topic, q):
-    global subscriptions, lock
+    global logger, subscriptions, lock
+    logger.info(f"Adding subscription to: {topic}")
     lock.acquire()
     subscriptions[topic].add(q)
     lock.release()
@@ -42,7 +43,8 @@ def subscribe(topic, q):
 
 @threatbus.backbone
 def unsubscribe(topic, q):
-    global subscriptions, lock
+    global logger, subscriptions, lock
+    logger.info(f"Removing subscription from: {topic}")
     lock.acquire()
     if q in subscriptions[topic]:
         subscriptions[topic].remove(q)

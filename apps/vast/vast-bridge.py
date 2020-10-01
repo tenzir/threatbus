@@ -7,9 +7,18 @@ import coloredlogs
 from datetime import datetime
 import json
 import logging
+from message_mapping import (
+    get_vast_intel_type,
+    get_ioc,
+    matcher_result_to_threatbus_sighting,
+    query_result_to_threatbus_sighting,
+    to_vast_ioc,
+    to_vast_query,
+)
 from pyvast import VAST
 import random
 from string import ascii_lowercase as letters
+from threatbus.data import Intel, IntelDecoder, Sighting, SightingEncoder, Operation
 import zmq
 
 logger = logging.getLogger(__name__)
@@ -32,21 +41,21 @@ def setup_logging(level):
 
 
 async def start(
-    cmd,
-    vast_endpoint,
-    zmq_endpoint,
-    snapshot,
-    retro_match,
-    transform_cmd=None,
-    sink=None,
+    cmd: str,
+    vast_endpoint: str,
+    zmq_endpoint: str,
+    snapshot: int,
+    retro_match: bool,
+    transform_cmd: str = None,
+    sink: str = None,
 ):
     """
     Starts the bridge between the two given endpoints. Subscribes the
     configured VAST instance for threat intelligence (IoCs) and reports new
     intelligence to Threat Bus.
     @param cmd The vast binary command to use with PyVAST
-    @param vast_endpoint The endpoint of a running vast node
-    @param zmq_endpoint The ZMQ management endpoint of Threat Bus
+    @param vast_endpoint The endpoint of a running VAST node ('host:port')
+    @param zmq_endpoint The ZMQ management endpoint of Threat Bus ('host:port')
     @param snapshot An integer value to request n days of past intel items
     @param transform_cmd The command to use to transform Sighting context with
     @param sink Forward sighting context to this sink (subprocess) instead of
@@ -58,16 +67,22 @@ async def start(
 
     logger.debug(f"Calling Threat Bus management endpoint {zmq_endpoint}")
     reply = subscribe(zmq_endpoint, "threatbus/intel", snapshot)
-    if not reply or not isinstance(reply, dict):
-        logger.error("Subsription unsuccessful")
+    if not reply or type(reply) is not dict:
+        logger.error("Subscription failed")
         exit(1)
     pub_endpoint = reply.get("pub_endpoint", None)
     sub_endpoint = reply.get("sub_endpoint", None)
     topic = reply.get("topic", None)
-    if not pub_endpoint or not sub_endpoint or not topic:
-        logger.error("Unparsable subscription reply")
+    status = reply.get("status", None)
+    if (
+        not status
+        or status != "success"
+        or not pub_endpoint
+        or not sub_endpoint
+        or not topic
+    ):
+        logger.error("Subscription failed")
         exit(1)
-    logger.debug("Subscription successfull")
     atexit.register(unsubscribe, zmq_endpoint, topic)
 
     intel_queue = asyncio.Queue()
@@ -76,10 +91,8 @@ async def start(
         report_sightings(sub_endpoint, sightings_queue, transform_cmd, sink)
     )
     atexit.register(report_sightings_task.cancel)
-    receive_intel_task = asyncio.create_task(
-        receive_intel(pub_endpoint, topic, intel_queue)
-    )
-    atexit.register(receive_intel_task.cancel)
+    receive_task = asyncio.create_task(receive(pub_endpoint, topic, intel_queue))
+    atexit.register(receive_task.cancel)
     match_task = asyncio.create_task(
         match_intel(cmd, vast_endpoint, intel_queue, sightings_queue, retro_match)
     )
@@ -90,54 +103,19 @@ async def start(
         )
         atexit.register(live_match_vast_task.cancel)
         await asyncio.gather(
-            receive_intel_task, report_sightings_task, match_task, live_match_vast_task
+            receive_task, report_sightings_task, match_task, live_match_vast_task
         )
     else:
-        await asyncio.gather(receive_intel_task, report_sightings_task, match_task)
+        await asyncio.gather(receive_task, report_sightings_task, match_task)
 
 
-def ioc_to_query(intel):
+async def receive(pub_endpoint: str, topic: str, intel_queue: asyncio.Queue):
     """
-    Creates a VAST query from an intel IoC item. See the Threat Bus VAST plugin,
-    `message_mapping.py`, for details of possible IoC `type`s.
-    """
-    ioc = intel.get("ioc", None)
-    type_ = intel.get("type", None)
-    if type_ == "ip" or type_ == "ipv6":
-        return str(ioc)
-    if type_ == "url":
-        # TODO: use field annotations, once implemented (ch17531)
-        return f'"{ioc}" in url'
-    if type_ == "domain":
-        # Currently, uses VAST's suffix-based field matching. Targets every
-        # schema with fieldnames that end in `domain`, `host`, or `hostname`
-        # (Zeek and Suricata)
-        # TODO: use field annotations, once implemented (ch17531)
-        return f'"{ioc}" in domain || "{ioc}" in host || "{ioc}" in hostname'
-    return None
-
-
-def query_result_to_sighting(query_result, intel):
-    """
-    Creates a VAST sighting (json string) in the format of the live-matcher from
-    a VAST query result.
-    @param query_result The query result to convert
-    @param intel The intel item that the sighting refers to
-    """
-    return {
-        "ts": str(datetime.now()),
-        "reference": intel.get("reference", ""),
-        "ioc": intel.get("ioc", ""),
-        "context": json.loads(query_result),
-    }
-
-
-async def receive_intel(pub_endpoint, topic, intel_queue):
-    """
-    Starts a zmq subscriber on the given endpoint and listens for new intel
-    items on the given topic. Enqueues all received IoCs on the intel_queue.
+    Starts a zmq subscriber on the given endpoint and listens for new messages
+    that are published on the given topic (zmq prefix matching). Depending on
+    the topic suffix, Intel items (IoCs) are enqueued to the intel_queue.
     @param pub_endpoint A host:port string to connect to via zmq
-    @param topic The topic to subscribe to get intelligence items
+    @param topic The topic prefix to subscribe to intelligence items
     @param intel_queue The queue to put arriving IoCs into
     """
     global logger
@@ -146,27 +124,39 @@ async def receive_intel(pub_endpoint, topic, intel_queue):
     socket.setsockopt(zmq.SUBSCRIBE, topic.encode())
     poller = zmq.Poller()
     poller.register(socket, zmq.POLLIN)
-    logger.info(f"Receiving intelligence items on {pub_endpoint}/{topic}")
+    logger.info(f"Receiving via ZMQ on topic {pub_endpoint}/{topic}")
     while True:
-        socks = dict(poller.poll(timeout=10))
+        socks = dict(
+            poller.poll(timeout=100)
+        )  # note that smaller timeouts may increase CPU load
         if socket in socks and socks[socket] == zmq.POLLIN:
             try:
-                _, msg = socket.recv().decode().split(" ", 1)
-                intel = json.loads(msg)
+                topic, msg = socket.recv().decode().split(" ", 1)
             except Exception as e:
                 logger.error(f"Error decoding message: {e}")
                 continue
-            await intel_queue.put(intel)
+            # the topic is suffixed with the message type
+            if not topic.endswith("intel"):
+                # vast bridge is not (yet) interested in Sightings or SnapshotRequests
+                logger.debug(f"Skipping unsupported message: {msg}")
+                continue
+            await intel_queue.put(msg)
         else:
             await asyncio.sleep(0.05)  # free event loop for other tasks
 
 
-async def match_intel(cmd, vast_endpoint, intel_queue, sightings_queue, retro_match):
+async def match_intel(
+    cmd: str,
+    vast_endpoint: str,
+    intel_queue: asyncio.Queue,
+    sightings_queue: asyncio.Queue,
+    retro_match: bool,
+):
     """
     Reads from the intel_queue and matches all IoCs, either via VAST's
     live-matching or retro-matching.
     @param cmd The vast binary command to use with PyVAST
-    @param vast_endpoint The endpoint of a running vast node
+    @param vast_endpoint The endpoint of a running vast node ('host:port')
     @param intel_queue The queue to read new IoCs from
     @param sightings_queue The queue to put new sightings into
     @param retro_match Boolean flag to use retro-matching over live-matching
@@ -174,46 +164,59 @@ async def match_intel(cmd, vast_endpoint, intel_queue, sightings_queue, retro_ma
     global logger
     vast = VAST(binary=cmd, endpoint=vast_endpoint)
     while True:
-        intel = await intel_queue.get()
-        operation = intel.pop("operation", None)
-        if operation == "ADD":
+        msg = await intel_queue.get()
+        try:
+            intel = json.loads(msg, cls=IntelDecoder)
+        except Exception as e:
+            logger.warn(f"Failed to decode intel item {msg}: {e}")
+            continue
+        if type(intel) is not Intel:
+            logger.warn(f"Ignoring unknown message type, expected Intel: {type(intel)}")
+            continue
+        if intel.operation == Operation.ADD:
             if retro_match:
-                query = ioc_to_query(intel)
+                query = to_vast_query(intel)
                 if not query:
                     continue
                 proc = await vast.export().json(query).exec()
                 while not proc.stdout.at_eof():
                     line = (await proc.stdout.readline()).decode().rstrip()
                     if line:
-                        sighting = query_result_to_sighting(line, intel)
+                        sighting = query_result_to_threatbus_sighting(line, intel)
+                        if not sighting:
+                            logger.warn(f"Could not parse VAST query result: {line}")
+                            continue
                         await sightings_queue.put(sighting)
                 logger.debug(f"Finished retro-matching for intel: {intel}")
             else:
-                proc = (
-                    await vast.import_()
-                    .json(type="intel.indicator")
-                    .exec(stdin=json.dumps(intel))
-                )
-                await proc.wait()
-                logger.debug(f"Ingested intel for live matching: {intel}")
-        elif operation == "REMOVE":
-            if not retro_match:
-                global matcher_name
-                ioc = intel.get("ioc", None)
-                type_ = intel.get("type", None)
-                if not ioc or not type_:
-                    logger.error(
-                        f"Cannot remove intel with missing required fields 'ioc' or 'type': {intel}"
+                ioc = to_vast_ioc(intel)
+                if not ioc:
+                    logger.warn(
+                        f"Unable to convert Intel to VAST compatible IoC: {intel}"
                     )
                     continue
-                await vast.matcher().ioc_remove(matcher_name, ioc, type_).exec()
-                logger.debug(f"Removed indicator {intel}")
+                proc = await vast.import_().json(type="intel.indicator").exec(stdin=ioc)
+                await proc.wait()
+                logger.debug(f"Ingested intel for live matching: {intel}")
+        elif intel.operation == Operation.REMOVE:
+            if retro_match:
+                continue
+            intel_type = get_vast_intel_type(intel)
+            ioc = get_ioc(intel)
+            if not ioc or not intel_type:
+                logger.error(
+                    f"Cannot remove intel with missing intel_type or indicator: {intel}"
+                )
+                continue
+            global matcher_name
+            await vast.matcher().ioc_remove(matcher_name, ioc, intel_type).exec()
+            logger.debug(f"Removed indicator {intel}")
         else:
             logger.warning(f"Unsupported operation for indicator: {intel}")
         intel_queue.task_done()
 
 
-async def live_match_vast(cmd, vast_endpoint, sightings_queue):
+async def live_match_vast(cmd: str, vast_endpoint: str, sightings_queue: asyncio.Queue):
     """
     Starts a VAST matcher. Enqueues all matches from VAST to the
     sightings_queue.
@@ -232,15 +235,15 @@ async def live_match_vast(cmd, vast_endpoint, sightings_queue):
                 logger.error("Lost connection to VAST, cannot live-match.")
                 # TODO reconnect
             continue
-        try:
-            sighting = data.decode("utf-8").rstrip()
-            sighting = json.loads(sighting)
-            await sightings_queue.put(sighting)
-        except Exception as e:
-            logger.error(f"Cannot parse sighting-output from VAST: {data}", e)
+        vast_sighting = data.decode("utf-8").rstrip()
+        sighting = matcher_result_to_threatbus_sighting(vast_sighting)
+        if not sighting:
+            logger.warn(f"Cannot parse sighting-output from VAST: {data}", e)
+            continue
+        await sightings_queue.put(sighting)
 
 
-async def invoke_cmd_for_context(cmd, context, ioc="%ioc"):
+async def invoke_cmd_for_context(cmd: str, context: dict, ioc: str = "%ioc"):
     """
     Invoke a command as subprocess for the given context. The command string is
     treated as template string and occurences of "%ioc" are replaced with the
@@ -249,9 +252,11 @@ async def invoke_cmd_for_context(cmd, context, ioc="%ioc"):
     @param cmd The command, including flags, to invoke as subprocess. cmd is
         treated as template string and occurrences of '%ioc' are replaced with
         the actually matched IoC.
-    @param context The context (python dict) to forward as JSON
+    @param context The context to forward as JSON
     @param ioc The value to replace '%ioc' with in the `cmd` string
     """
+    if not ioc:
+        ioc = "%ioc"
     cmd = cmd.replace("%ioc", ioc)
     proc = await asyncio.create_subprocess_exec(
         *cmd.split(" "),
@@ -269,7 +274,10 @@ async def invoke_cmd_for_context(cmd, context, ioc="%ioc"):
 
 
 async def report_sightings(
-    sub_endpoint, sightings_queue, transform_cmd=None, sink=None
+    sub_endpoint: str,
+    sightings_queue: asyncio.Queue,
+    transform_cmd: str = None,
+    sink: str = None,
 ):
     """
     Starts a ZeroMQ publisher on the given endpoint and publishes sightings from
@@ -292,49 +300,54 @@ async def report_sightings(
     else:
         socket = zmq.Context().socket(zmq.PUB)
         socket.connect(f"tcp://{sub_endpoint}")
-        topic = "vast/sightings"
+        topic = "threatbus/sighting"
         logger.info(f"Forwarding sightings to Threat Bus at {sub_endpoint}/{topic}")
     while True:
         sighting = await sightings_queue.get()
-        if transform_cmd and sighting.get("context", None):
+        if type(sighting) is not Sighting:
+            logger.warn(
+                f"Ignoring unknown message type, expected Sighting: {type(sighting)}"
+            )
+            continue
+        if transform_cmd and sighting.context:
+            ioc = sighting.ioc[0] if sighting.ioc else None
             context_str = await invoke_cmd_for_context(
-                transform_cmd, sighting.get("context"), sighting.get("ioc", None)
+                transform_cmd, sighting.context, ioc
             )
             try:
                 context = json.loads(context_str)
-                sighting["context"] = context
+                sighting.context = context
             except Exception as e:
                 logger.error(
                     f"Cannot parse transformed sighting context (expecting JSON): {context_str}",
                     e,
                 )
+                continue
         if sink:
-            context = sighting.get("context", {})
             if sink.lower() == "stdout":
-                print(json.dumps(context))
+                print(json.dumps(sighting.context))
             else:
-                await invoke_cmd_for_context(sink, context)
+                await invoke_cmd_for_context(sink, sighting.context)
         else:
-            socket.send_string(f"{topic} {json.dumps(sighting)}")
+            socket.send_string(f"{topic} {json.dumps(sighting, cls=SightingEncoder)}")
         sightings_queue.task_done()
         logger.debug(f"Reported sighting: {sighting}")
 
 
-def subscribe(endpoint, topic, snapshot, timeout=5):
+def send_manage_message(endpoint: str, action: dict, timeout: int = 5):
     """
-    Subscribes the vast-bridge to the Threat Bus for the given topic.
-    Requests an optional snapshot of past intelligence data.
-    @param endpoint The ZMQ management endpoint of Threat Bus
-    @param topic The topic to subscribe to
-    @param snapshot An integer value to request n days of past intel items
+    Sends a 'management' message, following the threatbus-zmq-app protocol to
+    either subscribe or unsubscribe this instance of the VAST bridge to/from
+    Threat Bus.
+    @param endpoint A host:port string to connect to via ZeroMQ
+    @param action The message to send as JSON
     @param timeout The period after which the connection attempt is aborted
     """
-    subscription = {"action": "subscribe", "topic": topic, "snapshot": snapshot}
     context = zmq.Context()
     socket = context.socket(zmq.REQ)
     socket.setsockopt(zmq.LINGER, 0)
     socket.connect(f"tcp://{endpoint}")
-    socket.send_json(subscription)
+    socket.send_json(action)
     poller = zmq.Poller()
     poller.register(socket, zmq.POLLIN)
 
@@ -346,7 +359,22 @@ def subscribe(endpoint, topic, snapshot, timeout=5):
     return reply
 
 
-def unsubscribe(endpoint, topic, timeout=5):
+def subscribe(endpoint: str, topic: str, snapshot: int, timeout: int = 5):
+    """
+    Subscribes the vast-bridge to the Threat Bus for the given topic.
+    Requests an optional snapshot of past intelligence data.
+    @param endpoint The ZMQ management endpoint of Threat Bus ('host:port')
+    @param topic The topic to subscribe to
+    @param snapshot An integer value to request n days of past intel items
+    @param timeout The period after which the connection attempt is aborted
+    """
+    global logger
+    logger.info(f"Subscribing to topic '{topic}'...")
+    action = {"action": "subscribe", "topic": topic, "snapshot": snapshot}
+    return send_manage_message(endpoint, action, timeout)
+
+
+def unsubscribe(endpoint: str, topic: str, timeout: int = 5):
     """
     Unsubscribes the vast-bridge from Threat Bus for the given topic.
     @param endpoint The ZMQ management endpoint of Threat Bus
@@ -354,22 +382,11 @@ def unsubscribe(endpoint, topic, timeout=5):
     @param timeout The period after which the connection attempt is aborted
     """
     global logger
-    logger.info("Unsubscribing...")
-    unsub = {"action": "unsubscribe", "topic": topic}
-    context = zmq.Context()
-    socket = context.socket(zmq.REQ)
-    socket.setsockopt(zmq.LINGER, 0)
-    socket.connect(f"tcp://{endpoint}")
-    socket.send_json(unsub)
-    poller = zmq.Poller()
-    poller.register(socket, zmq.POLLIN)
-
-    reply = "Unsuccessful"
-    if poller.poll(timeout * 1000):
-        reply = socket.recv_string()
-    socket.close()
-    context.term()
+    logger.info(f"Unsubscribing from topic '{topic}' ...")
+    action = {"action": "unsubscribe", "topic": topic}
+    reply = send_manage_message(endpoint, action, timeout)
     logger.info(f"Unsubscription: {reply}")
+    return reply
 
 
 def main():

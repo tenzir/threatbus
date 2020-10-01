@@ -11,6 +11,6 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
-- 🎁 Threat Bus now ships with a `CHANGELOG.md` that documents all notable
-  user-facing changes of the project.
-  [#48](https://github.com/tenzir/threatbus/pull/48)
+- 🎁 The generic Threat Bus ZeroMQ application plugin has replaced the former
+  VAST plugin. Any app that communicates via ZeroMQ can implement this plugin's
+  protocol to connect with Threat Bus effortlessly.

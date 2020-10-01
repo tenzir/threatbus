@@ -299,7 +299,8 @@ def subscribe(topic, q):
     Threat Bus' subscribe hook. Used to register new app-queues for certain
     topics.
     """
-    global subscriptions, lock
+    global logger, subscriptions, lock
+    logger.info(f"Adding subscription to: {topic}")
     lock.acquire()
     subscriptions[topic].add(q)
     lock.release()
@@ -311,7 +312,8 @@ def unsubscribe(topic, q):
     Threat Bus' unsubscribe hook. Used to deregister app-queues from certain
     topics.
     """
-    global subscriptions, lock
+    global logger, subscriptions, lock
+    logger.info(f"Removing subscription from: {topic}")
     lock.acquire()
     if q in subscriptions[topic]:
         subscriptions[topic].remove(q)

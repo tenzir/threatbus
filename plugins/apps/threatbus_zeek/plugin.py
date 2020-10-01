@@ -38,8 +38,9 @@ def manage_subscription(
 ):
     global lock, subscriptions
     rand_suffix_length = 10
-    if isinstance(task, Subscription):
+    if type(task) is Subscription:
         # point-to-point topic and queue for that particular subscription
+        logger.info(f"Received subscription for topic: {task.topic}")
         p2p_topic = task.topic + rand_string(rand_suffix_length)
         p2p_q = Queue()
         ack = broker.zeek.Event(
@@ -50,7 +51,8 @@ def manage_subscription(
         lock.acquire()
         subscriptions[p2p_topic] = p2p_q
         lock.release()
-    elif isinstance(task, Unsubscription):
+    elif type(task) is Unsubscription:
+        logger.info(f"Received unsubscription from topic: {task.topic}")
         threatbus_topic = task.topic[: len(task.topic) - rand_suffix_length]
         p2p_q = subscriptions.get(task.topic, None)
         if p2p_q:
@@ -58,6 +60,8 @@ def manage_subscription(
             lock.acquire()
             del subscriptions[task.topic]
             lock.release()
+    else:
+        logger.debug(f"Skipping unknown management message of type: {type(task)}")
 
 
 def publish(module_namespace, ep):
@@ -102,9 +106,6 @@ def manage(module_namespace, ep, subscribe_callback, unsubscribe_callback):
         (topic, broker_data) = sub.get()
         msg = map_management_message(broker_data, module_namespace)
         if msg:
-            logger.debug(
-                f"Received management request: {type(msg).__name__} -- {msg.topic}"
-            )
             manage_subscription(
                 ep, module_namespace, msg, subscribe_callback, unsubscribe_callback
             )

@@ -18,7 +18,7 @@ COPY plugins plugins
 RUN python3 setup.py install && \
   python3 plugins/apps/threatbus_misp/setup.py install && \
   python3 plugins/apps/threatbus_zeek/setup.py install && \
-  python3 plugins/apps/threatbus_vast/setup.py install && \
+  python3 plugins/apps/threatbus_zmq_app/setup.py install && \
   python3 plugins/apps/threatbus_cif3/setup.py install && \
   python3 plugins/backbones/threatbus_inmem/setup.py install
 COPY config* ./

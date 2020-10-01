@@ -86,7 +86,7 @@ class IntelData(dict):
     The 'intel_type' is a threatbus.data.IntelType
     """
 
-    def __init__(self, indicator, intel_type: IntelType, *args, **kw):
+    def __init__(self, indicator: str or tuple, intel_type: IntelType, *args, **kw):
         super(IntelData, self).__init__(*args, **kw)
         assert indicator, "Intel indicator must be set"
         assert (
@@ -115,6 +115,7 @@ class Sighting:
     ts: datetime
     intel: str
     context: dict
+    ioc: tuple or None
 
 
 @dataclass()
@@ -202,6 +203,7 @@ class SightingEncoder(json.JSONEncoder):
             "ts": str(sighting.ts),
             "intel": sighting.intel,
             "context": sighting.context,
+            "ioc": list(sighting.ioc) if sighting.ioc else None,
         }
 
 
@@ -215,7 +217,10 @@ class SightingDecoder(json.JSONDecoder):
 
     def decode_hook(self, dct: dict):
         if "ts" in dct and "intel" in dct and "context" in dct:
-            return Sighting(parser.parse(dct["ts"]), dct["intel"], dct["context"])
+            ioc = dct.get("ioc", None)
+            if ioc:
+                ioc = tuple(ioc)
+            return Sighting(parser.parse(dct["ts"]), dct["intel"], dct["context"], ioc)
         return dct
 
 

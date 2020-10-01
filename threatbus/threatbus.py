@@ -1,5 +1,7 @@
 import argparse
 import confuse
+from datetime import timedelta
+from logging import Logger
 import pluggy
 from queue import Queue
 from threatbus import appspecs, backbonespecs, logger
@@ -9,7 +11,13 @@ from uuid import uuid4
 
 
 class ThreatBus:
-    def __init__(self, backbones, apps, logger, config):
+    def __init__(
+        self,
+        backbones: pluggy.hooks._HookRelay,
+        apps: pluggy.hooks._HookRelay,
+        logger: Logger,
+        config: confuse.Subview,
+    ):
         self.backbones = backbones
         self.apps = apps
         self.config = config
@@ -41,13 +49,16 @@ class ThreatBus:
                 )
             self.snapshot_q.task_done()
 
-    def request_snapshot(self, topic, dst_q, time_delta):
+    def request_snapshot(
+        self, topic: str, dst_q: Queue, snapshot_id: str, time_delta: timedelta
+    ):
         """
         Create a new SnapshotRequest and push it to the inq, so that the
         backbones can provision it.
         @param topic The topic for which the snapshot is requested
         @param dst_q A queue that should be used to forward all snapshot
             data to
+        @param snapshot_id The UUID of the requested snapshot
         @param time_delta A timedelta object to mark the snapshot size
         """
         # Threat Bus follows a hierarchical pub-sub structure. Subscriptions
@@ -65,26 +76,30 @@ class ThreatBus:
             self.logger.info(
                 f"Requesting snapshot from all plugins for message type {mt.name} and time delta {time_delta}"
             )
-            snapshot_id = str(uuid4())
             self.snapshots[snapshot_id] = dst_q  # store queue of requester
             req = SnapshotRequest(mt, snapshot_id, time_delta)
 
             self.inq.put(req)
 
-    def subscribe(self, topic, q, time_delta=None):
+    def subscribe(self, topic: str, q: Queue, time_delta: timedelta = None):
         """
         Accepts a new subscription for a given topic and queue pointer.
         Forwards that subscription to all managed backbones.
         @param topic Subscribe to this topic
         @param q A queue object to forward all messages for the given topics
         @param time_delta A timedelta object to mark the snapshot size
+        @return Returns the UUID for the requested snapshot, or None in case no
+            snapshot was requested.
         """
         assert isinstance(topic, str), "topic must be string"
         self.backbones.subscribe(topic=topic, q=q)
-        if time_delta:
-            self.request_snapshot(topic, q, time_delta)
+        if not time_delta:
+            return None
+        snapshot_id = str(uuid4())
+        self.request_snapshot(topic, q, snapshot_id, time_delta)
+        return snapshot_id
 
-    def unsubscribe(self, topic, q):
+    def unsubscribe(self, topic: str, q: Queue):
         """
         Removes subscription for a given topic and queue pointer from all
         managed backbones.
@@ -95,6 +110,11 @@ class ThreatBus:
     def run(self):
         self.logger.info("Starting plugins...")
         logging = self.config["logging"]
+        self.backbones.run(
+            config=self.config["plugins"]["backbones"], logging=logging, inq=self.inq
+        )
+        self.subscribe("threatbus/snapshotrequest", self.snapshot_q)
+        self.subscribe("threatbus/snapshotenvelope", self.snapshot_q)
         self.apps.run(
             config=self.config["plugins"]["apps"],
             logging=logging,
@@ -102,15 +122,10 @@ class ThreatBus:
             subscribe_callback=self.subscribe,
             unsubscribe_callback=self.unsubscribe,
         )
-        self.backbones.run(
-            config=self.config["plugins"]["backbones"], logging=logging, inq=self.inq
-        )
-        self.subscribe("threatbus/snapshotrequest", self.snapshot_q)
-        self.subscribe("threatbus/snapshotenvelope", self.snapshot_q)
         self.handle_snapshots()
 
 
-def validate_config(config):
+def validate_config(config: confuse.Subview):
     if config["logging"]["console"].get(bool):
         config["logging"]["console_verbosity"].get(str)
     if config["logging"]["file"].get(bool):
@@ -118,7 +133,7 @@ def validate_config(config):
         config["logging"]["filename"].get(str)
 
 
-def start(config):
+def start(config: confuse.Subview):
     try:
         validate_config(config)
     except Exception as e:

@@ -65,7 +65,9 @@ class TestJsonConversions(unittest.TestCase):
             "_extra": {"vast-ioc": "172.31.129.17"},
             "source": "VAST",
         }
-        self.sighting = Sighting(self.ts, self.intel_id, self.sighting_context)
+        self.sighting = Sighting(
+            self.ts, self.intel_id, self.sighting_context, (self.indicator,)
+        )
 
         self.snapshot_id = "SNAPSHOT_UUID"
         self.snapshot = timedelta(days=42, hours=23, minutes=13, seconds=37)
@@ -116,10 +118,11 @@ class TestJsonConversions(unittest.TestCase):
         py_dict = json.loads(encoded)
         self.assertEqual(py_dict["ts"], str(self.ts))
         self.assertEqual(py_dict["intel"], self.intel_id)
+        self.assertEqual(py_dict["ioc"], [self.indicator])
         self.assertEqual(py_dict["context"], self.sighting_context)
 
     def test_valid_sighting_decoding(self):
-        encoded = f'{{"ts": "{self.ts}", "intel": "{self.intel_id}", "context": {json.dumps(self.sighting_context)}}}'
+        encoded = f'{{"ts": "{self.ts}", "intel": "{self.intel_id}", "ioc": ["{self.indicator}"], "context": {json.dumps(self.sighting_context)}}}'
         sighting = json.loads(encoded, cls=SightingDecoder)
         self.assertEqual(sighting, self.sighting)
 
@@ -172,6 +175,7 @@ class TestJsonConversions(unittest.TestCase):
         self.assertEqual(py_dict["snapshot_id"], self.snapshot_id)
         self.assertEqual(py_dict["body"]["ts"], str(self.ts))
         self.assertEqual(py_dict["body"]["intel"], self.intel_id)
+        self.assertEqual(py_dict["body"]["ioc"], [self.indicator])
         self.assertEqual(py_dict["body"]["context"], self.sighting_context)
 
     def test_valid_snapshot_envelope_decoding(self):
@@ -179,7 +183,7 @@ class TestJsonConversions(unittest.TestCase):
         read_back = json.loads(encoded_envelope_intel, cls=SnapshotEnvelopeDecoder)
         self.assertEqual(read_back, self.snapshot_envelope_intel)
 
-        encoded_envelope_sighting = f'{{"snapshot_type": {MessageType.SIGHTING.value}, "snapshot_id": "{self.snapshot_id}", "body": {{"ts": "{self.ts}", "intel": "{self.intel_id}", "context": {json.dumps(self.sighting_context)}}}}}'
+        encoded_envelope_sighting = f'{{"snapshot_type": {MessageType.SIGHTING.value}, "snapshot_id": "{self.snapshot_id}", "body": {{"ts": "{self.ts}", "intel": "{self.intel_id}", "ioc": ["{self.indicator}"], "context": {json.dumps(self.sighting_context)}}}}}'
         read_back = json.loads(encoded_envelope_sighting, cls=SnapshotEnvelopeDecoder)
         self.assertEqual(read_back, self.snapshot_envelope_sighting)
 
