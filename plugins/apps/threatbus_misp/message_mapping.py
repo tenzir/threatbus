@@ -1,8 +1,10 @@
 from datetime import datetime
 from threatbus.data import Intel, IntelData, IntelType, Operation, Sighting
 import pymisp
+from typing import Dict
 
-misp_intel_type_mapping = {
+
+misp_intel_type_mapping: Dict[str, IntelType] = {
     "ip-src": IntelType.IPSRC,
     "ip-dst": IntelType.IPDST,
     "ip-src|port": IntelType.IPSRC_PORT,
@@ -53,7 +55,7 @@ misp_intel_type_mapping = {
 }
 
 
-def map_to_internal(misp_attribute, action, logger=None):
+def map_to_internal(misp_attribute: dict, action: str, logger=None):
     """
     Maps the given MISP attribute to the threatbus intel format.
     @param misp_attribute A MISP attribute
@@ -98,13 +100,13 @@ def map_to_internal(misp_attribute, action, logger=None):
     )
 
 
-def map_to_misp(sighting):
+def map_to_misp(sighting: Sighting):
     """
     Maps the threatbus sighting format to a MISP sighting.
     @param sighting A threatbus Sighting object
     @return the mapped MISP sighting object or None
     """
-    if not sighting or not isinstance(sighting, Sighting):
+    if not sighting or not type(sighting) == Sighting:
         return None
 
     misp_sighting = pymisp.MISPSighting()

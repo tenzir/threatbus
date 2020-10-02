@@ -1,27 +1,29 @@
 from confluent_kafka import Consumer
+from confuse import Subview
 from datetime import datetime
 import json
 import pymisp
 from queue import Queue
 import threading
+import threatbus
+from threatbus.data import MessageType, SnapshotEnvelope, SnapshotRequest
+from threatbus_misp.message_mapping import map_to_internal, map_to_misp
+from typing import Callable
 import warnings
 import zmq
 
-from threatbus_misp.message_mapping import map_to_internal, map_to_misp
-import threatbus
-from threatbus.data import MessageType, SnapshotEnvelope
 
 warnings.simplefilter("ignore")  # pymisp produces urllib warnings
 
 """MISP - Open Source Threat Intelligence Platform - plugin for Threat Bus"""
 
 
-plugin_name = "misp"
-misp = None
-lock = threading.Lock()
+plugin_name: str = "misp"
+misp: pymisp.api.PyMISP = None
+lock: threading.Lock = threading.Lock()
 
 
-def validate_config(config):
+def validate_config(config: Subview):
     assert config, "config must not be None"
     # redact fallback values to allow for omitting configuration blocks
     config["api"].add({})
@@ -44,7 +46,7 @@ def validate_config(config):
         config["kafka"]["config"].get(dict)
 
 
-def publish_sightings(outq):
+def publish_sightings(outq: Queue):
     """
     Reports / publishes true-positive sightings of intelligence items back to the given MISP endpoint.
     @param outq The queue from which to forward messages to MISP
@@ -62,7 +64,7 @@ def publish_sightings(outq):
         outq.task_done()
 
 
-def receive_kafka(kafka_config, inq):
+def receive_kafka(kafka_config: Subview, inq: Queue):
     """
     Binds a Kafka consumer to the the given host/port. Forwards all received messages to the inq.
     @param kafka_config A configuration object for Kafka binding
@@ -93,7 +95,7 @@ def receive_kafka(kafka_config, inq):
             inq.put(intel)
 
 
-def receive_zmq(zmq_config, inq):
+def receive_zmq(zmq_config: Subview, inq: Queue):
     """
     Binds a ZMQ poller to the the given host/port. Forwards all received messages to the inq.
     @param zmq_config A configuration object for ZeroMQ binding
@@ -127,7 +129,7 @@ def receive_zmq(zmq_config, inq):
 
 
 @threatbus.app
-def snapshot(snapshot_request, result_q):
+def snapshot(snapshot_request: SnapshotRequest, result_q: Queue):
     global logger, misp, lock
     if snapshot_request.snapshot_type != MessageType.INTEL:
         logger.debug("Sighting snapshot feature not yet implemented.")
@@ -156,7 +158,13 @@ def snapshot(snapshot_request, result_q):
 
 
 @threatbus.app
-def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
+def run(
+    config: Subview,
+    logging: Subview,
+    inq: Queue,
+    subscribe_callback: Callable,
+    unsubscribe_callback: Callable,
+):
     global logger
     logger = threatbus.logger.setup(logging, __name__)
     config = config[plugin_name]
@@ -180,7 +188,9 @@ def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
             logger.error(f"Cannot subscribe to MISP at {host}, using SSL: {ssl}")
             lock.release()
 
-    # TODO: MISP instances shall subscribe themselves to threatbus and each subscription shall have an individual outq and receiving thread for intel updates.
+    # TODO: MISP instances shall subscribe themselves to threatbus and each
+    # subscription shall have an individual outq and receiving thread for intel
+    # updates.
     outq = Queue()
     subscribe_callback("threatbus/sighting", outq)
 
