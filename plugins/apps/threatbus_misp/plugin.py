@@ -7,8 +7,8 @@ from queue import Queue
 import threading
 import threatbus
 from threatbus.data import MessageType, SnapshotEnvelope, SnapshotRequest
-from threatbus_misp.message_mapping import map_to_internal, map_to_misp
-from typing import Callable
+from threatbus_misp.message_mapping import map_to_internal, map_to_misp, is_whitelisted
+from typing import Callable, List, Dict
 import warnings
 import zmq
 
@@ -21,6 +21,9 @@ warnings.simplefilter("ignore")  # pymisp produces urllib warnings
 plugin_name: str = "misp"
 misp: pymisp.api.PyMISP = None
 lock: threading.Lock = threading.Lock()
+filter_config: List[
+    Dict
+] = None  # required for message mapping, not available when Threat Bus invokes `snapshot()` -> global, initialized on startup
 
 
 def validate_config(config: Subview):
@@ -29,8 +32,13 @@ def validate_config(config: Subview):
     config["api"].add({})
     config["zmq"].add({})
     config["kafka"].add({})
+    config["filter"].add([])
+
     if config["zmq"].get(dict) and config["kafka"].get(dict):
         raise AssertionError("either use ZeroMQ or Kafka, but not both")
+
+    if type(config["filter"].get()) is not list:
+        raise AssertionError("filter must be specified as list")
 
     if config["api"].get(dict):
         config["api"]["host"].get(str)
@@ -72,7 +80,7 @@ def receive_kafka(kafka_config: Subview, inq: Queue):
     """
     consumer = Consumer(kafka_config["config"].get(dict))
     consumer.subscribe(kafka_config["topics"].get(list))
-    global logger
+    global logger, filter_config
     while True:
         message = consumer.poll(timeout=kafka_config["poll_interval"].get(float))
         if message is None:
@@ -85,8 +93,7 @@ def receive_kafka(kafka_config: Subview, inq: Queue):
         except Exception as e:
             logger.error(f"Error decoding Kafka message: {e}")
             continue
-        if not msg.get("Attribute", None):
-            logger.debug("Skipping message without MISP Attribute")
+        if not is_whitelisted(msg, filter_config):
             continue
         intel = map_to_internal(msg["Attribute"], msg.get("action", None), logger)
         if not intel:
@@ -101,7 +108,7 @@ def receive_zmq(zmq_config: Subview, inq: Queue):
     @param zmq_config A configuration object for ZeroMQ binding
     @param inq The queue to which intel items from MISP are forwarded to
     """
-    global logger
+    global logger, filter_config
     socket = zmq.Context().socket(zmq.SUB)
     socket.connect(f"tcp://{zmq_config['host']}:{zmq_config['port']}")
     # TODO: allow reception of more topics, i.e. handle events.
@@ -117,9 +124,9 @@ def receive_zmq(zmq_config: Subview, inq: Queue):
             try:
                 msg = json.loads(message)
             except Exception as e:
-                logger.error(f"Erro decoding message {message}: {e}")
+                logger.error(f"Error decoding message {message}: {e}")
                 continue
-            if not msg.get("Attribute", None):
+            if not is_whitelisted(msg, filter_config):
                 continue
             intel = map_to_internal(msg["Attribute"], msg.get("action", None), logger)
             if not intel:
@@ -165,7 +172,7 @@ def run(
     subscribe_callback: Callable,
     unsubscribe_callback: Callable,
 ):
-    global logger
+    global logger, filter_config
     logger = threatbus.logger.setup(logging, __name__)
     config = config[plugin_name]
     try:
@@ -187,15 +194,17 @@ def run(
             # TODO: log individual error per MISP subscriber
             logger.error(f"Cannot subscribe to MISP at {host}, using SSL: {ssl}")
             lock.release()
-
+    filter_config = config["filter"].get(list)
     # TODO: MISP instances shall subscribe themselves to threatbus and each
     # subscription shall have an individual outq and receiving thread for intel
     # updates.
     outq = Queue()
     subscribe_callback("threatbus/sighting", outq)
 
-    if misp:
-        threading.Thread(target=publish_sightings, args=(outq,), daemon=True).start()
+    if not misp:
+        logger.error("Failed to start up MISP plugin")
+        return
+    threading.Thread(target=publish_sightings, args=(outq,), daemon=True).start()
     if config["zmq"].get():
         threading.Thread(
             target=receive_zmq, args=(config["zmq"], inq), daemon=True
