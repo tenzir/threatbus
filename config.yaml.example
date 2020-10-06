@@ -32,6 +32,19 @@ plugins:
         host: https://localhost
         ssl: false
         key: MISP_API_KEY
+      filter: # filter are optional. you can omit the entire section.
+        - orgs: # org IDs must be strings: https://github.com/MISP/PyMISP/blob/main/pymisp/data/schema.json
+            - "1"
+            - "25"
+          tags:
+            - "TLP:AMBER"
+            - "TLP:RED"
+          types: # MISP attribute types https://github.com/MISP/misp-objects/blob/main/schema_objects.json
+            - ip-src
+            - ip-dst
+            - hostname
+            - domain
+            - url
       zmq:
         host: localhost
         port: 50000

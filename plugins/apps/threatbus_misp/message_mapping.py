@@ -1,8 +1,10 @@
 from datetime import datetime
 from threatbus.data import Intel, IntelData, IntelType, Operation, Sighting
 import pymisp
+from typing import Dict, List
 
-misp_intel_type_mapping = {
+
+misp_intel_type_mapping: Dict[str, IntelType] = {
     "ip-src": IntelType.IPSRC,
     "ip-dst": IntelType.IPDST,
     "ip-src|port": IntelType.IPSRC_PORT,
@@ -53,12 +55,65 @@ misp_intel_type_mapping = {
 }
 
 
-def map_to_internal(misp_attribute, action, logger=None):
+def get_tags(misp_attr: dict):
     """
-    Maps the given MISP attribute to the threatbus intel format.
-    @param misp_attribute A MISP attribute
-    @param action A string from MISP, describing the action for the attribute (either 'add' or 'delete')
-    @return the mapped intel item or None
+    Tags are attached as list of objects to MISP attributes. Returns a list of
+    all tag names.
+    @param The MISP attribute to get the tag names from
+    @return A list of tag names
+    """
+    return [
+        t.get("name", None)
+        for t in misp_attr.get("Tag", [])
+        if t and t.get("name", None)
+    ]
+
+
+def is_whitelisted(misp_msg: dict, filter_config: List[Dict]):
+    """
+    Compares the given MISP message against every filter in the filter_config
+    list. Returns True if the filter_config is empty or if the event is
+    whitelisted according to at least one filter from the filter_config.
+    @param misp_msg The MISP message to check
+    @param filter_config A list of whitelist-filters for "orgs", "tags", and
+        "types"
+    @return Boolean flag to indicate if the event is whitelisted
+    """
+    if not misp_msg:
+        return False
+    event = misp_msg.get("Event", None)
+    attr = misp_msg.get("Attribute", None)
+    if not event or not attr:
+        return False
+    org_id = event.get("org_id", None)
+    intel_type = attr.get("type", None)
+    tags = get_tags(attr)
+    if not org_id or not intel_type:
+        return False
+    if not filter_config:
+        # no whitelist = allow all
+        return True
+    for fil in filter_config:
+        if (
+            (not fil.get("orgs", None) or org_id in fil["orgs"])
+            and (not fil.get("types", None) or intel_type in fil["types"])
+            and (
+                not fil.get("tags", None)
+                or len(set(tags).intersection(set(fil["tags"]))) > 0
+            )
+        ):
+            return True
+    return False
+
+
+def map_to_internal(misp_attribute: dict, action: str, logger=None):
+    """
+    Maps the given MISP attribute to the threatbus Intel format. Discards all
+    messages that do not match the given filter, if any.
+    @param misp_attribute The MISP attribute to map
+    @param action A string from MISP, describing the action for the attribute
+        (either 'add' or 'delete')
+    @return The mapped intel item or None
     """
     # parse MISP attribute
     if not misp_attribute:
@@ -85,26 +140,28 @@ def map_to_internal(misp_attribute, action, logger=None):
                     f"Expected '|'-separated composite values for MISP intel type {intel_type}"
                 )
             return None
-
+    tb_intel_type = misp_intel_type_mapping.get(intel_type, None)
+    if not tb_intel_type:
+        return None
     return Intel(
         datetime.fromtimestamp(int(misp_attribute["timestamp"])),
         str(misp_attribute["id"]),
         IntelData(
             indicator,
-            misp_intel_type_mapping[intel_type],
+            tb_intel_type,
             source="MISP",
         ),
         operation,
     )
 
 
-def map_to_misp(sighting):
+def map_to_misp(sighting: Sighting):
     """
     Maps the threatbus sighting format to a MISP sighting.
     @param sighting A threatbus Sighting object
     @return the mapped MISP sighting object or None
     """
-    if not sighting or not isinstance(sighting, Sighting):
+    if not sighting or not type(sighting) == Sighting:
         return None
 
     misp_sighting = pymisp.MISPSighting()

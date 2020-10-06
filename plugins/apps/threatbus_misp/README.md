@@ -48,6 +48,21 @@ plugins:
       host: https://localhost
       ssl: false
       key: MISP_API_KEY
+    filter: # filter are optional. you can omit the entire section.
+      - orgs: # org IDs must be strings: https://github.com/MISP/PyMISP/blob/main/pymisp/data/schema.json
+          - "1"
+          - "25"
+        tags:
+          - "TLP:AMBER"
+          - "TLP:RED"
+        types: # MISP attribute types https://github.com/MISP/misp-objects/blob/main/schema_objects.json
+          - ip-src
+          - ip-dst
+          - hostname
+          - domain
+          - url
+      - orgs:
+        - "2"
     zmq:
       host: localhost
       port: 50000
@@ -63,6 +78,76 @@ plugins:
     #    auto.offset.reset: "earliest"
 ...
 ```
+
+### Filter
+
+The plugin can be configured with a list of filters. Every filter describes a
+whitelist for MISP attributes (IoCs). The MISP plugin will only forward IoCs to
+Threat Bus if the whitelisted properties are present.
+
+A filter consists of three sub-whitelists for organizations, types, and tags.
+To pass through the filter, an attribute must provide at least one of the
+whitelisted properties of each of the whitelists. More precisely, entries of
+each whitelist are linked by an `"or"`-function, the whitelists themselves are
+linked by an `"and"`-function, as follows:
+`(org_1 OR org_2) AND (type_1 OR type_2) AND (tag_1 OR tag_2)`.
+
+The MISP plugin always assumes that the *absence of a whitelist means that
+everything is whitelisted*. For example, when the entire `filter` section is
+omitted from the config, then all attributes are forwarded and nothing is
+filtered. More examples follow below.
+
+#### Organizations
+
+Organizations are whitelisted by their ID, which is a
+[string](https://github.com/MISP/PyMISP/blob/main/pymisp/data/schema.json). Only
+those MISP attributes that come from any of the whitelisted organizations will
+be forwarded to Threat Bus.
+
+#### Types
+
+Types can be whitelisted by specifying MISP
+[attribute types](https://github.com/MISP/misp-objects/blob/main/schema_objects.json).
+Only those attributes that are instances of a whitelisted type will be forwarded
+to Threat Bus.
+
+#### Tags
+
+MISP Attributes can be tagged with arbitrary strings. The tag whitelist respects
+tag *names*. Only those attributes that have at least one of the whitelisted
+tags will be forwarded to Threat Bus.
+
+#### Examples:
+
+This section provides some simple configuration examples to illustrate how
+whitelist filtering works.
+
+1. Forward all IoCs from the organizations `"1"` and `"25"`
+  ```yaml
+  - orgs:
+    - "1"
+    - "25"
+  ```
+2. Forward only IoCs of the `domain`, `url`, or `uri` type, but only if they
+  come from the organization `"1"` or `"25"`.
+  ```yaml
+  - orgs:
+    - "1"
+    - "25"
+  - types:
+    - domain
+    - url
+    - uri
+  ```
+2. Forward only IoCs that are tagged with `TLP:RED` or `TLP:AMBER`, but only of
+  type `"src-ip"`:
+  ```yaml
+  - tags:
+    - "TLP:RED"
+    - "TLP:AMBER"
+  - types:
+    - src-ip
+  ```
 
 ## Development Setup
 
