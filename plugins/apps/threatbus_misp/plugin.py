@@ -1,6 +1,7 @@
 from confluent_kafka import Consumer
 from confuse import Subview
 from datetime import datetime
+from itertools import product
 import json
 import pymisp
 from queue import Queue
@@ -137,31 +138,51 @@ def receive_zmq(zmq_config: Subview, inq: Queue):
 
 @threatbus.app
 def snapshot(snapshot_request: SnapshotRequest, result_q: Queue):
-    global logger, misp, lock
+    global logger, misp, lock, filter_config
     if snapshot_request.snapshot_type != MessageType.INTEL:
         logger.debug("Sighting snapshot feature not yet implemented.")
         return  # TODO sighting snapshot not yet implemented
-
     if not misp:
         return
+
     logger.info(f"Executing intel snapshot for time delta {snapshot_request.snapshot}")
-    lock.acquire()
-    data = misp.search(
-        controller="attributes",
-        to_ids=True,
-        date_from=datetime.now() - snapshot_request.snapshot,
-    )
-    lock.release()
-    if not data:
-        return
-    for attr in data["Attribute"]:
-        intel = map_to_internal(attr, "add", logger)
-        if intel:
-            result_q.put(
-                SnapshotEnvelope(
-                    snapshot_request.snapshot_type, snapshot_request.snapshot_id, intel
-                )
+    if not filter_config:
+        filter_config = [{}]  # this empty whitelist results in a global query
+
+    # build queries for everything that is whitelisted
+    for fil in filter_config:
+        orgs = fil.get("orgs", [None])
+        types = fil.get("types", [None])
+        tags_query = misp.build_complex_query(or_parameters=fil.get("tags", []))
+        if not tags_query:
+            tags_query = None  # explicit None value
+
+        # By API design, orgs and types must be queried value-by-value
+        # None-values mean that all values are accepted
+        # https://pymisp.readthedocs.io/en/latest/_modules/pymisp/api.html#PyMISP.search
+        for (org, type_) in product(orgs, types):
+            lock.acquire()
+            data = misp.search(
+                org=org,
+                type_attribute=type_,
+                tags=tags_query,
+                controller="attributes",
+                to_ids=True,
+                date_from=datetime.now() - snapshot_request.snapshot,
             )
+            lock.release()
+            if not data:
+                continue
+            for attr in data["Attribute"]:
+                intel = map_to_internal(attr, "add", logger)
+                if intel:
+                    result_q.put(
+                        SnapshotEnvelope(
+                            snapshot_request.snapshot_type,
+                            snapshot_request.snapshot_id,
+                            intel,
+                        )
+                    )
 
 
 @threatbus.app
