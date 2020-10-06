@@ -11,6 +11,13 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+
+- 🎁 The MISP plugin now supports a whitelist-filtering mechanism. Users can
+  specify required properties of IoCs (MISP attributes) in the configuration
+  file. The filter is implemented for IoCs that are received via ZeroMQ or Kafka
+  as well as IoCs that are requested as part of a snapshot.
+  [#49](https://github.com/tenzir/threatbus/pull/49)
+
 - 🎁 The generic Threat Bus ZeroMQ application plugin has replaced the former
   VAST plugin. Any app that communicates via ZeroMQ can implement this plugin's
   protocol to connect with Threat Bus effortlessly.
