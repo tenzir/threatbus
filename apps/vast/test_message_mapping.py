@@ -30,7 +30,7 @@ class TestMessageMapping(unittest.TestCase):
         self.valid_intel = Intel(
             self.ts, self.id, self.valid_intel_data, self.operation
         )
-        self.valid_query_result = f'{{"ts": "{self.ts}", "uid": "CArLTF3OEJAsF1A41h", "id.orig_h": "{self.indicator[0]}", "id.orig_p": "20004/tcp", "id.resp_h": "172.31.129.37", "id.resp_p": "40731/tcp", "proto": "tcp", "service": null, "duration": "10.75ms", "orig_bytes": 260, "resp_bytes": 352, "conn_state": "SF", "local_orig": null, "local_resp": null, "missed_bytes": 0, "history": "DadAFf", "orig_pkts": 5, "orig_ip_bytes": 520, "resp_pkts": 5, "resp_ip_bytes": 612, "tunnel_parents": []}}'
+        self.valid_query_result = f'{{"timestamp": "{self.ts}", "uid": "CArLTF3OEJAsF1A41h", "id.orig_h": "{self.indicator[0]}", "id.orig_p": "20004/tcp", "id.resp_h": "172.31.129.37", "id.resp_p": "40731/tcp", "proto": "tcp", "service": null, "duration": "10.75ms", "orig_bytes": 260, "resp_bytes": 352, "conn_state": "SF", "local_orig": null, "local_resp": null, "missed_bytes": 0, "history": "DadAFf", "orig_pkts": 5, "orig_ip_bytes": 520, "resp_pkts": 5, "resp_ip_bytes": 612, "tunnel_parents": []}}'
         self.valid_vast_sighting = f'{{"ts": "{self.ts}", "data_id": 8, "indicator_id": 5, "matcher": "threatbus-syeocdkfcy", "ioc": "{self.indicator[0]}", "reference": "threatbus__{self.id}"}}'
         self.invalid_intel_1 = {
             "ts": self.ts,

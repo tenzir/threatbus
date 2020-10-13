@@ -99,8 +99,11 @@ def query_result_to_threatbus_sighting(query_result: str, intel: Intel):
     try:
         context = json.loads(query_result)
         context["source"] = "VAST"
+        ts = context.get("ts", context.get("timestamp", None))
+        if not ts:
+            return None
         return Sighting(
-            dateutil_parser.parse(context.get("ts", None)),
+            dateutil_parser.parse(ts),
             intel.id,
             context,
             get_ioc(intel),
