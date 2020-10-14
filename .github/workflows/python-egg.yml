@@ -52,6 +52,7 @@ jobs:
     - name: Install Application and Plugins
       run: |
         make dev-mode
+        python -m pip install -r apps/vast/requirements.txt
     - name: Run Unit Tests
       run: |
         make unit-tests
