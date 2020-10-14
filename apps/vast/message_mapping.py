@@ -3,6 +3,7 @@ from dateutil import parser as dateutil_parser
 from ipaddress import ip_address
 import json
 from threatbus.data import Intel, IntelType, Sighting
+from unflatten import unflatten as apply_unflatten
 
 to_vast_intel = {
     IntelType.IPSRC: "ip",
@@ -88,11 +89,14 @@ def to_vast_query(intel: Intel):
     return None
 
 
-def query_result_to_threatbus_sighting(query_result: str, intel: Intel):
+def query_result_to_threatbus_sighting(
+    query_result: str, intel: Intel, unflatten: bool = False
+):
     """
     Creates a Threat Bus Sighting from a VAST query result.
     @param query_result The query result to convert
     @param intel The intel item that the sighting refers to
+    @param unflatten Boolean flag to unflatten the query_result JSON
     """
     if type(query_result) is not str or type(intel) is not Intel:
         return None
@@ -105,7 +109,7 @@ def query_result_to_threatbus_sighting(query_result: str, intel: Intel):
         return Sighting(
             dateutil_parser.parse(ts),
             intel.id,
-            context,
+            apply_unflatten(context) if unflatten else context,
             get_ioc(intel),
         )
     except Exception:
