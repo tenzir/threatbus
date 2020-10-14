@@ -31,7 +31,9 @@ class TestMessageMapping(unittest.TestCase):
             self.ts, self.id, self.valid_intel_data, self.operation
         )
         self.valid_query_result = f'{{"timestamp": "{self.ts}", "flow_id": 1840147514011873, "pcap_cnt": 626, "src_ip": "{self.indicator[0]}", "src_port": "1193/?", "dest_ip": "65.54.95.64", "dest_port": "80/?", "proto": "TCP", "event_type": "http", "community_id": "1:AzSEWwmsqEKUX5qrReAHI3Rpizg=", "http.hostname": "download.windowsupdate.com", "http.url": "/v9/windowsupdate/a/selfupdate/WSUS3/x86/Other/wsus3setup.cab?0911180916", "http.http_port": null, "http.http_user_agent": "Windows-Update-Agent", "http.http_content_type": "application/octet-stream", "http.http_method": "HEAD", "http.http_refer": null, "http.protocol": "HTTP/1.1", "http.status": 200, "http.redirect": null, "http.length": 0, "tx_id": 0}}'
-        self.unflattened_query_result = f'{{"timestamp": "{self.ts}", "flow_id": 1840147514011873, "pcap_cnt": 626, "src_ip": "{self.indicator[0]}", "src_port": "1193/?", "dest_ip": "65.54.95.64", "dest_port": "80/?", "proto": "TCP", "event_type": "http", "community_id": "1:AzSEWwmsqEKUX5qrReAHI3Rpizg=", "http": {{"hostname": "download.windowsupdate.com", "url": "/v9/windowsupdate/a/selfupdate/WSUS3/x86/Other/wsus3setup.cab?0911180916", "http_port": null, "http_user_agent": "Windows-Update-Agent", "http_content_type": "application/octet-stream", "http_method": "HEAD", "http_refer": null, "protocol": "HTTP/1.1", "status": 200, "redirect": null, "length": 0}}, "tx_id": 0}}'
+        # TODO: the following is similar to the above, except for the ports - remove this, once VAST outputs ports as integers.
+        self.transformed_query_result = f'{{"timestamp": "{self.ts}", "flow_id": 1840147514011873, "pcap_cnt": 626, "src_ip": "{self.indicator[0]}", "src_port": 1193, "dest_ip": "65.54.95.64", "dest_port": 80, "proto": "TCP", "event_type": "http", "community_id": "1:AzSEWwmsqEKUX5qrReAHI3Rpizg=", "http.hostname": "download.windowsupdate.com", "http.url": "/v9/windowsupdate/a/selfupdate/WSUS3/x86/Other/wsus3setup.cab?0911180916", "http.http_port": null, "http.http_user_agent": "Windows-Update-Agent", "http.http_content_type": "application/octet-stream", "http.http_method": "HEAD", "http.http_refer": null, "http.protocol": "HTTP/1.1", "http.status": 200, "http.redirect": null, "http.length": 0, "tx_id": 0}}'
+        self.unflattened_query_result = f'{{"timestamp": "{self.ts}", "flow_id": 1840147514011873, "pcap_cnt": 626, "src_ip": "{self.indicator[0]}", "src_port": 1193, "dest_ip": "65.54.95.64", "dest_port": 80, "proto": "TCP", "event_type": "http", "community_id": "1:AzSEWwmsqEKUX5qrReAHI3Rpizg=", "http": {{"hostname": "download.windowsupdate.com", "url": "/v9/windowsupdate/a/selfupdate/WSUS3/x86/Other/wsus3setup.cab?0911180916", "http_port": null, "http_user_agent": "Windows-Update-Agent", "http_content_type": "application/octet-stream", "http_method": "HEAD", "http_refer": null, "protocol": "HTTP/1.1", "status": 200, "redirect": null, "length": 0}}, "tx_id": 0}}'
         self.valid_vast_sighting = f'{{"ts": "{self.ts}", "data_id": 8, "indicator_id": 5, "matcher": "threatbus-syeocdkfcy", "ioc": "{self.indicator[0]}", "reference": "threatbus__{self.id}"}}'
         self.invalid_intel_1 = {
             "ts": self.ts,
@@ -198,7 +200,9 @@ class TestMessageMapping(unittest.TestCase):
         self.assertEqual(type(parsed_sighting), Sighting)
         self.assertEqual(parsed_sighting.ts, self.ts)
         self.assertEqual(parsed_sighting.ioc, self.indicator[0])
-        expected_context = json.loads(self.valid_query_result)
+
+        # TODO: use self.valid_query_result for comparison, once VAST outputs ports as integers
+        expected_context = json.loads(self.transformed_query_result)
         expected_context["source"] = "VAST"
         self.assertEqual(parsed_sighting.context, expected_context)
         self.assertEqual(parsed_sighting.intel, self.id)
