@@ -46,6 +46,7 @@ async def start(
     zmq_endpoint: str,
     snapshot: int,
     retro_match: bool,
+    unflatten: bool,
     transform_cmd: str = None,
     sink: str = None,
 ):
@@ -57,6 +58,8 @@ async def start(
     @param vast_endpoint The endpoint of a running VAST node ('host:port')
     @param zmq_endpoint The ZMQ management endpoint of Threat Bus ('host:port')
     @param snapshot An integer value to request n days of past intel items
+    @param retro_match Boolean flag to use retro-matching over live-matching
+    @param unflatten Boolean flag to unflatten JSON when received from VAST
     @param transform_cmd The command to use to transform Sighting context with
     @param sink Forward sighting context to this sink (subprocess) instead of
         reporting back to Threat Bus
@@ -94,7 +97,9 @@ async def start(
     receive_task = asyncio.create_task(receive(pub_endpoint, topic, intel_queue))
     atexit.register(receive_task.cancel)
     match_task = asyncio.create_task(
-        match_intel(cmd, vast_endpoint, intel_queue, sightings_queue, retro_match)
+        match_intel(
+            cmd, vast_endpoint, intel_queue, sightings_queue, retro_match, unflatten
+        )
     )
     atexit.register(match_task.cancel)
     if not retro_match:
@@ -151,6 +156,7 @@ async def match_intel(
     intel_queue: asyncio.Queue,
     sightings_queue: asyncio.Queue,
     retro_match: bool,
+    unflatten: bool,
 ):
     """
     Reads from the intel_queue and matches all IoCs, either via VAST's
@@ -160,6 +166,7 @@ async def match_intel(
     @param intel_queue The queue to read new IoCs from
     @param sightings_queue The queue to put new sightings into
     @param retro_match Boolean flag to use retro-matching over live-matching
+    @param unflatten Boolean flag to unflatten JSON when received from VAST
     """
     global logger
     vast = VAST(binary=cmd, endpoint=vast_endpoint)
@@ -182,7 +189,9 @@ async def match_intel(
                 while not proc.stdout.at_eof():
                     line = (await proc.stdout.readline()).decode().rstrip()
                     if line:
-                        sighting = query_result_to_threatbus_sighting(line, intel)
+                        sighting = query_result_to_threatbus_sighting(
+                            line, intel, unflatten
+                        )
                         if not sighting:
                             logger.warn(f"Could not parse VAST query result: {line}")
                             continue
@@ -223,6 +232,7 @@ async def live_match_vast(cmd: str, vast_endpoint: str, sightings_queue: asyncio
     @param cmd The VAST binary command to use with PyVAST
     @param vast_endpoint The endpoint of a running VAST node
     @param sightings_queue The queue to put new sightings into
+    @param retro_match Boolean flag to use retro-matching over live-matching
     """
     global logger, matcher_name
     vast = VAST(binary=cmd, endpoint=vast_endpoint)
@@ -236,7 +246,7 @@ async def live_match_vast(cmd: str, vast_endpoint: str, sightings_queue: asyncio
                 # TODO reconnect
             continue
         vast_sighting = data.decode("utf-8").rstrip()
-        sighting = matcher_result_to_threatbus_sighting(vast_sighting)
+        sighting = matcher_result_to_threatbus_sighting(vast_sighting, unflatten)
         if not sighting:
             logger.warn(f"Cannot parse sighting-output from VAST: {data}", e)
             continue
@@ -434,6 +444,12 @@ def main():
         help="Use plain vast queries instead of live-matcher",
     )
     parser.add_argument(
+        "--unflatten",
+        dest="unflatten",
+        action="store_true",
+        help="Only applicable when --retro-match is used. Unflatten the JSON results from VAST. The unflattening is applied immediately after retrieving the results from VAST, i.e., unflatten is applied before all further processing steps like --transform-context, --sink, or reporting back to Threat Bus.",
+    )
+    parser.add_argument(
         "--transform-context",
         "-T",
         dest="transform",
@@ -458,6 +474,7 @@ def main():
             args.threatbus,
             args.snapshot,
             args.retro_match,
+            args.unflatten,
             args.transform,
             args.sink,
         )
