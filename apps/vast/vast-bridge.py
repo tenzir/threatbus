@@ -17,6 +17,7 @@ from message_mapping import (
 )
 from pyvast import VAST
 import random
+from shlex import split as lexical_split
 from string import ascii_lowercase as letters
 from threatbus.data import Intel, IntelDecoder, Sighting, SightingEncoder, Operation
 import zmq
@@ -269,7 +270,7 @@ async def invoke_cmd_for_context(cmd: str, context: dict, ioc: str = "%ioc"):
         ioc = "%ioc"
     cmd = cmd.replace("%ioc", ioc)
     proc = await asyncio.create_subprocess_exec(
-        *cmd.split(" "),
+        *lexical_split(cmd),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         stdin=asyncio.subprocess.PIPE,
