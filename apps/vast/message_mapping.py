@@ -119,7 +119,7 @@ def query_result_to_threatbus_sighting(
             dateutil_parser.parse(ts),
             intel.id,
             apply_unflatten(context) if unflatten else context,
-            get_ioc(intel),
+            intel.data["indicator"],
         )
     except Exception:
         return None
@@ -140,9 +140,15 @@ def matcher_result_to_threatbus_sighting(msg: str):
     except Exception:
         return None
     ref = dct.get("reference", "")
-    ioc = dct.get("ioc", "")
+    ioc = (dct.get("ioc", ""),)  # ioc's are tuples
     context = dct.get("context", {})
-    if not ts or not ref or not len(ref) > len(threatbus_reference) or not ioc:
+    if (
+        not ts
+        or not ref
+        or not len(ref) > len(threatbus_reference)
+        or not ioc
+        or not ioc[0]
+    ):
         return None
     ref = ref[len(threatbus_reference) :]
     context["source"] = "VAST"

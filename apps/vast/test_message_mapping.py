@@ -199,7 +199,7 @@ class TestMessageMapping(unittest.TestCase):
         self.assertIsNotNone(parsed_sighting)
         self.assertEqual(type(parsed_sighting), Sighting)
         self.assertEqual(parsed_sighting.ts, self.ts)
-        self.assertEqual(parsed_sighting.ioc, self.indicator[0])
+        self.assertEqual(parsed_sighting.ioc, self.indicator)
 
         # TODO: use self.valid_query_result for comparison, once VAST outputs ports as integers
         expected_context = json.loads(self.transformed_query_result)
@@ -214,7 +214,7 @@ class TestMessageMapping(unittest.TestCase):
         self.assertIsNotNone(parsed_sighting)
         self.assertEqual(type(parsed_sighting), Sighting)
         self.assertEqual(parsed_sighting.ts, self.ts)
-        self.assertEqual(parsed_sighting.ioc, self.indicator[0])
+        self.assertEqual(parsed_sighting.ioc, self.indicator)
         expected_context = json.loads(self.unflattened_query_result)
         expected_context["source"] = "VAST"
         self.assertEqual(parsed_sighting.context, expected_context)
@@ -225,6 +225,6 @@ class TestMessageMapping(unittest.TestCase):
         self.assertIsNotNone(parsed_sighting)
         self.assertEqual(type(parsed_sighting), Sighting)
         self.assertEqual(parsed_sighting.ts, self.ts)
-        self.assertEqual(parsed_sighting.ioc, self.indicator[0])
+        self.assertEqual(parsed_sighting.ioc, self.indicator)
         self.assertEqual(parsed_sighting.context, {"source": "VAST"})
         self.assertEqual(parsed_sighting.intel, self.id)

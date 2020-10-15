@@ -320,7 +320,9 @@ async def report_sightings(
             )
             continue
         if transform_cmd and sighting.context:
-            ioc = sighting.ioc[0] if sighting.ioc else None
+            ioc = sighting.ioc
+            if sighting.ioc and type(sighting.ioc) is tuple:
+                ioc = sighting.ioc[0]  # use first value of tuple
             context_str = await invoke_cmd_for_context(
                 transform_cmd, sighting.context, ioc
             )
