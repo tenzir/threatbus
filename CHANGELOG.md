@@ -12,8 +12,8 @@ Every entry has a category for which we use the following visual abbreviations:
 ## Unreleased
 
 - 🎁 The MISP plugin does not require an API connection anymore. If omitted, the
-  plugin can still receive IoCs normally, but it cannot report back Sightings or
-  request Snapshots.
+  plugin can still receive IoCs normally, but it cannot report back sightings or
+  request snapshots.
   [#55](https://github.com/tenzir/threatbus/pull/55)
 
 - 🎁 The MISP plugin now supports a whitelist-filtering mechanism. Users can
