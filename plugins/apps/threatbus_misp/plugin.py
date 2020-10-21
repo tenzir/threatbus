@@ -205,6 +205,7 @@ def run(
     filter_config = config["filter"].get(list)
 
     # start Attribute-update receiver
+    receiver_thread = None
     if config["zmq"].get():
         receiver_thread = threading.Thread(
             target=receive_zmq, args=(config["zmq"], inq), daemon=True
@@ -244,5 +245,6 @@ def run(
     outq = Queue()
     subscribe_callback("threatbus/sighting", outq)
     threading.Thread(target=publish_sightings, args=(outq,), daemon=True).start()
-    receiver_thread.start()
+    if receiver_thread is not None:
+        receiver_thread.start()
     logger.info("MISP plugin started")
