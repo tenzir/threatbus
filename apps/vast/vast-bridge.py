@@ -493,7 +493,7 @@ def main():
     try:
         validate_config(config)
     except Exception as e:
-        raise ValueError("Invalid config: {}".format(str(e)))
+        raise ValueError(f"Invalid config: {e}")
 
     setup_logging(config["loglevel"].get(str))
     asyncio.run(
