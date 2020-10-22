@@ -11,6 +11,8 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+- 🎁 The MISP plugin now works without a valid PyMISP API connection. If omitted in the configuration, the plugin can still receive indicators via ZeroMQ or Kafka, but it cannot report back sightings or request snapshots.
+  [#55](https://github.com/tenzir/threatbus/pull/55)
 
 - 🎁 The MISP plugin now supports a whitelist-filtering mechanism. Users can
   specify required properties of IoCs (MISP attributes) in the configuration

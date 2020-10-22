@@ -143,6 +143,7 @@ def snapshot(snapshot_request: SnapshotRequest, result_q: Queue):
         logger.debug("Sighting snapshot feature not yet implemented.")
         return  # TODO sighting snapshot not yet implemented
     if not misp:
+        logger.debug("Cannot perform snapshot request. No MISP API connection.")
         return
 
     logger.info(f"Executing intel snapshot for time delta {snapshot_request.snapshot}")
@@ -200,7 +201,25 @@ def run(
         validate_config(config)
     except Exception as e:
         logger.fatal("Invalid config for plugin {}: {}".format(plugin_name, str(e)))
-    if config["api"].get():
+
+    filter_config = config["filter"].get(list)
+
+    # start Attribute-update receiver
+    receiver_thread = None
+    if config["zmq"].get():
+        receiver_thread = threading.Thread(
+            target=receive_zmq, args=(config["zmq"], inq), daemon=True
+        )
+    elif config["kafka"].get():
+        receiver_thread = threading.Thread(
+            target=receive_kafka, args=(config["kafka"], inq), daemon=True
+        )
+
+    # bind to MISP
+    if config["api"].get(dict):
+        # TODO: MISP instances shall subscribe themselves to threatbus and each
+        # subscription shall have an individual outq and receiving thread for intel
+        # updates.
         host, key, ssl = (
             config["api"]["host"].get(),
             config["api"]["key"].get(),
@@ -215,23 +234,17 @@ def run(
             # TODO: log individual error per MISP subscriber
             logger.error(f"Cannot subscribe to MISP at {host}, using SSL: {ssl}")
             lock.release()
-    filter_config = config["filter"].get(list)
-    # TODO: MISP instances shall subscribe themselves to threatbus and each
-    # subscription shall have an individual outq and receiving thread for intel
-    # updates.
+        if not misp:
+            logger.error("Failed to start MISP plugin")
+            return
+    else:
+        logger.warning(
+            "Starting MISP plugin without API connection, cannot report back sightings or request snapshots."
+        )
+
     outq = Queue()
     subscribe_callback("threatbus/sighting", outq)
-
-    if not misp:
-        logger.error("Failed to start up MISP plugin")
-        return
     threading.Thread(target=publish_sightings, args=(outq,), daemon=True).start()
-    if config["zmq"].get():
-        threading.Thread(
-            target=receive_zmq, args=(config["zmq"], inq), daemon=True
-        ).start()
-    if config["kafka"].get():
-        threading.Thread(
-            target=receive_kafka, args=(config["kafka"], inq), daemon=True
-        ).start()
+    if receiver_thread is not None:
+        receiver_thread.start()
     logger.info("MISP plugin started")
