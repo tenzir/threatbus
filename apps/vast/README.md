@@ -22,31 +22,28 @@ python3 -m pip install -r requirements.txt
 
 ## Quick Start
 
-The bridge is configured either via a config file in YAML format or via command
-line arguments and flags. See `config.yaml.example` for an example configuration
-file that make use of [fever alertify](https://github.com/DCSO/fever) to
-transform sighting contexts before they get printed to `STDOUT`. See the section
+You can configure the bridge either via YAML config file or via command line
+arguments. See `config.yaml.example` for an example configuration file that uses
+[fever alertify](https://github.com/DCSO/fever) to transform sighting contexts
+before they get printed to `STDOUT`. See the section
 [Bridge Features](/tenzir/threatbus/tree/master/apps/vast#bridge-features) for
-details. Or inspect the command help as follows.
+details and `--help` for command line usage. Here are some command line options
+to get you started.
 
-```sh
-./vast-bridge.py --help
-```
-
-Start with a config file.
+Start with a config file:
 
 ```sh
 ./vast-bridge.py -c config.yaml
 ```
 
-Startup with debug logging and customized endpoints for Threat Bus and VAST.
+Startup with debug logging and customized endpoints for Threat Bus and VAST:
 
 ```sh
 ./vast-bridge.py --vast-binary=/opt/tenzir/bin/vast --vast=localhost:42000 --threatbus=localhost:13370 --loglevel=DEBUG
 ```
 
 Request an intelligence snapshot of the past 50 days and match it
-retrospectively against the entire VAST database.
+retrospectively against the entire VAST database:
 
 ```sh
 ./vast-bridge.py --snapshot=50 --retro-match
