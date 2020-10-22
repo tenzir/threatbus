@@ -1,0 +1,11 @@
+vast: "localhost:42000"
+vast_binary: vast
+threatbus: "localhost:13370"
+snapshot: 30
+loglevel: DEBUG
+retro_match: true
+unflatten: true
+# optional. remove the field if you don't want to transform sighting context
+transform_context: fever alertify --alert-prefix 'MY PREFIX' --extra-key my-ioc --ioc %ioc
+# optional. remove the field if you simply want to report back sightings to Threat Bus
+sink: STDOUT

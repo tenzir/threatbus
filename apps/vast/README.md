@@ -22,32 +22,42 @@ python3 -m pip install -r requirements.txt
 
 ## Quick Start
 
-The bridge gets configured via command line arguments and flags. Inspect the
-command help as follows.
+You can configure the bridge either via YAML config file or via command line
+arguments. See `config.yaml.example` for an example configuration file that uses
+[fever alertify](https://github.com/DCSO/fever) to transform sighting contexts
+before they get printed to `STDOUT`. See the section
+[Bridge Features](/tenzir/threatbus/tree/master/apps/vast#bridge-features) for
+details and `--help` for command line usage. Here are some command line options
+to get you started.
+
+Start with a config file:
 
 ```sh
-./vast-bridge --help
+./vast-bridge.py -c config.yaml
 ```
 
-Startup with debug logging and customized endpoints for Threat Bus and VAST.
+Startup with debug logging and customized endpoints for Threat Bus and VAST:
 
 ```sh
-./vast-bridge --vast-binary=/opt/tenzir/bin/vast --vast=localhost:42000 --threatbus=localhost:13370 --loglevel=DEBUG
+./vast-bridge.py --vast-binary=/opt/tenzir/bin/vast --vast=localhost:42000 --threatbus=localhost:13370 --loglevel=DEBUG
 ```
 
-Request an intelligence snapshot of the past 50 days.
+Request an intelligence snapshot of the past 50 days and match it
+retrospectively against the entire VAST database:
 
 ```sh
-./vast-bridge.py --snapshot=50
+./vast-bridge.py --snapshot=50 --retro-match
 ```
 
 ## Bridge Features
 
-This section explains the most important features and CLI options of the `vast-bridge`.
+This section explains the most important features and CLI options of the
+`vast-bridge`.
 
 ### IoC Matching
 
-VAST can match IoCs either live or retrospectively via usual queries.
+[VAST](https://github.com/tenzir/vast) can match IoCs either live or
+retrospectively via usual queries.
 
 #### Live Matching
 
@@ -65,7 +75,7 @@ that the VAST node must support this feature.
 
 The `vast-bridge` supports retro matching via the command line option
 `--retro-match`. This instructs the bridge to translate IoCs from
-Threat Bus to VAST queries instead of feeding the IoCs to a live matcher.
+Threat Bus to normal VAST queries instead of feeding the IoCs to a live matcher.
 
 Each result from an IoC query is treated as `Sighting` of that IoC and reported
 back to Threat Bus.
@@ -80,7 +90,7 @@ field of a Sighting via the specified utility. For example, pass the `context`
 object to [DCSO/fever](https://github.com/DCSO/fever) `alertify`:
 
 ```
-apps/vast/vast-bridge.py --retro-match --transform-context "fever alertify --alert-prefix VAST-RETRO --extra-key vast-ioc --ioc %ioc"
+apps/vast/vast-bridge.py --retro-match --transform-context "fever alertify --alert-prefix 'MY PREFIX' --extra-key my-ioc --ioc %ioc"
 ```
 
 A `Sighting` object is structured as follows:
@@ -111,7 +121,7 @@ _instead_ of reporting them back to Threat Bus. This can be configured via the
 Sighting context to `STDOUT`. Example:
 
 ```
-apps/vast/vast-bridge.py --sink stdout
+./vast-bridge.py --sink stdout
 ```
 
 A custom sink is useful to forward `Sightings` to another process, like

@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import atexit
 import coloredlogs
+import confuse
 from datetime import datetime
 import json
 import logging
@@ -39,6 +40,21 @@ def setup_logging(level):
         logger.setLevel(log_level)
     handler.setFormatter(colored_formatter)
     logger.addHandler(handler)
+
+
+def validate_config(config: confuse.Subview):
+    assert config, "config must not be None"
+    config["vast"].get(str)
+    config["vast_binary"].get(str)
+    config["threatbus"].get(str)
+    config["snapshot"].get(int)
+    config["loglevel"].get(str)
+    config["retro_match"].get(bool)
+    config["unflatten"].get(bool)
+
+    # fallback values for the optional arguments
+    config["transform_context"].add(None)
+    config["sink"].add(None)
 
 
 async def start(
@@ -404,6 +420,7 @@ def unsubscribe(endpoint: str, topic: str, timeout: int = 5):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--config", "-c", help="Path to a configuration file")
     parser.add_argument(
         "--vast",
         "-v",
@@ -414,7 +431,7 @@ def main():
     parser.add_argument(
         "--vast-binary",
         "-b",
-        dest="binary",
+        dest="vast_binary",
         default="vast",
         help="The vast command to use (either absolte path or a command available in $PATH)",
     )
@@ -436,7 +453,7 @@ def main():
     parser.add_argument(
         "--loglevel",
         "-l",
-        dest="log_level",
+        dest="loglevel",
         default="info",
         help="Loglevel to use for the bridge",
     )
@@ -455,7 +472,7 @@ def main():
     parser.add_argument(
         "--transform-context",
         "-T",
-        dest="transform",
+        dest="transform_context",
         default=None,
         help="Forward the context of each sighting (only the contents without the Threat Bus specific sighting structure) via a UNIX pipe. This option takes a command line string to use and invokes it as direct subprocess without shell / globbing support. Note: Treated as template string. Occurrences of '%%ioc' get replaced with the matched IoC.",
     )
@@ -466,20 +483,29 @@ def main():
         default=None,
         help="If sink is specified, sightings are not reported back to Threat Bus. Instead, the context of a sighting (only the contents without the Threat Bus specific sighting structure) is forwarded to the specified sink via a UNIX pipe. This option takes a command line string to use and invokes it as direct subprocess without shell / globbing support.",
     )
-
     args = parser.parse_args()
 
-    setup_logging(args.log_level)
+    config = confuse.Configuration("vast-bridge")
+    config.set_args(args)
+    if args.config:
+        config.set_file(args.config)
+
+    try:
+        validate_config(config)
+    except Exception as e:
+        raise ValueError(f"Invalid config: {e}")
+
+    setup_logging(config["loglevel"].get(str))
     asyncio.run(
         start(
-            args.binary,
-            args.vast,
-            args.threatbus,
-            args.snapshot,
-            args.retro_match,
-            args.unflatten,
-            args.transform,
-            args.sink,
+            config["vast_binary"].get(),
+            config["vast"].get(),
+            config["threatbus"].get(),
+            config["snapshot"].get(),
+            config["retro_match"].get(),
+            config["unflatten"].get(),
+            config["transform_context"].get(),
+            config["sink"].get(),
         )
     )
 

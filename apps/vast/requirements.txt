@@ -1,4 +1,5 @@
 coloredlogs>=14.0
+confuse
 pyzmq>=19
 pyvast>=2020.8.28
 threatbus>=2020.9.30
