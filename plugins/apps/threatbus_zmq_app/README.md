@@ -107,7 +107,7 @@ endpoint of the plugin, as follows:
 ```
 {
   "action": "unsubscribe",
-  "topic": <P2P_TOPIC>       # the 32-characters random topic that the got during subscription handshake
+  "topic": <P2P_TOPIC>       # the 32-characters random topic that the app got during subscription handshake
 }
 ```
 
@@ -125,6 +125,48 @@ In response, the app will either receive a `success` or `error` response.
     "status": "success"
   }
   ```
+
+### Heartbeats
+
+The plugin supports synchronous heartbeats from subscribed apps. Both, Threat
+Bus and the connected apps benefit from heartbeats, they can mutually ensure
+that the connected party is still alive.
+
+Subscribed apps can send heartbeat messages with the following JSON format to
+the `manage` endpoint of this plugin:
+
+```
+{
+  "action": "heartbeat",
+  "topic": <P2P_TOPIC>       # the 32-characters random topic that the app got during subscription handshake
+}
+```
+
+As stated in the beginning of this section, the `manage` endpoint implements the
+[ZeroMQ Request/Reply](https://learning-0mq-with-pyzmq.readthedocs.io/en/latest/pyzmq/patterns/client_server.html)
+pattern. Threat Bus answers immediately to each heartbeat request with either a
+`success` or `error` response.
+
+- Error response:
+  ```
+  {
+    "status": "error"
+  }
+  ```
+- Success response:
+  ```
+  {
+    "status": "success"
+  }
+  ```
+
+An `error` response indicates that either Threat Bus has internal erros or that
+it lost track of the app's subscription. Note: This only happens when Threat Bus
+is restarted. Apps can then use that information to re-subscribe.
+
+If Threat Bus does not answer a heartbeat message, it is either down or not
+reachable (e.g., due to network issues). Plugins can use that information to try
+again later.
 
 ### Pub/Sub via ZeroMQ
 
