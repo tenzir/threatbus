@@ -5,7 +5,6 @@ import asyncio
 import atexit
 import coloredlogs
 import confuse
-from datetime import datetime
 import json
 import logging
 from message_mapping import (
@@ -25,6 +24,10 @@ import zmq
 
 logger = logging.getLogger(__name__)
 matcher_name = None
+async_tasks = []  # list of all running async tasks of the bridge
+p2p_topic = (
+    None  # the p2p topic that was given to the vast-bridge upon successful subscription
+)
 
 
 def setup_logging(level):
@@ -57,6 +60,17 @@ def validate_config(config: confuse.Subview):
     config["sink"].add(None)
 
 
+def cancel_async_tasks():
+    """
+    Cancels all async tasks of the vast-bridge.
+    """
+    global async_tasks
+    for task in async_tasks:
+        task.cancel()
+        del task
+    async_tasks = []
+
+
 async def start(
     cmd: str,
     vast_endpoint: str,
@@ -81,54 +95,62 @@ async def start(
     @param sink Forward sighting context to this sink (subprocess) instead of
         reporting back to Threat Bus
     """
-    global logger
+    global logger, async_tasks, p2p_topic
     vast = VAST(binary=cmd, endpoint=vast_endpoint)
     assert await vast.test_connection() is True, "Cannot connect to VAST"
 
     logger.debug(f"Calling Threat Bus management endpoint {zmq_endpoint}")
     reply = subscribe(zmq_endpoint, "threatbus/intel", snapshot)
-    if not reply or type(reply) is not dict:
+    if not reply_is_success(reply):
         logger.error("Subscription failed")
-        exit(1)
+        return
     pub_endpoint = reply.get("pub_endpoint", None)
     sub_endpoint = reply.get("sub_endpoint", None)
     topic = reply.get("topic", None)
-    status = reply.get("status", None)
-    if (
-        not status
-        or status != "success"
-        or not pub_endpoint
-        or not sub_endpoint
-        or not topic
-    ):
+    if not pub_endpoint or not sub_endpoint or not topic:
         logger.error("Subscription failed")
-        exit(1)
+        return
+    logger.info(f"Subscription successful. New p2p_topic: {topic}")
+    if p2p_topic:
+        # The 'start' function is called as result of a restart
+        # Unsubscribe the old topic as soon as we get a working connection
+        logger.info("Cleaning up old p2p_topic subscription ...")
+        unsubscribe(zmq_endpoint, p2p_topic)
+        atexit.unregister(unsubscribe)
+    p2p_topic = topic
     atexit.register(unsubscribe, zmq_endpoint, topic)
+
+    async_tasks.append(
+        asyncio.create_task(heartbeat(zmq_endpoint, p2p_topic, interval=5))
+    )
 
     intel_queue = asyncio.Queue()
     sightings_queue = asyncio.Queue()
-    report_sightings_task = asyncio.create_task(
-        report_sightings(sub_endpoint, sightings_queue, transform_cmd, sink)
-    )
-    atexit.register(report_sightings_task.cancel)
-    receive_task = asyncio.create_task(receive(pub_endpoint, topic, intel_queue))
-    atexit.register(receive_task.cancel)
-    match_task = asyncio.create_task(
-        match_intel(
-            cmd, vast_endpoint, intel_queue, sightings_queue, retro_match, unflatten
+    async_tasks.append(
+        asyncio.create_task(
+            report_sightings(sub_endpoint, sightings_queue, transform_cmd, sink)
         )
     )
-    atexit.register(match_task.cancel)
+
+    async_tasks.append(
+        asyncio.create_task(receive(pub_endpoint, p2p_topic, intel_queue))
+    )
+
+    async_tasks.append(
+        asyncio.create_task(
+            match_intel(
+                cmd, vast_endpoint, intel_queue, sightings_queue, retro_match, unflatten
+            )
+        )
+    )
+
     if not retro_match:
-        live_match_vast_task = asyncio.create_task(
-            live_match_vast(cmd, vast_endpoint, sightings_queue)
+        async_tasks.append(
+            asyncio.create_task(live_match_vast(cmd, vast_endpoint, sightings_queue))
         )
-        atexit.register(live_match_vast_task.cancel)
-        await asyncio.gather(
-            receive_task, report_sightings_task, match_task, live_match_vast_task
-        )
-    else:
-        await asyncio.gather(receive_task, report_sightings_task, match_task)
+
+    atexit.register(cancel_async_tasks)
+    return await asyncio.gather(*async_tasks)
 
 
 async def receive(pub_endpoint: str, topic: str, intel_queue: asyncio.Queue):
@@ -192,10 +214,12 @@ async def match_intel(
         try:
             intel = json.loads(msg, cls=IntelDecoder)
         except Exception as e:
-            logger.warn(f"Failed to decode intel item {msg}: {e}")
+            logger.warning(f"Failed to decode intel item {msg}: {e}")
             continue
         if type(intel) is not Intel:
-            logger.warn(f"Ignoring unknown message type, expected Intel: {type(intel)}")
+            logger.warning(
+                f"Ignoring unknown message type, expected Intel: {type(intel)}"
+            )
             continue
         if intel.operation == Operation.ADD:
             if retro_match:
@@ -203,6 +227,7 @@ async def match_intel(
                 if not query:
                     continue
                 proc = await vast.export().json(query).exec()
+                reported = 0
                 while not proc.stdout.at_eof():
                     line = (await proc.stdout.readline()).decode().rstrip()
                     if line:
@@ -210,14 +235,15 @@ async def match_intel(
                             line, intel, unflatten
                         )
                         if not sighting:
-                            logger.warn(f"Could not parse VAST query result: {line}")
+                            logger.error(f"Could not parse VAST query result: {line}")
                             continue
+                        reported += 1
                         await sightings_queue.put(sighting)
-                logger.debug(f"Finished retro-matching for intel: {intel}")
+                logger.debug(f"Retro-matched {reported} sightings for intel: {intel}")
             else:
                 ioc = to_vast_ioc(intel)
                 if not ioc:
-                    logger.warn(
+                    logger.error(
                         f"Unable to convert Intel to VAST compatible IoC: {intel}"
                     )
                     continue
@@ -259,13 +285,13 @@ async def live_match_vast(cmd: str, vast_endpoint: str, sightings_queue: asyncio
         data = await proc.stdout.readline()
         if not data:
             if not await vast.test_connection():
-                logger.error("Lost connection to VAST, cannot live-match.")
+                logger.error("Lost connection to VAST, cannot live-match")
                 # TODO reconnect
             continue
         vast_sighting = data.decode("utf-8").rstrip()
-        sighting = matcher_result_to_threatbus_sighting(vast_sighting, unflatten)
+        sighting = matcher_result_to_threatbus_sighting(vast_sighting)
         if not sighting:
-            logger.warn(f"Cannot parse sighting-output from VAST: {data}", e)
+            logger.error(f"Cannot parse sighting-output from VAST: {vast_sighting}")
             continue
         await sightings_queue.put(sighting)
 
@@ -332,7 +358,7 @@ async def report_sightings(
     while True:
         sighting = await sightings_queue.get()
         if type(sighting) is not Sighting:
-            logger.warn(
+            logger.warning(
                 f"Ignoring unknown message type, expected Sighting: {type(sighting)}"
             )
             continue
@@ -388,6 +414,21 @@ def send_manage_message(endpoint: str, action: dict, timeout: int = 5):
     return reply
 
 
+def reply_is_success(reply: dict):
+    """
+    Predicate to check if `reply` is a dict and contains the key-value pair
+    "status" = "success"
+    @param reply A python dict
+    @return True if the dict contains "status" = "success"
+    """
+    return (
+        reply
+        and type(reply) is dict
+        and reply.get("status", None)
+        and reply["status"] == "success"
+    )
+
+
 def subscribe(endpoint: str, topic: str, snapshot: int, timeout: int = 5):
     """
     Subscribes the vast-bridge to the Threat Bus for the given topic.
@@ -414,8 +455,30 @@ def unsubscribe(endpoint: str, topic: str, timeout: int = 5):
     logger.info(f"Unsubscribing from topic '{topic}' ...")
     action = {"action": "unsubscribe", "topic": topic}
     reply = send_manage_message(endpoint, action, timeout)
-    logger.info(f"Unsubscription: {reply}")
-    return reply
+    if not reply_is_success(reply):
+        logger.warning("Unsubscription failed")
+        return
+    logger.info("Unsubscription successful")
+
+
+async def heartbeat(endpoint: str, p2p_topic: str, interval: int = 5):
+    """
+    Sends heartbeats to Threat Bus periodically to check if the given p2p_topic
+    is still valid at the Threat Bus host. Cancels all async tasks of the bridge
+    when the heartbeat fails and stops the heartbeat.
+    @param endpoint The ZMQ management endpoint of Threat Bus
+    @param p2p_topic The topic string to include in the heartbeat
+    @param timeout The period after which the connection attempt is aborted
+    """
+    global logger, async_tasks
+    action = {"action": "heartbeat", "topic": p2p_topic}
+    while True:
+        reply = send_manage_message(endpoint, action, interval)
+        if not reply_is_success(reply):
+            logger.error("Subscription with Threat Bus host became invalid")
+            cancel_async_tasks()
+            return
+        await asyncio.sleep(interval)
 
 
 def main():
@@ -496,18 +559,22 @@ def main():
         raise ValueError(f"Invalid config: {e}")
 
     setup_logging(config["loglevel"].get(str))
-    asyncio.run(
-        start(
-            config["vast_binary"].get(),
-            config["vast"].get(),
-            config["threatbus"].get(),
-            config["snapshot"].get(),
-            config["retro_match"].get(),
-            config["unflatten"].get(),
-            config["transform_context"].get(),
-            config["sink"].get(),
-        )
-    )
+    while True:
+        try:
+            asyncio.run(
+                start(
+                    config["vast_binary"].get(),
+                    config["vast"].get(),
+                    config["threatbus"].get(),
+                    config["snapshot"].get(),
+                    config["retro_match"].get(),
+                    config["unflatten"].get(),
+                    config["transform_context"].get(),
+                    config["sink"].get(),
+                )
+            )
+        except asyncio.CancelledError:
+            logger.info("Restarting vast-bridge ...")
 
 
 if __name__ == "__main__":
