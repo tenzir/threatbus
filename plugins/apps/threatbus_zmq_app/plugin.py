@@ -4,7 +4,7 @@ from queue import Queue
 import random
 import string
 import threading
-from threatbus_zmq_app.message_mapping import map_management_message
+from threatbus_zmq_app.message_mapping import Heartbeat, map_management_message
 import threatbus
 from threatbus.data import (
     Intel,
@@ -72,57 +72,63 @@ def receive_management(
     while True:
         #  Wait for next request from client
         try:
+            msg = None
             msg = socket.recv_json()
-        except Exception as e:
-            logger.error(f"Error decoding message {msg}: {e}")
-            continue
-        task = map_management_message(msg)
+            task = map_management_message(msg)
 
-        if type(task) is Subscription:
-            # point-to-point topic and queue for that particular subscription
-            try:
-                p2p_topic = rand_string(p2p_topic_prefix_length)
-                p2p_q = Queue()
+            if type(task) is Subscription:
+                # point-to-point topic and queue for that particular subscription
                 logger.info(
                     f"Received subscription for topic {task.topic}, snapshot {task.snapshot}"
                 )
+                try:
+                    p2p_topic = rand_string(p2p_topic_prefix_length)
+                    p2p_q = Queue()
+                    subscriptions_lock.acquire()
+                    subscriptions[p2p_topic] = (task.topic, p2p_q)
+                    subscriptions_lock.release()
+                    snapshot_id = subscribe_callback(task.topic, p2p_q, task.snapshot)
+                    if snapshot_id:
+                        # remember that this snapshot was requested by this particular
+                        # subscriber (identified by unique topic), so it is not asked to
+                        # execute it's own request
+                        snapshots_lock.acquire()
+                        snapshots[snapshot_id] = p2p_topic
+                        snapshots_lock.release()
+                    # send success message for reconnecting
+                    socket.send_json(
+                        {
+                            "topic": p2p_topic,
+                            "pub_endpoint": pub_endpoint,
+                            "sub_endpoint": sub_endpoint,
+                            "status": "success",
+                        }
+                    )
+                except Exception as e:
+                    logger.error(f"Error handling subscription request {task}: {e}")
+                    socket.send_json({"status": "error"})
+            elif type(task) is Unsubscription:
+                logger.info(f"Received unsubscription from topic {task.topic}")
+                threatbus_topic, p2p_q = subscriptions.get(task.topic, (None, None))
+                if not p2p_q:
+                    logger.warn("No one was subscribed for that topic. Skipping.")
+                    socket.send_json({"status": "error"})
+                    continue
+                unsubscribe_callback(threatbus_topic, p2p_q)
                 subscriptions_lock.acquire()
-                subscriptions[p2p_topic] = (task.topic, p2p_q)
+                del subscriptions[task.topic]
                 subscriptions_lock.release()
-                snapshot_id = subscribe_callback(task.topic, p2p_q, task.snapshot)
-                if snapshot_id:
-                    # remember that this snapshot was requested by this particular
-                    # subscriber (identified by unique topic), so it is not asked to
-                    # execute it's own request
-                    snapshots_lock.acquire()
-                    snapshots[snapshot_id] = p2p_topic
-                    snapshots_lock.release()
-                # send success message for reconnecting
-                socket.send_json(
-                    {
-                        "topic": p2p_topic,
-                        "pub_endpoint": pub_endpoint,
-                        "sub_endpoint": sub_endpoint,
-                        "status": "success",
-                    }
-                )
-            except Exception as e:
-                logger.error(f"Error handling subscription request {task}: {e}")
-                socket.send_json({"status": "error"})
-        elif type(task) is Unsubscription:
-            logger.info(f"Received unsubscription from topic {task.topic}")
-            threatbus_topic, p2p_q = subscriptions.get(task.topic, (None, None))
-            if not p2p_q:
-                logger.warn("No one was subscribed for that topic. Skipping.")
-                socket.send_json({"status": "error"})
-                continue
-            unsubscribe_callback(threatbus_topic, p2p_q)
-            subscriptions_lock.acquire()
-            del subscriptions[task.topic]
-            subscriptions_lock.release()
-            socket.send_json({"status": "success"})
-        else:
-            socket.send_json({"status": "unknown request"})
+                socket.send_json({"status": "success"})
+            elif type(task) is Heartbeat:
+                if task.topic not in subscriptions:
+                    socket.send_json({"status": "error"})
+                    continue
+                socket.send_json({"status": "success"})
+            else:
+                socket.send_json({"status": "unknown request"})
+        except Exception as e:
+            socket.send_json({"status": "error"})
+            logger.error(f"Error handling management message {msg}: {e}")
 
 
 def pub_zmq(zmq_config: Subview):
@@ -146,6 +152,7 @@ def pub_zmq(zmq_config: Subview):
                 continue
             msg = q.get()
             if not msg:
+                q.task_done()
                 continue
             if type(msg) is Intel:
                 encoded = json.dumps(msg, cls=IntelEncoder)
