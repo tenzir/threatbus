@@ -9,7 +9,9 @@ Every entry has a category for which we use the following visual abbreviations:
 - ⚠️ change
 - 🐞 bugfix
 
-## Unreleased
+<!-- ## Unreleased -->
+
+## [2020.10.29]
 
 - 🎁 The MISP plugin now works without a valid PyMISP API connection. If omitted in the configuration, the plugin can still receive indicators via ZeroMQ or Kafka, but it cannot report back sightings or request snapshots.
   [#55](https://github.com/tenzir/threatbus/pull/55)
@@ -24,3 +26,6 @@ Every entry has a category for which we use the following visual abbreviations:
   VAST plugin. Any app that communicates via ZeroMQ can implement this plugin's
   protocol to connect with Threat Bus effortlessly.
   [#46](https://github.com/tenzir/threatbus/pull/46)
+
+
+[2020.10.29]: https://github.com/tenzir/threatbus/releases/tag/2020.10.29

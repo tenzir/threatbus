@@ -45,5 +45,5 @@ setup(
     packages=["threatbus_zmq_app"],
     python_requires=">=3.7",
     url="https://github.com/tenzir/threatbus",
-    version="2020.09.30",
+    version="2020.10.29",
 )
