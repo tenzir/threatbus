@@ -5,7 +5,7 @@ Threat Bus is a publish-subscribe broker for threat intelligence. It is expected
 that applications register themselves at the bus. Since VAST cannot do so on its
 own (yet), `vast-bridge.py` implements that functionality in the meantime.
 
-The bridge provides a thin layer around 
+The bridge provides a thin layer around
 [PyVAST](https://docs.tenzir.com/vast/python-bindings/overview), VAST's Python
 CLI bindings. It facilitates message exchange between Threat Bus and a VAST
 instance.
@@ -74,11 +74,12 @@ that the VAST node must support this feature.
 #### Retro Matching
 
 The `vast-bridge` supports retro matching via the command line option
-`--retro-match`. This instructs the bridge to translate IoCs from
-Threat Bus to normal VAST queries instead of feeding the IoCs to a live matcher.
+`--retro-match`. This instructs the bridge to translate IoCs from Threat Bus to
+normal VAST queries instead of feeding the IoCs to a live matcher.
 
 Each result from an IoC query is treated as `Sighting` of that IoC and reported
-back to Threat Bus.
+back to Threat Bus. You can limit the maximum amount of results returned from
+VAST via the option `--retro-match-max-events`.
 
 ### Sighting Context Transformation
 
