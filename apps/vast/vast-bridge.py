@@ -53,6 +53,7 @@ def validate_config(config: confuse.Subview):
     config["snapshot"].get(int)
     config["loglevel"].get(str)
     config["retro_match"].get(bool)
+    config["retro_match_max_events"].get(int)
     config["unflatten"].get(bool)
 
     # fallback values for the optional arguments
@@ -77,6 +78,7 @@ async def start(
     zmq_endpoint: str,
     snapshot: int,
     retro_match: bool,
+    retro_match_max_events: int,
     unflatten: bool,
     transform_cmd: str = None,
     sink: str = None,
@@ -90,6 +92,7 @@ async def start(
     @param zmq_endpoint The ZMQ management endpoint of Threat Bus ('host:port')
     @param snapshot An integer value to request n days of past intel items
     @param retro_match Boolean flag to use retro-matching over live-matching
+    @param retro_match_max_events Max amount of retro match results
     @param unflatten Boolean flag to unflatten JSON when received from VAST
     @param transform_cmd The command to use to transform Sighting context with
     @param sink Forward sighting context to this sink (subprocess) instead of
@@ -139,7 +142,13 @@ async def start(
     async_tasks.append(
         asyncio.create_task(
             match_intel(
-                cmd, vast_endpoint, intel_queue, sightings_queue, retro_match, unflatten
+                cmd,
+                vast_endpoint,
+                intel_queue,
+                sightings_queue,
+                retro_match,
+                retro_match_max_events,
+                unflatten,
             )
         )
     )
@@ -195,6 +204,7 @@ async def match_intel(
     intel_queue: asyncio.Queue,
     sightings_queue: asyncio.Queue,
     retro_match: bool,
+    retro_match_max_events: int,
     unflatten: bool,
 ):
     """
@@ -205,6 +215,7 @@ async def match_intel(
     @param intel_queue The queue to read new IoCs from
     @param sightings_queue The queue to put new sightings into
     @param retro_match Boolean flag to use retro-matching over live-matching
+    @param retro_match_max_events  Max amount of retro match results
     @param unflatten Boolean flag to unflatten JSON when received from VAST
     """
     global logger
@@ -226,7 +237,11 @@ async def match_intel(
                 query = to_vast_query(intel)
                 if not query:
                     continue
-                proc = await vast.export().json(query).exec()
+                proc = (
+                    await vast.export(max_events=retro_match_max_events)
+                    .json(query)
+                    .exec()
+                )
                 reported = 0
                 while not proc.stdout.at_eof():
                     line = (await proc.stdout.readline()).decode().rstrip()
@@ -239,7 +254,7 @@ async def match_intel(
                             continue
                         reported += 1
                         await sightings_queue.put(sighting)
-                logger.debug(f"Retro-matched {reported} sightings for intel: {intel}")
+                logger.debug(f"Retro-matched {reported} sighting(s) for intel: {intel}")
             else:
                 ioc = to_vast_ioc(intel)
                 if not ioc:
@@ -533,6 +548,13 @@ def main():
         help="Only applicable when --retro-match is used. Unflatten the JSON results from VAST. The unflattening is applied immediately after retrieving the results from VAST, i.e., unflatten is applied before all further processing steps like --transform-context, --sink, or reporting back to Threat Bus.",
     )
     parser.add_argument(
+        "--retro-match-max-events",
+        dest="retro_match_max_events",
+        default=0,
+        type=int,
+        help="Use this options to fine-tune '--retro-match'. The bridge passes this option to VAST to at most return the configured number of sightings per IoC.",
+    )
+    parser.add_argument(
         "--transform-context",
         "-T",
         dest="transform_context",
@@ -568,6 +590,7 @@ def main():
                     config["threatbus"].get(),
                     config["snapshot"].get(),
                     config["retro_match"].get(),
+                    config["retro_match_max_events"].get(),
                     config["unflatten"].get(),
                     config["transform_context"].get(),
                     config["sink"].get(),
