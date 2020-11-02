@@ -4,6 +4,7 @@ threatbus: "localhost:13370"
 snapshot: 30
 loglevel: DEBUG
 retro_match: true
+retro_match_max_events: 0
 unflatten: true
 # optional. remove the field if you don't want to transform sighting context
 transform_context: fever alertify --alert-prefix 'MY PREFIX' --extra-key my-ioc --ioc %ioc
