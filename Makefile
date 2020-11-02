@@ -30,6 +30,7 @@ integration-tests:
 	-python -m unittest tests/integration/test_message_roundtrips.py
 	-python -m unittest tests/integration/test_zeek_app.py
 	-python -m unittest tests/integration/test_rabbitmq.py
+	-python -m unittest tests/integration/test_zmq_app_management.py
 	-${RM} {broker,intel,reporter,weird}.log
 	docker kill rabbit-int > /dev/null 2>&1
 
