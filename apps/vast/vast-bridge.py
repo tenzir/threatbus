@@ -96,7 +96,7 @@ async def start(
         reporting back to Threat Bus
     """
     global logger, async_tasks, p2p_topic
-    vast = VAST(binary=cmd, endpoint=vast_endpoint)
+    vast = VAST(binary=cmd, endpoint=vast_endpoint, logger=logger)
     assert await vast.test_connection() is True, "Cannot connect to VAST"
 
     logger.debug(f"Calling Threat Bus management endpoint {zmq_endpoint}")
@@ -208,7 +208,7 @@ async def match_intel(
     @param unflatten Boolean flag to unflatten JSON when received from VAST
     """
     global logger
-    vast = VAST(binary=cmd, endpoint=vast_endpoint)
+    vast = VAST(binary=cmd, endpoint=vast_endpoint, logger=logger)
     while True:
         msg = await intel_queue.get()
         try:
@@ -278,7 +278,7 @@ async def live_match_vast(cmd: str, vast_endpoint: str, sightings_queue: asyncio
     @param retro_match Boolean flag to use retro-matching over live-matching
     """
     global logger, matcher_name
-    vast = VAST(binary=cmd, endpoint=vast_endpoint)
+    vast = VAST(binary=cmd, endpoint=vast_endpoint, logger=logger)
     matcher_name = "threatbus-" + "".join(random.choice(letters) for i in range(10))
     proc = await vast.matcher().start(name=matcher_name).exec()
     while True:
