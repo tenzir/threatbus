@@ -1,4 +1,4 @@
-from queue import Queue
+from multiprocessing import JoinableQueue
 import threading
 from cifsdk.client.http import HTTP as Client
 
@@ -81,7 +81,7 @@ def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
         )
         return
 
-    from_backbone_to_cifq = Queue()
+    from_backbone_to_cifq = JoinableQueue()
     topic = "threatbus/intel"
     subscribe_callback(topic, from_backbone_to_cifq)
 

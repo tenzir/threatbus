@@ -1,6 +1,8 @@
 from collections import defaultdict
+from confuse import Subview
 import json
 import pika
+from multiprocessing import JoinableQueue
 from retry import retry
 from socket import gethostname
 import threading
@@ -19,17 +21,18 @@ from threatbus.data import (
     SnapshotEnvelopeEncoder,
     SnapshotEnvelopeDecoder,
 )
+from typing import Dict, Union
 
 
 """RabbitMQ backbone plugin for Threat Bus"""
 
 plugin_name = "rabbitmq"
 
-subscriptions = defaultdict(set)
+subscriptions: Dict[str, set] = defaultdict(set)
 lock = threading.Lock()
 
 
-def get_queue_name(join_symbol, data_type, suffix=gethostname()):
+def get_queue_name(join_symbol: str, data_type: str, suffix: str = gethostname()):
     """
     Returns a queue name accroding to the desired pattern.
     @param join_symbol The symbol to use when concatenating the name
@@ -39,7 +42,7 @@ def get_queue_name(join_symbol, data_type, suffix=gethostname()):
     return join_symbol.join(["threatbus", data_type, suffix])
 
 
-def get_exchange_name(join_symbol, data_type):
+def get_exchange_name(join_symbol: str, data_type: str):
     """
     Returns an exchange name accroding to the desired pattern.
     @param join_symbol The symbol to use when concatenating the name
@@ -49,7 +52,7 @@ def get_exchange_name(join_symbol, data_type):
     return join_symbol.join(["threatbus", data_type])
 
 
-def validate_config(config):
+def validate_config(config: Subview):
     assert config, "config must not be None"
     config["host"].get(str)
     config["port"].get(int)
@@ -68,7 +71,9 @@ def validate_config(config):
     config["queue"]["max_items"].get(int)
 
 
-def __provision(topic, msg):
+def __provision(
+    topic: str, msg: Union[Intel, Sighting, SnapshotEnvelope, SnapshotRequest]
+):
     """
     Provisions the given `msg` to all subscribers of `topic`.
     @param topic The topic string to use for provisioning
@@ -83,7 +88,7 @@ def __provision(topic, msg):
     logger.debug(f"Relayed message from RabbitMQ: {msg}")
 
 
-def __decode(msg, decoder):
+def __decode(msg: str, decoder: json.JSONDecoder):
     """
     Decodes a JSON message with the given decoder. Returns the decoded object or
     None and logs an error.
@@ -159,7 +164,9 @@ def __provision_snapshot_envelope(channel, method_frame, header_frame, body):
 
 
 @retry(delay=5)
-def consume_rabbitmq(conn_params, join_symbol, queue_params):
+def consume_rabbitmq(
+    conn_params: pika.ConnectionParameters, join_symbol: str, queue_params: Subview
+):
     """
     Connects to RabbitMQ on the given host/port endpoint. Registers callbacks to
     consumes all messages and initiates further provisioning.
@@ -233,13 +240,15 @@ def consume_rabbitmq(conn_params, join_symbol, queue_params):
 
 
 @retry(delay=5)
-def publish_rabbitmq(conn_params, join_symbol, inq):
+def publish_rabbitmq(
+    conn_params: pika.ConnectionParameters, join_symbol: str, inq: JoinableQueue
+):
     """
     Connects to RabbitMQ on the given host/port endpoint. Forwards all messages
     from the `inq`, based on their type, to the appropriate RabbitMQ exchange.
     @param conn_params Pika.ConnectionParameters to connect to RabbitMQ
     @param join_symbol The symbol to use when determining queue and exchange names
-    @param inq A Queue object to read messages from and publish them to RabbitMQ
+    @param inq A queue object to read messages from and publish them to RabbitMQ
     """
     global logger
     logger.debug("Connecting RabbitMQ publisher...")
@@ -294,7 +303,7 @@ def publish_rabbitmq(conn_params, join_symbol, inq):
 
 
 @threatbus.backbone
-def subscribe(topic, q):
+def subscribe(topic: str, q: JoinableQueue):
     """
     Threat Bus' subscribe hook. Used to register new app-queues for certain
     topics.
@@ -307,7 +316,7 @@ def subscribe(topic, q):
 
 
 @threatbus.backbone
-def unsubscribe(topic, q):
+def unsubscribe(topic: str, q: JoinableQueue):
     """
     Threat Bus' unsubscribe hook. Used to deregister app-queues from certain
     topics.
@@ -321,7 +330,7 @@ def unsubscribe(topic, q):
 
 
 @threatbus.backbone
-def run(config, logging, inq):
+def run(config: Subview, logging: Subview, inq: JoinableQueue):
     global logger
     logger = threatbus.logger.setup(logging, __name__)
     config = config[plugin_name]

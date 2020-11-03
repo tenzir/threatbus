@@ -3,7 +3,7 @@ import confuse
 from datetime import timedelta
 from logging import Logger
 import pluggy
-from queue import Queue
+from multiprocessing import JoinableQueue
 from threatbus import appspecs, backbonespecs, logger
 from threatbus.data import MessageType, SnapshotRequest, SnapshotEnvelope
 from threading import Lock
@@ -22,8 +22,8 @@ class ThreatBus:
         self.apps = apps
         self.config = config
         self.logger = logger
-        self.inq = Queue()  # fan-in everything, provisioned by backbone
-        self.snapshot_q = Queue()
+        self.inq = JoinableQueue()  # fan-in everything, provisioned by backbone
+        self.snapshot_q = JoinableQueue()
         self.lock = Lock()
         self.snapshots = dict()
 
@@ -34,7 +34,10 @@ class ThreatBus:
         or discards them accordingly.
         """
         while True:
-            msg = self.snapshot_q.get(block=True)
+            try:
+                msg = self.snapshot_q.get(block=True, timeout=1)
+            except:
+                continue
             if type(msg) is SnapshotRequest:
                 self.logger.debug(f"Received SnapshotRequest: {msg}")
                 self.apps.snapshot(snapshot_request=msg, result_q=self.inq)
@@ -50,7 +53,7 @@ class ThreatBus:
             self.snapshot_q.task_done()
 
     def request_snapshot(
-        self, topic: str, dst_q: Queue, snapshot_id: str, time_delta: timedelta
+        self, topic: str, dst_q: JoinableQueue, snapshot_id: str, time_delta: timedelta
     ):
         """
         Create a new SnapshotRequest and push it to the inq, so that the
@@ -81,7 +84,7 @@ class ThreatBus:
 
             self.inq.put(req)
 
-    def subscribe(self, topic: str, q: Queue, time_delta: timedelta = None):
+    def subscribe(self, topic: str, q: JoinableQueue, time_delta: timedelta = None):
         """
         Accepts a new subscription for a given topic and queue pointer.
         Forwards that subscription to all managed backbones.
@@ -99,7 +102,7 @@ class ThreatBus:
         self.request_snapshot(topic, q, snapshot_id, time_delta)
         return snapshot_id
 
-    def unsubscribe(self, topic: str, q: Queue):
+    def unsubscribe(self, topic: str, q: JoinableQueue):
         """
         Removes subscription for a given topic and queue pointer from all
         managed backbones.

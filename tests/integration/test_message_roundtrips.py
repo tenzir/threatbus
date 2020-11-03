@@ -47,6 +47,7 @@ class TestMessageRoundtrip(unittest.TestCase):
             target=zeek_receiver.forward, args=(items, result_q), daemon=False
         )
         rec.start()
+        time.sleep(1)
         zeek_sender.send_generic("threatbus/intel", items)
         time.sleep(1)
         self.assertEqual(result_q.qsize(), items)

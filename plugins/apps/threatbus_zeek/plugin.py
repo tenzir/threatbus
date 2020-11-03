@@ -1,5 +1,5 @@
 import broker
-from queue import Queue
+from multiprocessing import JoinableQueue
 import random
 import select
 import string
@@ -42,7 +42,7 @@ def manage_subscription(
         # point-to-point topic and queue for that particular subscription
         logger.info(f"Received subscription for topic: {task.topic}")
         p2p_topic = task.topic + rand_string(rand_suffix_length)
-        p2p_q = Queue()
+        p2p_q = JoinableQueue()
         ack = broker.zeek.Event(
             f"{module_namespace}::subscription_acknowledged", p2p_topic
         )

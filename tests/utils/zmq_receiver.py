@@ -14,7 +14,7 @@ def send_manage_message(action, topic):
     context = zmq.Context()
     socket = context.socket(zmq.REQ)
     socket.setsockopt(zmq.LINGER, 0)
-    socket.connect(f"tcp://127.0.0.1:13370")
+    socket.connect("tcp://127.0.0.1:13370")
     socket.send_json(action)
     poller = zmq.Poller()
     poller.register(socket, zmq.POLLIN)
@@ -55,7 +55,7 @@ def receive(n: int, topics: list):
 
 def forward(n: int, topics: list, q: Queue):
     """
-    Receives exactly n messages via ZeroMQ and forwards them to the result queueu q
+    Receives exactly n messages via ZeroMQ and forwards them to the result queue
     @param n Items to receive
     @param topics List of topics to subscribe to
     @param q The queue to push received items to

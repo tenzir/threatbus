@@ -1,7 +1,7 @@
 import confuse
 from datetime import datetime, timedelta
+from multiprocessing import JoinableQueue
 from plugins.backbones.threatbus_rabbitmq import plugin
-from queue import Queue
 from threatbus.data import (
     Intel,
     IntelData,
@@ -94,11 +94,11 @@ class TestRoundtrips(unittest.TestCase):
         config["console"] = False
         config["file"] = False
 
-        self.inq = Queue()
+        self.inq = JoinableQueue()
         plugin.run(config, config, self.inq)
 
         # subscribe this test case as concumer
-        self.outq = Queue()
+        self.outq = JoinableQueue()
         plugin.subscribe("threatbus/intel", self.outq)
         plugin.subscribe("threatbus/sighting", self.outq)
         plugin.subscribe("threatbus/snapshotrequest", self.outq)

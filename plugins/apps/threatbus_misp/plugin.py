@@ -3,8 +3,8 @@ from confuse import Subview
 from datetime import datetime
 from itertools import product
 import json
+from multiprocessing import JoinableQueue
 import pymisp
-from queue import Queue
 import threading
 import threatbus
 from threatbus.data import MessageType, SnapshotEnvelope, SnapshotRequest
@@ -55,7 +55,7 @@ def validate_config(config: Subview):
         config["kafka"]["config"].get(dict)
 
 
-def publish_sightings(outq: Queue):
+def publish_sightings(outq: JoinableQueue):
     """
     Reports / publishes true-positive sightings of intelligence items back to the given MISP endpoint.
     @param outq The queue from which to forward messages to MISP
@@ -73,7 +73,7 @@ def publish_sightings(outq: Queue):
         outq.task_done()
 
 
-def receive_kafka(kafka_config: Subview, inq: Queue):
+def receive_kafka(kafka_config: Subview, inq: JoinableQueue):
     """
     Binds a Kafka consumer to the the given host/port. Forwards all received messages to the inq.
     @param kafka_config A configuration object for Kafka binding
@@ -103,7 +103,7 @@ def receive_kafka(kafka_config: Subview, inq: Queue):
             inq.put(intel)
 
 
-def receive_zmq(zmq_config: Subview, inq: Queue):
+def receive_zmq(zmq_config: Subview, inq: JoinableQueue):
     """
     Binds a ZMQ poller to the the given host/port. Forwards all received messages to the inq.
     @param zmq_config A configuration object for ZeroMQ binding
@@ -137,7 +137,7 @@ def receive_zmq(zmq_config: Subview, inq: Queue):
 
 
 @threatbus.app
-def snapshot(snapshot_request: SnapshotRequest, result_q: Queue):
+def snapshot(snapshot_request: SnapshotRequest, result_q: JoinableQueue):
     global logger, misp, lock, filter_config
     if snapshot_request.snapshot_type != MessageType.INTEL:
         logger.debug("Sighting snapshot feature not yet implemented.")
@@ -190,7 +190,7 @@ def snapshot(snapshot_request: SnapshotRequest, result_q: Queue):
 def run(
     config: Subview,
     logging: Subview,
-    inq: Queue,
+    inq: JoinableQueue,
     subscribe_callback: Callable,
     unsubscribe_callback: Callable,
 ):
@@ -242,7 +242,7 @@ def run(
             "Starting MISP plugin without API connection, cannot report back sightings or request snapshots."
         )
 
-    outq = Queue()
+    outq = JoinableQueue()
     subscribe_callback("threatbus/sighting", outq)
     threading.Thread(target=publish_sightings, args=(outq,), daemon=True).start()
     if receiver_thread is not None:

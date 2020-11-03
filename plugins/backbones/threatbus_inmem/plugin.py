@@ -1,5 +1,7 @@
-import threading
 from collections import defaultdict
+from confuse import Subview
+from multiprocessing import JoinableQueue
+import threading
 import threatbus
 
 """In-Memory backbone plugin for Threat Bus"""
@@ -14,10 +16,10 @@ def validate_config(config):
     return True
 
 
-def provision(inq):
+def provision(inq: JoinableQueue):
     """
     Provisions all messages that arrive on the inq to all subscribers of that topic.
-    @param inq The in-Queue to read messages from
+    @param inq The in-queue to read messages from
     """
     global subscriptions, lock, logger
     while True:
@@ -33,7 +35,7 @@ def provision(inq):
 
 
 @threatbus.backbone
-def subscribe(topic, q):
+def subscribe(topic: str, q: JoinableQueue):
     global logger, subscriptions, lock
     logger.info(f"Adding subscription to: {topic}")
     lock.acquire()
@@ -42,7 +44,7 @@ def subscribe(topic, q):
 
 
 @threatbus.backbone
-def unsubscribe(topic, q):
+def unsubscribe(topic: str, q: JoinableQueue):
     global logger, subscriptions, lock
     logger.info(f"Removing subscription from: {topic}")
     lock.acquire()
@@ -52,7 +54,7 @@ def unsubscribe(topic, q):
 
 
 @threatbus.backbone
-def run(config, logging, inq):
+def run(config: Subview, logging: Subview, inq: JoinableQueue):
     global logger
     logger = threatbus.logger.setup(logging, __name__)
     config = config[plugin_name]

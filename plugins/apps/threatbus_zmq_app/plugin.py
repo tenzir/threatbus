@@ -1,6 +1,6 @@
 from confuse import Subview
 import json
-from queue import Queue
+from multiprocessing import JoinableQueue
 import random
 import string
 import threading
@@ -20,8 +20,8 @@ from threatbus.data import (
     Subscription,
     Unsubscription,
 )
-import time
 from typing import Callable, Dict, Tuple
+import time
 import zmq
 
 
@@ -32,7 +32,8 @@ Allows to connect any app via ZeroMQ that adheres to the Threat Bus ZMQ protocol
 
 plugin_name = "zmq-app"
 subscriptions_lock = threading.Lock()
-subscriptions: Dict[str, Tuple[str, Queue]] = dict()  # p2p_topic => (topic, queue)
+# subscriptions: p2p_topic => (topic, queue)
+subscriptions: Dict[str, Tuple[str, JoinableQueue]] = dict()
 snapshots_lock = threading.Lock()
 snapshots: Dict[str, str] = dict()  # snapshot_id => topic
 p2p_topic_prefix_length = 32  # length of random topic prefix
@@ -83,7 +84,7 @@ def receive_management(
                 )
                 try:
                     p2p_topic = rand_string(p2p_topic_prefix_length)
-                    p2p_q = Queue()
+                    p2p_q = JoinableQueue()
                     subscriptions_lock.acquire()
                     subscriptions[p2p_topic] = (task.topic, p2p_q)
                     subscriptions_lock.release()
@@ -167,6 +168,7 @@ def pub_zmq(zmq_config: Subview):
                 logger.warn(
                     f"Skipping unknown message type '{type(msg)}' for topic subscription {topic}."
                 )
+                q.task_done()
                 continue
             socket.send((f"{topic} {encoded}").encode())
             logger.debug(f"Published {encoded} on topic {topic}")
@@ -174,7 +176,7 @@ def pub_zmq(zmq_config: Subview):
         time.sleep(0.05)
 
 
-def sub_zmq(zmq_config: Subview, inq: Queue):
+def sub_zmq(zmq_config: Subview, inq: JoinableQueue):
     """
     Forwards messages that are received via ZeroMQ from connected applications
     to the plugin's in-queue.
@@ -228,9 +230,8 @@ def sub_zmq(zmq_config: Subview, inq: Queue):
 
 
 @threatbus.app
-def snapshot(snapshot_request: SnapshotRequest, result_q: Queue):
+def snapshot(snapshot_request: SnapshotRequest, result_q: JoinableQueue):
     global logger, snapshots, snapshots_lock, subscriptions, subscriptions_lock
-    logger.info(f"Executing snapshot for time delta {snapshot_request.snapshot}")
 
     snapshots_lock.acquire()
     requester = snapshots.get(snapshot_request.snapshot_id, None)
@@ -250,7 +251,7 @@ def snapshot(snapshot_request: SnapshotRequest, result_q: Queue):
 def run(
     config: Subview,
     logging: Subview,
-    inq: Queue,
+    inq: JoinableQueue,
     subscribe_callback: Callable,
     unsubscribe_callback: Callable,
 ):

@@ -1,6 +1,6 @@
 import pluggy
 from confuse import Subview
-from queue import Queue
+from multiprocessing import JoinableQueue
 from typing import Callable
 from threatbus.data import SnapshotRequest
 
@@ -11,7 +11,7 @@ hookspec = pluggy.HookspecMarker("threatbus.app")
 def run(
     config: Subview,
     logging: Subview,
-    inq: Queue,
+    inq: JoinableQueue,
     subscribe_callback: Callable,
     unsubscribe_callback: Callable,
 ):
@@ -28,7 +28,7 @@ def run(
 
 
 @hookspec
-def snapshot(snapshot_request: SnapshotRequest, result_q: Queue):
+def snapshot(snapshot_request: SnapshotRequest, result_q: JoinableQueue):
     """
     Perform a snapshot, based on the given `snapshot_request`. Snapshots are
     collected up to the requested earliest date. Results of the type
