@@ -2,6 +2,7 @@ from confuse import Subview
 import json
 from multiprocessing import JoinableQueue
 import random
+import select
 import string
 import threading
 from threatbus_zmq_app.message_mapping import Heartbeat, map_management_message
@@ -21,7 +22,6 @@ from threatbus.data import (
     Unsubscription,
 )
 from typing import Callable, Dict, Tuple
-import time
 import zmq
 
 
@@ -144,11 +144,16 @@ def pub_zmq(zmq_config: Subview):
 
     while True:
         subscriptions_lock.acquire()
-        subs_copy = subscriptions.copy()
+        # subscriptions is a dict with p2p_topic => (topic, queue)
+        # qt_lookup is a dict with queue-reader => (topic, queue)
+        qt_lookup = {
+            sub[1][1]._reader: (sub[0], sub[1][1]) for sub in subscriptions.items()
+        }
+        readers = [tq[1]._reader for tq in subscriptions.values()]
         subscriptions_lock.release()
-        # the queues are filled by the backbone, the plugin distributes all
-        # messages in round-robin fashion to all subscribers
-        for topic, (_, q) in subs_copy.items():
+        (ready_readers, [], []) = select.select(readers, [], [], 0.05)
+        for fd in ready_readers:
+            topic, q = qt_lookup[fd]
             if q.empty():
                 continue
             msg = q.get()
@@ -170,10 +175,12 @@ def pub_zmq(zmq_config: Subview):
                 )
                 q.task_done()
                 continue
-            socket.send((f"{topic} {encoded}").encode())
-            logger.debug(f"Published {encoded} on topic {topic}")
+            try:
+                socket.send((f"{topic} {encoded}").encode())
+                logger.debug(f"Published {encoded} on topic {topic}")
+            except Exception as e:
+                logger.error(f"Error sending {encoded} on topic {topic}: {e}")
             q.task_done()
-        time.sleep(0.05)
 
 
 def sub_zmq(zmq_config: Subview, inq: JoinableQueue):

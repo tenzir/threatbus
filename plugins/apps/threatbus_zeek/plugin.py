@@ -12,14 +12,13 @@ from threatbus_zeek.message_mapping import (
     map_to_internal,
     map_management_message,
 )
-import time
 from typing import Callable, Dict, Union
 
 """Zeek network monitor - plugin for Threat Bus"""
 
 plugin_name = "zeek"
 lock = threading.Lock()
-subscriptions: Dict[str, JoinableQueue] = dict()
+subscriptions: Dict[str, JoinableQueue] = dict()  # p2p_topic => queue
 
 
 def validate_config(config):
@@ -80,19 +79,25 @@ def publish(module_namespace: str, ep: broker.Endpoint):
     global subscriptions, lock, logger
     while True:
         lock.acquire()
-        for topic, q in subscriptions.items():
+        # subscriptions is a dict with p2p_topic => queue
+        # qt_lookup is a dict with queue-reader => (p2p_topic, queue)
+        qt_lookup = {sub[1]._reader: (sub[0], sub[1]) for sub in subscriptions.items()}
+        readers = [q._reader for q in subscriptions.values()]
+        lock.release()
+        (ready_readers, [], []) = select.select(readers, [], [], 0.05)
+        for fd in ready_readers:
+            topic, q = qt_lookup[fd]
             if q.empty():
                 continue
             msg = q.get()
             if not msg:
+                q.task_done()
                 continue
             event = map_to_broker(msg, module_namespace)
             if event:
                 ep.publish(topic, event)
                 logger.debug(f"Published {msg} on topic {topic}")
             q.task_done()
-        lock.release()
-        time.sleep(0.05)
 
 
 def manage(
