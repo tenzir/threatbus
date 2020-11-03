@@ -196,8 +196,78 @@ async def receive(pub_endpoint: str, topic: str, intel_queue: asyncio.Queue):
             await asyncio.sleep(0.05)  # free event loop for other tasks
 
 
+async def retro_match_vast(
+    vast_cmd, vast_endpoint, retro_match_max_events, intel, sightings_queue, unflatten
+):
+    """
+    Turns the given intel into a valid VAST query and forwards all all query
+    results (sightings) to the sightings_queue.
+    @param vast_cmd The vast binary command to use with PyVAST
+    @param vast_endpoint The endpoint of a running vast node ('host:port')
+    @param retro_match_max_events  Max amount of retro match results
+    @param intel The IoC to query VAST for
+    @param sightings_queue The queue to put new sightings into
+    @param unflatten Boolean flag to unflatten JSON when received from VAST
+    """
+    global logger
+    query = to_vast_query(intel)
+    if not query:
+        return
+    vast = VAST(binary=vast_cmd, endpoint=vast_endpoint, logger=logger)
+    proc = await vast.export(max_events=retro_match_max_events).json(query).exec()
+    reported = 0
+    while not proc.stdout.at_eof():
+        line = (await proc.stdout.readline()).decode().rstrip()
+        if line:
+            sighting = query_result_to_threatbus_sighting(line, intel, unflatten)
+            if not sighting:
+                logger.error(f"Could not parse VAST query result: {line}")
+                continue
+            reported += 1
+            await sightings_queue.put(sighting)
+    logger.debug(f"Retro-matched {reported} sighting(s) for intel: {intel}")
+
+
+async def ingest_vast_ioc(vast_cmd, vast_endpoint, intel):
+    """
+    Ingests the given intel as IoC into a VAST matcher.
+    @param vast_cmd The vast binary command to use with PyVAST
+    @param vast_endpoint The endpoint of a running vast node ('host:port')
+    @param intel The IoC to query VAST for
+    """
+    global logger
+    ioc = to_vast_ioc(intel)
+    if not ioc:
+        logger.error(f"Unable to convert Intel to VAST compatible IoC: {intel}")
+        return
+    vast = VAST(binary=vast_cmd, endpoint=vast_endpoint, logger=logger)
+    proc = await vast.import_().json(type="intel.indicator").exec(stdin=ioc)
+    await proc.wait()
+    logger.debug(f"Ingested intel for live matching: {intel}")
+
+
+async def remove_vast_ioc(vast_cmd, vast_endpoint, intel):
+    """
+    Removes the given intel as IoC from a VAST matcher.
+    @param vast_cmd The vast binary command to use with PyVAST
+    @param vast_endpoint The endpoint of a running vast node ('host:port')
+    @param intel The IoC to query VAST for
+    """
+    global logger, matcher_name
+    intel_type = get_vast_intel_type(intel)
+    ioc = get_ioc(intel)
+    if not ioc or not intel_type:
+        logger.error(
+            f"Cannot remove intel with missing intel_type or indicator: {intel}"
+        )
+        return
+    vast = VAST(binary=vast_cmd, endpoint=vast_endpoint, logger=logger)
+    await vast.matcher().ioc_remove(matcher_name, ioc, intel_type).exec()
+    logger.debug(f"Removed indicator {intel}")
+
+
 async def match_intel(
-    cmd: str,
+    vast_cmd: str,
     vast_endpoint: str,
     intel_queue: asyncio.Queue,
     sightings_queue: asyncio.Queue,
@@ -208,7 +278,7 @@ async def match_intel(
     """
     Reads from the intel_queue and matches all IoCs, either via VAST's
     live-matching or retro-matching.
-    @param cmd The vast binary command to use with PyVAST
+    @param vast_cmd The vast binary command to use with PyVAST
     @param vast_endpoint The endpoint of a running vast node ('host:port')
     @param intel_queue The queue to read new IoCs from
     @param sightings_queue The queue to put new sightings into
@@ -217,7 +287,6 @@ async def match_intel(
     @param unflatten Boolean flag to unflatten JSON when received from VAST
     """
     global logger
-    vast = VAST(binary=cmd, endpoint=vast_endpoint, logger=logger)
     while True:
         msg = await intel_queue.get()
         try:
@@ -232,50 +301,22 @@ async def match_intel(
             continue
         if intel.operation == Operation.ADD:
             if retro_match:
-                query = to_vast_query(intel)
-                if not query:
-                    continue
-                proc = (
-                    await vast.export(max_events=retro_match_max_events)
-                    .json(query)
-                    .exec()
-                )
-                reported = 0
-                while not proc.stdout.at_eof():
-                    line = (await proc.stdout.readline()).decode().rstrip()
-                    if line:
-                        sighting = query_result_to_threatbus_sighting(
-                            line, intel, unflatten
-                        )
-                        if not sighting:
-                            logger.error(f"Could not parse VAST query result: {line}")
-                            continue
-                        reported += 1
-                        await sightings_queue.put(sighting)
-                logger.debug(f"Retro-matched {reported} sighting(s) for intel: {intel}")
-            else:
-                ioc = to_vast_ioc(intel)
-                if not ioc:
-                    logger.error(
-                        f"Unable to convert Intel to VAST compatible IoC: {intel}"
+                asyncio.create_task(
+                    retro_match_vast(
+                        vast_cmd,
+                        vast_endpoint,
+                        retro_match_max_events,
+                        intel,
+                        sightings_queue,
+                        unflatten,
                     )
-                    continue
-                proc = await vast.import_().json(type="intel.indicator").exec(stdin=ioc)
-                await proc.wait()
-                logger.debug(f"Ingested intel for live matching: {intel}")
+                )
+            else:
+                asyncio.create_task(ingest_vast_ioc(vast_cmd, vast_endpoint, intel))
         elif intel.operation == Operation.REMOVE:
             if retro_match:
                 continue
-            intel_type = get_vast_intel_type(intel)
-            ioc = get_ioc(intel)
-            if not ioc or not intel_type:
-                logger.error(
-                    f"Cannot remove intel with missing intel_type or indicator: {intel}"
-                )
-                continue
-            global matcher_name
-            await vast.matcher().ioc_remove(matcher_name, ioc, intel_type).exec()
-            logger.debug(f"Removed indicator {intel}")
+            asyncio.create_task(remove_vast_ioc(vast_cmd, vast_endpoint, intel))
         else:
             logger.warning(f"Unsupported operation for indicator: {intel}")
         intel_queue.task_done()
