@@ -1,4 +1,5 @@
 import broker
+from confuse import Subview
 from multiprocessing import JoinableQueue
 import random
 import select
@@ -12,12 +13,13 @@ from threatbus_zeek.message_mapping import (
     map_management_message,
 )
 import time
+from typing import Callable, Dict, Union
 
 """Zeek network monitor - plugin for Threat Bus"""
 
 plugin_name = "zeek"
 lock = threading.Lock()
-subscriptions = dict()
+subscriptions: Dict[str, JoinableQueue] = dict()
 
 
 def validate_config(config):
@@ -34,7 +36,11 @@ def rand_string(length):
 
 
 def manage_subscription(
-    ep, module_namespace, task, subscribe_callback, unsubscribe_callback
+    ep: broker.Endpoint,
+    module_namespace: str,
+    task: Union[Subscription, Unsubscription],
+    subscribe_callback: Callable,
+    unsubscribe_callback: Callable,
 ):
     global lock, subscriptions
     rand_suffix_length = 10
@@ -64,7 +70,7 @@ def manage_subscription(
         logger.debug(f"Skipping unknown management message of type: {type(task)}")
 
 
-def publish(module_namespace, ep):
+def publish(module_namespace: str, ep: broker.Endpoint):
     """
     Publishes messages for all subscriptions in a round-robin fashion to via
     broker.
@@ -89,7 +95,12 @@ def publish(module_namespace, ep):
         time.sleep(0.05)
 
 
-def manage(module_namespace, ep, subscribe_callback, unsubscribe_callback):
+def manage(
+    module_namespace: str,
+    ep: broker.Endpoint,
+    subscribe_callback: Callable,
+    unsubscribe_callback: Callable,
+):
     """Binds a broker subscriber to the given endpoint. Only listens for
     management messages, such as un/subscriptions of new clients.
     @param module_namespace A Zeek namespace to accept events from
@@ -111,7 +122,7 @@ def manage(module_namespace, ep, subscribe_callback, unsubscribe_callback):
             )
 
 
-def listen(module_namespace, ep, inq):
+def listen(module_namespace: str, ep: broker.Endpoint, inq: JoinableQueue):
     """Binds a broker subscriber to the given endpoint. Forwards all received
     intel and sightings to the inq.
     @param logger A logging.logger object
@@ -132,7 +143,13 @@ def listen(module_namespace, ep, inq):
 
 
 @threatbus.app
-def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
+def run(
+    config: Subview,
+    logging: Subview,
+    inq: JoinableQueue,
+    subscribe_callback: Callable,
+    unsubscribe_callback: Callable,
+):
     global logger
     logger = threatbus.logger.setup(logging, __name__)
     config = config[plugin_name]

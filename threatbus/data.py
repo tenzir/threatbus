@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from dateutil import parser
 from enum import auto, Enum, unique
 import json
+from typing import Union
 
 
 @dataclass
@@ -86,7 +87,9 @@ class IntelData(dict):
     The 'intel_type' is a threatbus.data.IntelType
     """
 
-    def __init__(self, indicator: str or tuple, intel_type: IntelType, *args, **kw):
+    def __init__(
+        self, indicator: Union[str, tuple], intel_type: IntelType, *args, **kw
+    ):
         super(IntelData, self).__init__(*args, **kw)
         assert indicator, "Intel indicator must be set"
         assert (
@@ -115,7 +118,7 @@ class Sighting:
     ts: datetime
     intel: str
     context: dict
-    ioc: tuple or None
+    ioc: Union[tuple, None]
 
 
 @dataclass()
@@ -128,7 +131,7 @@ class SnapshotEnvelope:
 
     snapshot_type: MessageType
     snapshot_id: str
-    body: Intel or Sighting
+    body: Union[Intel, Sighting]
 
 
 @dataclass

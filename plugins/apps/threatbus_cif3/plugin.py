@@ -1,16 +1,18 @@
+from confuse import Subview
 from multiprocessing import JoinableQueue
 import threading
 from cifsdk.client.http import HTTP as Client
 
 from threatbus_cif3.message_mapping import map_to_cif
 import threatbus
+from typing import Callable
 
 """Threatbus - Open Source Threat Intelligence Platform - plugin for CIFv3"""
 
 plugin_name = "cif3"
 
 
-def validate_config(config):
+def validate_config(config: Subview):
     assert config, "config must not be None"
     config["tags"].get(list)
     config["tlp"].get(str)
@@ -22,7 +24,9 @@ def validate_config(config):
     config["api"]["token"].get(str)
 
 
-def receive_intel_from_backbone(watched_queue, cif, config):
+def receive_intel_from_backbone(
+    watched_queue: JoinableQueue, cif: Client, config: Subview
+):
     """
     Reports / publishes intel items back to the given CIF endpoint.
     @param watched_queue The py queue from which to read messages to submit on to CIF
@@ -57,7 +61,13 @@ def receive_intel_from_backbone(watched_queue, cif, config):
 
 
 @threatbus.app
-def run(config, logging, inq, subscribe_callback, unsubscribe_callback):
+def run(
+    config: Subview,
+    logging: Subview,
+    inq: JoinableQueue,
+    subscribe_callback: Callable,
+    unsubscribe_callback: Callable,
+):
     global logger
     logger = threatbus.logger.setup(logging, __name__)
     config = config[plugin_name]
