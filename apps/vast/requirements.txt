@@ -1,6 +1,6 @@
 coloredlogs>=14.0
 confuse
 pyzmq>=19
-pyvast>=2020.8.28
+pyvast>=2020.10.29
 threatbus>=2020.9.30
 unflatten
