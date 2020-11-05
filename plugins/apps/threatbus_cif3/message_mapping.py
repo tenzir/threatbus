@@ -20,7 +20,8 @@ cif_supported_types = [
 
 
 def map_to_cif(intel: Intel, logger, confidence, tags, tlp, group):
-    """Maps an Intel item to a CIFv3 compatible indicator format.
+    """
+    Maps an Intel item to a CIFv3 compatible indicator format.
     @param intel The item to map
     @return the mapped intel item or None
     """
@@ -49,10 +50,8 @@ def map_to_cif(intel: Intel, logger, confidence, tags, tlp, group):
     }
 
     try:
-        ii = Indicator(**ii)
+        return Indicator(**ii)
     except InvalidIndicator as e:
         logger.error(f"Invalid CIF indicator {e}")
     except Exception as e:
         logger.error(f"CIF indicator error: {e}")
-
-    return ii
