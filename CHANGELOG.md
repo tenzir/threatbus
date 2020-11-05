@@ -11,6 +11,25 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+- 🎁 The `zmq-app` and `zeek` plugins now use the Unix select system call for
+  improved performance during message passing. Both plugins forward messages a
+  lot faster to subscribers than before.
+  [#61](https://github.com/tenzir/threatbus/pull/61)
+
+- 🎁 Shutdown behavior is now controlled. Pressing ctrl+c first shuts down
+  backbone plugins, then app plugins, and lastly Threat Bus itself.
+  [#61](https://github.com/tenzir/threatbus/pull/61)
+
+- ⚠️ A new base class is added to implement plugin-threads. Plugin developers
+  should extend the new `StoppableWorker` for every plugin. Threat Bus and all
+  plugins in this repository now implement that class.
+  [#61](https://github.com/tenzir/threatbus/pull/61)
+
+- ⚠️ Threat Bus and all plugins now use
+  [multiprocessing.JoinableQueue](https://docs.python.org/3.8/library/multiprocessing.html#multiprocessing.JoinableQueue)
+  for message passing.
+  [#61](https://github.com/tenzir/threatbus/pull/61)
+
 - 🎁 The `zmq-app` plugin now supports synchronous heartbeats. With heartbeats,
   both Threat Bus and the connected apps can mutually ensure that the connected
   party is still alive.
