@@ -15,6 +15,11 @@ def run(config: Subview, logging: Subview, inq: JoinableQueue):
 
 
 @hookspec
+def stop():
+    """Stops all Threads that the plugin has started."""
+
+
+@hookspec
 def subscribe(topic: str, q: JoinableQueue):
     """Subscribes the given queue to the requested topic.
     @param topic Subscribe to this topic (string)

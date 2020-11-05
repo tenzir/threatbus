@@ -28,6 +28,11 @@ def run(
 
 
 @hookspec
+def stop():
+    """Stops all Threads that the plugin has started."""
+
+
+@hookspec
 def snapshot(snapshot_request: SnapshotRequest, result_q: JoinableQueue):
     """
     Perform a snapshot, based on the given `snapshot_request`. Snapshots are
