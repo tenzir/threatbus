@@ -5,7 +5,7 @@ import os
 import queue
 import subprocess
 import threading
-from threatbus import start
+from threatbus import start as start_threatbus
 import time
 import unittest
 
@@ -63,12 +63,11 @@ class TestZeekSightingReports(unittest.TestCase):
     def setUp(self):
         config = confuse.Configuration("threatbus")
         config.set_file("config_integration_test.yaml")
-        self.threatbus = threading.Thread(
-            target=start,
-            args=(config,),
-            daemon=True,
-        )
-        self.threatbus.start()
+        self.threatbus = start_threatbus(config)
+        time.sleep(1)
+
+    def tearDown(self):
+        self.threatbus.stop()
         time.sleep(1)
 
     def test_intel_sighting_roundtrip(self):
