@@ -24,8 +24,11 @@ import zmq
 
 logger = logging.getLogger(__name__)
 matcher_name = None
-async_tasks = []  # list of all running async tasks of the app
-p2p_topic = None  # the p2p topic that was given to the app upon successful subscription
+# list of all running async tasks of the bridge
+async_tasks = []
+# the p2p topic that was given to the vast-bridge upon successful subscription
+p2p_topic = None
+max_open_tasks = None
 
 
 def setup_logging(level):
@@ -53,6 +56,7 @@ def validate_config(config: confuse.Subview):
     config["retro_match"].get(bool)
     config["retro_match_max_events"].get(int)
     config["unflatten"].get(bool)
+    config["ulimit"].get(int)
 
     # fallback values for the optional arguments
     config["transform_context"].add(None)
@@ -80,6 +84,7 @@ async def start(
     unflatten: bool,
     transform_cmd: str = None,
     sink: str = None,
+    max_open_files: int = 100,
 ):
     """
     Starts the app between the two given endpoints. Subscribes the configured
@@ -96,7 +101,9 @@ async def start(
     @param sink Forward sighting context to this sink (subprocess) instead of
         reporting back to Threat Bus
     """
-    global logger, async_tasks, p2p_topic
+    global logger, async_tasks, p2p_topic, max_open_tasks
+    # needs to be created inside the same eventloop where it is used
+    max_open_tasks = asyncio.Semaphore(max_open_files)
     vast = VAST(binary=cmd, endpoint=vast_endpoint, logger=logger)
     assert await vast.test_connection() is True, "Cannot connect to VAST"
 
@@ -209,23 +216,24 @@ async def retro_match_vast(
     @param sightings_queue The queue to put new sightings into
     @param unflatten Boolean flag to unflatten JSON when received from VAST
     """
-    global logger
     query = to_vast_query(intel)
     if not query:
         return
-    vast = VAST(binary=vast_cmd, endpoint=vast_endpoint, logger=logger)
-    proc = await vast.export(max_events=retro_match_max_events).json(query).exec()
-    reported = 0
-    while not proc.stdout.at_eof():
-        line = (await proc.stdout.readline()).decode().rstrip()
-        if line:
-            sighting = query_result_to_threatbus_sighting(line, intel, unflatten)
-            if not sighting:
-                logger.error(f"Could not parse VAST query result: {line}")
-                continue
-            reported += 1
-            await sightings_queue.put(sighting)
-    logger.debug(f"Retro-matched {reported} sighting(s) for intel: {intel}")
+    global logger, max_open_tasks
+    async with max_open_tasks:
+        vast = VAST(binary=vast_cmd, endpoint=vast_endpoint, logger=logger)
+        proc = await vast.export(max_events=retro_match_max_events).json(query).exec()
+        reported = 0
+        while not proc.stdout.at_eof():
+            line = (await proc.stdout.readline()).decode().rstrip()
+            if line:
+                sighting = query_result_to_threatbus_sighting(line, intel, unflatten)
+                if not sighting:
+                    logger.error(f"Could not parse VAST query result: {line}")
+                    continue
+                reported += 1
+                await sightings_queue.put(sighting)
+        logger.debug(f"Retro-matched {reported} sighting(s) for intel: {intel}")
 
 
 async def ingest_vast_ioc(vast_cmd, vast_endpoint, intel):
@@ -286,7 +294,7 @@ async def match_intel(
     @param retro_match_max_events  Max amount of retro match results
     @param unflatten Boolean flag to unflatten JSON when received from VAST
     """
-    global logger
+    global logger, open_tasks
     while True:
         msg = await intel_queue.get()
         try:
@@ -606,6 +614,14 @@ def main():
         default=None,
         help="If sink is specified, sightings are not reported back to Threat Bus. Instead, the context of a sighting (only the contents without the Threat Bus specific sighting structure) is forwarded to the specified sink via a UNIX pipe. This option takes a command line string to use and invokes it as direct subprocess without shell / globbing support.",
     )
+    parser.add_argument(
+        "--ulimit",
+        "-U",
+        dest="ulimit",
+        default=100,
+        type=int,
+        help="Controls the maximum number of concurrent background tasks for VAST queries. Default is 100.",
+    )
     args = parser.parse_args()
 
     config = confuse.Configuration("pyvast-threatbus")
@@ -632,6 +648,7 @@ def main():
                     config["unflatten"].get(),
                     config["transform_context"].get(),
                     config["sink"].get(),
+                    config["ulimit"].get(),
                 )
             )
         except asyncio.CancelledError:
