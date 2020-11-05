@@ -1,9 +1,6 @@
 import unittest
 
-from threatbus_rabbitmq.plugin import (
-    get_exchange_name,
-    get_queue_name,
-)
+from threatbus_rabbitmq import get_exchange_name, get_queue_name
 
 
 class TestNameCreation(unittest.TestCase):
