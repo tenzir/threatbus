@@ -52,7 +52,6 @@ jobs:
     - name: Install Application and Plugins
       run: |
         make dev-mode
-        python -m pip install -r apps/vast/requirements.txt
     - name: Run Unit Tests
       run: |
         make unit-tests
@@ -101,7 +100,7 @@ jobs:
       run: |
         NAME="Threat Bus $(date +%Y-%m-%d)"
         ASSET="$NAME.tar.gz"
-        tar czf "$ASSET" dist
+        tar czf "$ASSET" dist apps/vast/dist apps/zeek
         echo "::set-output name=name::$NAME"
         echo "::set-output name=asset::$ASSET"
     - name: Publish to GitHub
@@ -116,3 +115,4 @@ jobs:
     - name: Publish to PyPI
       run: |
         python -m twine upload --verbose --non-interactive dist/*
+        python -m twine upload --verbose --non-interactive apps/vast/dist/*
