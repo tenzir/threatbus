@@ -24,10 +24,8 @@ import zmq
 
 logger = logging.getLogger(__name__)
 matcher_name = None
-async_tasks = []  # list of all running async tasks of the bridge
-p2p_topic = (
-    None  # the p2p topic that was given to the vast-bridge upon successful subscription
-)
+async_tasks = []  # list of all running async tasks of the app
+p2p_topic = None  # the p2p topic that was given to the app upon successful subscription
 
 
 def setup_logging(level):
@@ -63,7 +61,7 @@ def validate_config(config: confuse.Subview):
 
 def cancel_async_tasks():
     """
-    Cancels all async tasks of the vast-bridge.
+    Cancels all async tasks.
     """
     global async_tasks
     for task in async_tasks:
@@ -84,9 +82,9 @@ async def start(
     sink: str = None,
 ):
     """
-    Starts the bridge between the two given endpoints. Subscribes the
-    configured VAST instance for threat intelligence (IoCs) and reports new
-    intelligence to Threat Bus.
+    Starts the app between the two given endpoints. Subscribes the configured
+    VAST instance for threat intelligence (IoCs) and reports new intelligence to
+    Threat Bus.
     @param cmd The vast binary command to use with PyVAST
     @param vast_endpoint The endpoint of a running VAST node ('host:port')
     @param zmq_endpoint The ZMQ management endpoint of Threat Bus ('host:port')
@@ -190,7 +188,7 @@ async def receive(pub_endpoint: str, topic: str, intel_queue: asyncio.Queue):
                 continue
             # the topic is suffixed with the message type
             if not topic.endswith("intel"):
-                # vast bridge is not (yet) interested in Sightings or SnapshotRequests
+                # pyvast-threatbus is not (yet) interested in Sightings or SnapshotRequests
                 logger.debug(f"Skipping unsupported message: {msg}")
                 continue
             await intel_queue.put(msg)
@@ -407,8 +405,7 @@ async def report_sightings(
 def send_manage_message(endpoint: str, action: dict, timeout: int = 5):
     """
     Sends a 'management' message, following the threatbus-zmq-app protocol to
-    either subscribe or unsubscribe this instance of the VAST bridge to/from
-    Threat Bus.
+    either subscribe or unsubscribe this application to/from Threat Bus.
     @param endpoint A host:port string to connect to via ZeroMQ
     @param action The message to send as JSON
     @param timeout The period after which the connection attempt is aborted
@@ -446,8 +443,8 @@ def reply_is_success(reply: dict):
 
 def subscribe(endpoint: str, topic: str, snapshot: int, timeout: int = 5):
     """
-    Subscribes the vast-bridge to the Threat Bus for the given topic.
-    Requests an optional snapshot of past intelligence data.
+    Subscribes this app to the Threat Bus for the given topic. Requests an
+    optional snapshot of past intelligence data.
     @param endpoint The ZMQ management endpoint of Threat Bus ('host:port')
     @param topic The topic to subscribe to
     @param snapshot An integer value to request n days of past intel items
@@ -461,7 +458,7 @@ def subscribe(endpoint: str, topic: str, snapshot: int, timeout: int = 5):
 
 def unsubscribe(endpoint: str, topic: str, timeout: int = 5):
     """
-    Unsubscribes the vast-bridge from Threat Bus for the given topic.
+    Unsubscribes this app from Threat Bus for the given topic.
     @param endpoint The ZMQ management endpoint of Threat Bus
     @param topic The topic to unsubscribe from
     @param timeout The period after which the connection attempt is aborted
@@ -479,7 +476,7 @@ def unsubscribe(endpoint: str, topic: str, timeout: int = 5):
 async def heartbeat(endpoint: str, p2p_topic: str, interval: int = 5):
     """
     Sends heartbeats to Threat Bus periodically to check if the given p2p_topic
-    is still valid at the Threat Bus host. Cancels all async tasks of the bridge
+    is still valid at the Threat Bus host. Cancels all async tasks of this app
     when the heartbeat fails and stops the heartbeat.
     @param endpoint The ZMQ management endpoint of Threat Bus
     @param p2p_topic The topic string to include in the heartbeat
@@ -533,7 +530,7 @@ def main():
         "-l",
         dest="loglevel",
         default="info",
-        help="Loglevel to use for the bridge",
+        help="Loglevel to use",
     )
     parser.add_argument(
         "--retro-match",
@@ -552,7 +549,7 @@ def main():
         dest="retro_match_max_events",
         default=0,
         type=int,
-        help="Use this options to fine-tune '--retro-match'. The bridge passes this option to VAST to at most return the configured number of sightings per IoC.",
+        help="Use this options to fine-tune '--retro-match'. The app passes this option to VAST to at most return the configured number of sightings per IoC.",
     )
     parser.add_argument(
         "--transform-context",
@@ -570,7 +567,7 @@ def main():
     )
     args = parser.parse_args()
 
-    config = confuse.Configuration("vast-bridge")
+    config = confuse.Configuration("pyvast-threatbus")
     config.set_args(args)
     if args.config:
         config.set_file(args.config)
@@ -597,7 +594,7 @@ def main():
                 )
             )
         except asyncio.CancelledError:
-            logger.info("Restarting vast-bridge ...")
+            logger.info("Restarting pyvast-threatbus ...")
 
 
 if __name__ == "__main__":
