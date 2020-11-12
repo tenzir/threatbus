@@ -75,7 +75,7 @@ def cancel_async_tasks():
 
 
 async def start(
-    cmd: str,
+    vast_binary: str,
     vast_endpoint: str,
     zmq_endpoint: str,
     snapshot: int,
@@ -105,7 +105,7 @@ async def start(
     global logger, async_tasks, p2p_topic, max_open_tasks
     # needs to be created inside the same eventloop where it is used
     max_open_tasks = asyncio.Semaphore(max_open_files)
-    vast = VAST(binary=cmd, endpoint=vast_endpoint, logger=logger)
+    vast = VAST(binary=vast_binary, endpoint=vast_endpoint, logger=logger)
     assert await vast.test_connection() is True, "Cannot connect to VAST"
 
     logger.debug(f"Calling Threat Bus management endpoint {zmq_endpoint}")
@@ -148,7 +148,7 @@ async def start(
     async_tasks.append(
         asyncio.create_task(
             match_intel(
-                cmd,
+                vast_binary,
                 vast_endpoint,
                 intel_queue,
                 sightings_queue,
@@ -161,7 +161,9 @@ async def start(
 
     if not retro_match:
         async_tasks.append(
-            asyncio.create_task(live_match_vast(cmd, vast_endpoint, sightings_queue))
+            asyncio.create_task(
+                live_match_vast(vast_binary, vast_endpoint, sightings_queue)
+            )
         )
 
     atexit.register(cancel_async_tasks)
@@ -205,12 +207,17 @@ async def receive(pub_endpoint: str, topic: str, intel_queue: asyncio.Queue):
 
 
 async def retro_match_vast(
-    vast_cmd, vast_endpoint, retro_match_max_events, intel, sightings_queue, unflatten
+    vast_binary,
+    vast_endpoint,
+    retro_match_max_events,
+    intel,
+    sightings_queue,
+    unflatten,
 ):
     """
     Turns the given intel into a valid VAST query and forwards all all query
     results (sightings) to the sightings_queue.
-    @param vast_cmd The vast binary command to use with PyVAST
+    @param vast_binary The vast binary command to use with PyVAST
     @param vast_endpoint The endpoint of a running vast node ('host:port')
     @param retro_match_max_events  Max amount of retro match results
     @param intel The IoC to query VAST for
@@ -222,7 +229,7 @@ async def retro_match_vast(
         return
     global logger, max_open_tasks
     async with max_open_tasks:
-        vast = VAST(binary=vast_cmd, endpoint=vast_endpoint, logger=logger)
+        vast = VAST(binary=vast_binary, endpoint=vast_endpoint, logger=logger)
         proc = await vast.export(max_events=retro_match_max_events).json(query).exec()
         reported = 0
         while not proc.stdout.at_eof():
@@ -237,10 +244,10 @@ async def retro_match_vast(
         logger.debug(f"Retro-matched {reported} sighting(s) for intel: {intel}")
 
 
-async def ingest_vast_ioc(vast_cmd, vast_endpoint, intel):
+async def ingest_vast_ioc(vast_binary, vast_endpoint, intel):
     """
     Ingests the given intel as IoC into a VAST matcher.
-    @param vast_cmd The vast binary command to use with PyVAST
+    @param vast_binary The vast binary command to use with PyVAST
     @param vast_endpoint The endpoint of a running vast node ('host:port')
     @param intel The IoC to query VAST for
     """
@@ -249,16 +256,16 @@ async def ingest_vast_ioc(vast_cmd, vast_endpoint, intel):
     if not ioc:
         logger.error(f"Unable to convert Intel to VAST compatible IoC: {intel}")
         return
-    vast = VAST(binary=vast_cmd, endpoint=vast_endpoint, logger=logger)
+    vast = VAST(binary=vast_binary, endpoint=vast_endpoint, logger=logger)
     proc = await vast.import_().json(type="intel.indicator").exec(stdin=ioc)
     await proc.wait()
     logger.debug(f"Ingested intel for live matching: {intel}")
 
 
-async def remove_vast_ioc(vast_cmd, vast_endpoint, intel):
+async def remove_vast_ioc(vast_binary, vast_endpoint, intel):
     """
     Removes the given intel as IoC from a VAST matcher.
-    @param vast_cmd The vast binary command to use with PyVAST
+    @param vast_binary The vast binary command to use with PyVAST
     @param vast_endpoint The endpoint of a running vast node ('host:port')
     @param intel The IoC to query VAST for
     """
@@ -270,13 +277,13 @@ async def remove_vast_ioc(vast_cmd, vast_endpoint, intel):
             f"Cannot remove intel with missing intel_type or indicator: {intel}"
         )
         return
-    vast = VAST(binary=vast_cmd, endpoint=vast_endpoint, logger=logger)
+    vast = VAST(binary=vast_binary, endpoint=vast_endpoint, logger=logger)
     await vast.matcher().ioc_remove(matcher_name, ioc, intel_type).exec()
     logger.debug(f"Removed indicator {intel}")
 
 
 async def match_intel(
-    vast_cmd: str,
+    vast_binary: str,
     vast_endpoint: str,
     intel_queue: asyncio.Queue,
     sightings_queue: asyncio.Queue,
@@ -287,7 +294,7 @@ async def match_intel(
     """
     Reads from the intel_queue and matches all IoCs, either via VAST's
     live-matching or retro-matching.
-    @param vast_cmd The vast binary command to use with PyVAST
+    @param vast_binary The vast binary command to use with PyVAST
     @param vast_endpoint The endpoint of a running vast node ('host:port')
     @param intel_queue The queue to read new IoCs from
     @param sightings_queue The queue to put new sightings into
@@ -312,7 +319,7 @@ async def match_intel(
             if retro_match:
                 asyncio.create_task(
                     retro_match_vast(
-                        vast_cmd,
+                        vast_binary,
                         vast_endpoint,
                         retro_match_max_events,
                         intel,
@@ -321,27 +328,29 @@ async def match_intel(
                     )
                 )
             else:
-                asyncio.create_task(ingest_vast_ioc(vast_cmd, vast_endpoint, intel))
+                asyncio.create_task(ingest_vast_ioc(vast_binary, vast_endpoint, intel))
         elif intel.operation == Operation.REMOVE:
             if retro_match:
                 continue
-            asyncio.create_task(remove_vast_ioc(vast_cmd, vast_endpoint, intel))
+            asyncio.create_task(remove_vast_ioc(vast_binary, vast_endpoint, intel))
         else:
             logger.warning(f"Unsupported operation for indicator: {intel}")
         intel_queue.task_done()
 
 
-async def live_match_vast(cmd: str, vast_endpoint: str, sightings_queue: asyncio.Queue):
+async def live_match_vast(
+    vast_binary: str, vast_endpoint: str, sightings_queue: asyncio.Queue
+):
     """
     Starts a VAST matcher. Enqueues all matches from VAST to the
     sightings_queue.
-    @param cmd The VAST binary command to use with PyVAST
+    @param vast_binary The VAST binary command to use with PyVAST
     @param vast_endpoint The endpoint of a running VAST node
     @param sightings_queue The queue to put new sightings into
     @param retro_match Boolean flag to use retro-matching over live-matching
     """
     global logger, matcher_name
-    vast = VAST(binary=cmd, endpoint=vast_endpoint, logger=logger)
+    vast = VAST(binary=vast_binary, endpoint=vast_endpoint, logger=logger)
     matcher_name = "threatbus-" + "".join(random.choice(letters) for i in range(10))
     proc = await vast.matcher().start(name=matcher_name).exec()
     while True:
