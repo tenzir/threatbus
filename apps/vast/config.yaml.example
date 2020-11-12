@@ -10,4 +10,5 @@ unflatten: true
 transform_context: fever alertify --alert-prefix 'MY PREFIX' --extra-key my-ioc --ioc %ioc
 # optional. remove the field if you simply want to report back sightings to Threat Bus
 sink: STDOUT
+# limits the amount of concurrent background tasks for querying vast
 ulimit: 100
