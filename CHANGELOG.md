@@ -16,13 +16,13 @@ Every entry has a category for which we use the following visual abbreviations:
   lot faster to subscribers than before.
   [#61](https://github.com/tenzir/threatbus/pull/61)
 
-- 🎁 Shutdown behavior is now controlled. Pressing ctrl+c first shuts down
+- 🎁 Threat Bus now has a controlled shutdown. Pressing ctrl+c first shuts down
   backbone plugins, then app plugins, and lastly Threat Bus itself.
   [#61](https://github.com/tenzir/threatbus/pull/61)
 
-- ⚠️ A new base class is added to implement plugin-threads. Plugin developers
-  should extend the new `StoppableWorker` for every plugin. Threat Bus and all
-  plugins in this repository now implement that class.
+- ⚠️ There exists a new base class for implement plugin-threads. Plugin
+  developers should extend the new `StoppableWorker` for every plugin. Threat
+  Bus and all plugins in this repository now implement that class.
   [#61](https://github.com/tenzir/threatbus/pull/61)
 
 - ⚠️ Threat Bus and all plugins now use
