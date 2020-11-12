@@ -82,9 +82,9 @@ async def start(
     retro_match: bool,
     retro_match_max_events: int,
     unflatten: bool,
+    max_open_files: int,
     transform_cmd: str = None,
     sink: str = None,
-    max_open_files: int = 100,
 ):
     """
     Starts the app between the two given endpoints. Subscribes the configured
@@ -97,6 +97,7 @@ async def start(
     @param retro_match Boolean flag to use retro-matching over live-matching
     @param retro_match_max_events Max amount of retro match results
     @param unflatten Boolean flag to unflatten JSON when received from VAST
+    @param max_open_files The maximum number of concurrent background tasks for VAST queries.
     @param transform_cmd The command to use to transform Sighting context with
     @param sink Forward sighting context to this sink (subprocess) instead of
         reporting back to Threat Bus
@@ -646,9 +647,9 @@ def main():
                     config["retro_match"].get(),
                     config["retro_match_max_events"].get(),
                     config["unflatten"].get(),
+                    config["ulimit"].get(),
                     config["transform_context"].get(),
                     config["sink"].get(),
-                    config["ulimit"].get(),
                 )
             )
         except asyncio.CancelledError:
