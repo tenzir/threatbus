@@ -181,7 +181,7 @@ class TestMessageMapping(unittest.TestCase):
         url = "https://example.com/foo/bar"
         intel_data = IntelData(url, IntelType.URL)
         intel = Intel(self.ts, self.id, intel_data, self.operation)
-        self.assertEqual(to_vast_query(intel), f'"{url}" in url')
+        self.assertEqual(to_vast_query(intel), f'"{url}" in net.uri')
 
         # Domain type
         domain = "example.com"
@@ -189,7 +189,7 @@ class TestMessageMapping(unittest.TestCase):
         intel = Intel(self.ts, self.id, intel_data, self.operation)
         self.assertEqual(
             to_vast_query(intel),
-            f'"{domain}" in domain || "{domain}" in host || "{domain}" in hostname',
+            f'"{domain}" in net.domain || "{domain}" in net.hostname',
         )
 
     def test_valid_query_result_to_threatbus_sighting(self):

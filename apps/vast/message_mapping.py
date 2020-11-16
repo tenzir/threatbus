@@ -78,14 +78,9 @@ def to_vast_query(intel: Intel):
     if vast_type == "ip":
         return str(indicator)
     if vast_type == "url":
-        # TODO: use field annotations, once implemented (ch17531)
-        return f'"{indicator}" in url'
+        return f'"{indicator}" in net.uri'
     if vast_type == "domain":
-        # Currently, uses VAST's suffix-based field matching. Targets every
-        # schema with fieldnames that end in `domain`, `host`, or `hostname`
-        # (Zeek and Suricata)
-        # TODO: use field annotations, once implemented (ch17531)
-        return f'"{indicator}" in domain || "{indicator}" in host || "{indicator}" in hostname'
+        return f'"{indicator}" in net.domain || "{indicator}" in net.hostname'
     return None
 
 
