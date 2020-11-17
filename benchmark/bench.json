@@ -1,0 +1,1 @@
+{"ts": "2020-11-02 17:00:00", "id": "intel-42", "data": {"foo": 23, "more_args": "MORE ARGS", "indicator": ["68.255.79.255"], "intel_type": 1}, "operation": "ADD"}

@@ -1,0 +1,32 @@
+logging:
+  console: false
+  console_verbosity: DEBUG
+  file: true
+  file_verbosity: DEBUG
+  filename: threatbus.log
+
+plugins:
+  backbones:
+    file_benchmark:
+      input_type: intel
+      input_file: bench.json
+      repetitions: 10
+    #rabbitmq:
+    #  host: localhost
+    #  port: 5672
+    #  username: guest
+    #  password: guest
+    #  vhost: /
+    #  naming_join_pattern: .
+    #  queue:
+    #    durable: false
+    #    auto_delete: false
+    #    lazy: false
+    #    exclusive: false
+
+  apps:
+    zmq-app:
+      host: "127.0.0.1"
+      manage: 13370
+      pub: 13371
+      sub: 13372
