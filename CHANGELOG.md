@@ -12,15 +12,23 @@ Every entry has a category for which we use the following visual abbreviations:
 ## Unreleased
 
 - 🎁 The `zmq-app` and `zeek` plugins now use the Unix select system call for
-  improved performance during message passing. Both plugins forward messages a
-  lot faster to subscribers than before.
+  improved performance during message passing. The previous approach impacted
+  the performance with a constant delay for every message and did not scale.
+  The new approach saves at least that constant factor *per message*. For ZeroMQ
+  publishing we observed a speedup of approximately factor 183 for 100k events.
+  [#61](https://github.com/tenzir/threatbus/pull/61)
+
+- 🎁 The `rabbitmq` backbone plugin now uses an asynchronous
+  [SelectConnection](https://pika.readthedocs.io/en/stable/modules/adapters/select.html)
+  instead of a blocking one. We measured a speedup of approximately factor 1.2
+  for 100k events.
   [#61](https://github.com/tenzir/threatbus/pull/61)
 
 - 🎁 Threat Bus now has a controlled shutdown. Pressing ctrl+c first shuts down
   backbone plugins, then app plugins, and lastly Threat Bus itself.
   [#61](https://github.com/tenzir/threatbus/pull/61)
 
-- ⚠️ There exists a new base class for implement plugin-threads. Plugin
+- ⚠️ There exists a new base class for implementing plugin-threads. Plugin
   developers should extend the new `StoppableWorker` for every plugin. Threat
   Bus and all plugins in this repository now implement that class.
   [#61](https://github.com/tenzir/threatbus/pull/61)
