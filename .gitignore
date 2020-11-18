@@ -8,4 +8,6 @@ venv/
 *tar.gz
 **/vast.db/
 config.yaml
-
+*.png
+**/threatbus.log
+*.json
