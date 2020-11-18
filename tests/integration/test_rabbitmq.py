@@ -1,7 +1,7 @@
 import confuse
 from datetime import datetime, timedelta
+from multiprocessing import JoinableQueue
 from plugins.backbones.threatbus_rabbitmq import plugin
-from queue import Queue
 from threatbus.data import (
     Intel,
     IntelData,
@@ -17,6 +17,42 @@ import unittest
 
 
 class TestRoundtrips(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # setup the backbone with a fan-in queue
+        config = confuse.Configuration("threatbus")
+        config["rabbitmq"].add({})
+        config["rabbitmq"]["host"] = "localhost"
+        config["rabbitmq"]["port"] = 35672
+        config["rabbitmq"]["username"] = "guest"
+        config["rabbitmq"]["password"] = "guest"
+        config["rabbitmq"]["vhost"] = "/"
+        config["rabbitmq"]["naming_join_pattern"] = "."
+        config["rabbitmq"]["queue"].add({})
+        config["rabbitmq"]["queue"]["durable"] = False
+        config["rabbitmq"]["queue"]["auto_delete"] = True
+        config["rabbitmq"]["queue"]["exclusive"] = False
+        config["rabbitmq"]["queue"]["lazy"] = False
+        config["rabbitmq"]["queue"]["max_items"] = 10
+        config["console"] = False
+        config["file"] = False
+
+        cls.inq = JoinableQueue()
+        plugin.run(config, config, cls.inq)
+
+        # subscribe this test case as concumer
+        cls.outq = JoinableQueue()
+        plugin.subscribe("threatbus/intel", cls.outq)
+        plugin.subscribe("threatbus/sighting", cls.outq)
+        plugin.subscribe("threatbus/snapshotrequest", cls.outq)
+        plugin.subscribe("threatbus/snapshotenvelope", cls.outq)
+        time.sleep(1)
+
+    @classmethod
+    def tearDownClass(cls):
+        plugin.stop()
+        time.sleep(1)
+
     def setUp(self):
         self.ts = datetime.now().astimezone()
         self.intel_id = "intel-42"
@@ -75,35 +111,6 @@ class TestRoundtrips(unittest.TestCase):
         self.snapshot_envelope_sighting = SnapshotEnvelope(
             MessageType.SIGHTING, self.snapshot_id, self.sighting
         )
-
-        # setup the backbone with a fan-in queue
-        config = confuse.Configuration("threatbus")
-        config["rabbitmq"].add({})
-        config["rabbitmq"]["host"] = "localhost"
-        config["rabbitmq"]["port"] = 35672
-        config["rabbitmq"]["username"] = "guest"
-        config["rabbitmq"]["password"] = "guest"
-        config["rabbitmq"]["vhost"] = "/"
-        config["rabbitmq"]["naming_join_pattern"] = "."
-        config["rabbitmq"]["queue"].add({})
-        config["rabbitmq"]["queue"]["durable"] = False
-        config["rabbitmq"]["queue"]["auto_delete"] = True
-        config["rabbitmq"]["queue"]["exclusive"] = False
-        config["rabbitmq"]["queue"]["lazy"] = False
-        config["rabbitmq"]["queue"]["max_items"] = 10
-        config["console"] = False
-        config["file"] = False
-
-        self.inq = Queue()
-        plugin.run(config, config, self.inq)
-
-        # subscribe this test case as concumer
-        self.outq = Queue()
-        plugin.subscribe("threatbus/intel", self.outq)
-        plugin.subscribe("threatbus/sighting", self.outq)
-        plugin.subscribe("threatbus/snapshotrequest", self.outq)
-        plugin.subscribe("threatbus/snapshotenvelope", self.outq)
-        time.sleep(1)
 
     def test_intel_message_roundtrip(self):
         """

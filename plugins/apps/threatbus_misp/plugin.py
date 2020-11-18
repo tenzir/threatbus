@@ -3,8 +3,9 @@ from confuse import Subview
 from datetime import datetime
 from itertools import product
 import json
+from multiprocessing import JoinableQueue
 import pymisp
-from queue import Queue
+from queue import Empty
 import threading
 import threatbus
 from threatbus.data import MessageType, SnapshotEnvelope, SnapshotRequest
@@ -22,9 +23,122 @@ warnings.simplefilter("ignore")  # pymisp produces urllib warnings
 plugin_name: str = "misp"
 misp: pymisp.api.PyMISP = None
 lock: threading.Lock = threading.Lock()
-filter_config: List[
-    Dict
-] = None  # required for message mapping, not available when Threat Bus invokes `snapshot()` -> global, initialized on startup
+# filter_config is required for message mapping, but not available when Threat Bus invokes `snapshot()` -> global, initialized on startup
+filter_config: List[Dict] = None
+workers: List[threatbus.StoppableWorker] = list()
+
+
+class SightingsPublisher(threatbus.StoppableWorker):
+    """
+    Reports / publishes true-positive sightings of intelligence items back to the given MISP endpoint.
+    """
+
+    def __init__(self, outq: JoinableQueue):
+        """
+        @param outq The queue from which to forward messages to MISP
+        """
+        super(SightingsPublisher, self).__init__()
+        self.outq = outq
+
+    def run(self):
+        global logger, misp, lock
+        if not misp:
+            return
+        while self._running():
+            try:
+                sighting = self.outq.get(block=True, timeout=1)
+            except Empty:
+                continue
+            logger.debug(f"Reporting sighting: {sighting}")
+            misp_sighting = map_to_misp(sighting)
+            lock.acquire()
+            misp.add_sighting(misp_sighting)
+            lock.release()
+            self.outq.task_done()
+
+
+class KafkaReceiver(threatbus.StoppableWorker):
+    """
+    Binds a Kafka consumer to the the given host/port. Forwards all received messages to the inq.
+    """
+
+    def __init__(self, kafka_config: Subview, inq: JoinableQueue):
+        """
+        @param kafka_config A configuration object for Kafka binding
+        @param inq The queue to which intel items from MISP are forwarded to
+        """
+        super(KafkaReceiver, self).__init__()
+        self.kafka_config = kafka_config
+        self.inq = inq
+
+    def run(self):
+        consumer = Consumer(self.kafka_config["config"].get(dict))
+        consumer.subscribe(self.kafka_config["topics"].get(list))
+        global logger, filter_config
+        while self._running():
+            message = consumer.poll(
+                timeout=self.kafka_config["poll_interval"].get(float)
+            )
+            if message is None:
+                continue
+            if message.error():
+                logger.error(f"Kafka error: {message.error()}")
+                continue
+            try:
+                msg = json.loads(message.value())
+            except Exception as e:
+                logger.error(f"Error decoding Kafka message: {e}")
+                continue
+            if not is_whitelisted(msg, filter_config):
+                continue
+            intel = map_to_internal(msg["Attribute"], msg.get("action", None), logger)
+            if not intel:
+                logger.debug(f"Discarding unparsable intel {msg['Attribute']}")
+            else:
+                self.inq.put(intel)
+
+
+class ZmqReceiver(threatbus.StoppableWorker):
+    """
+    Binds a ZMQ poller to the the given host/port. Forwards all received messages to the inq.
+    """
+
+    def __init__(self, zmq_config: Subview, inq: JoinableQueue):
+        """
+        @param zmq_config A configuration object for ZeroMQ binding
+        @param inq The queue to which intel items from MISP are forwarded to
+        """
+        super(ZmqReceiver, self).__init__()
+        self.inq = inq
+        self.zmq_config = zmq_config
+
+    def run(self):
+        global logger, filter_config
+        socket = zmq.Context().socket(zmq.SUB)
+        socket.connect(f"tcp://{self.zmq_config['host']}:{self.zmq_config['port']}")
+        # TODO: allow reception of more topics, i.e. handle events.
+        socket.setsockopt(zmq.SUBSCRIBE, b"misp_json_attribute")
+        poller = zmq.Poller()
+        poller.register(socket, zmq.POLLIN)
+
+        while self._running():
+            socks = dict(poller.poll(timeout=1000))
+            if socket not in socks or socks[socket] != zmq.POLLIN:
+                continue
+            raw = socket.recv()
+            _, message = raw.decode("utf-8").split(" ", 1)
+            try:
+                msg = json.loads(message)
+            except Exception as e:
+                logger.error(f"Error decoding message {message}: {e}")
+                continue
+            if not is_whitelisted(msg, filter_config):
+                continue
+            intel = map_to_internal(msg["Attribute"], msg.get("action", None), logger)
+            if not intel:
+                logger.debug(f"Discarding unparsable intel {msg['Attribute']}")
+            else:
+                self.inq.put(intel)
 
 
 def validate_config(config: Subview):
@@ -55,89 +169,8 @@ def validate_config(config: Subview):
         config["kafka"]["config"].get(dict)
 
 
-def publish_sightings(outq: Queue):
-    """
-    Reports / publishes true-positive sightings of intelligence items back to the given MISP endpoint.
-    @param outq The queue from which to forward messages to MISP
-    """
-    global logger, misp, lock
-    if not misp:
-        return
-    while True:
-        sighting = outq.get(block=True)
-        logger.debug(f"Reporting sighting: {sighting}")
-        misp_sighting = map_to_misp(sighting)
-        lock.acquire()
-        misp.add_sighting(misp_sighting)
-        lock.release()
-        outq.task_done()
-
-
-def receive_kafka(kafka_config: Subview, inq: Queue):
-    """
-    Binds a Kafka consumer to the the given host/port. Forwards all received messages to the inq.
-    @param kafka_config A configuration object for Kafka binding
-    @param inq The queue to which intel items from MISP are forwarded to
-    """
-    consumer = Consumer(kafka_config["config"].get(dict))
-    consumer.subscribe(kafka_config["topics"].get(list))
-    global logger, filter_config
-    while True:
-        message = consumer.poll(timeout=kafka_config["poll_interval"].get(float))
-        if message is None:
-            continue
-        if message.error():
-            logger.error(f"Kafka error: {message.error()}")
-            continue
-        try:
-            msg = json.loads(message.value())
-        except Exception as e:
-            logger.error(f"Error decoding Kafka message: {e}")
-            continue
-        if not is_whitelisted(msg, filter_config):
-            continue
-        intel = map_to_internal(msg["Attribute"], msg.get("action", None), logger)
-        if not intel:
-            logger.debug(f"Discarding unparsable intel {msg['Attribute']}")
-        else:
-            inq.put(intel)
-
-
-def receive_zmq(zmq_config: Subview, inq: Queue):
-    """
-    Binds a ZMQ poller to the the given host/port. Forwards all received messages to the inq.
-    @param zmq_config A configuration object for ZeroMQ binding
-    @param inq The queue to which intel items from MISP are forwarded to
-    """
-    global logger, filter_config
-    socket = zmq.Context().socket(zmq.SUB)
-    socket.connect(f"tcp://{zmq_config['host']}:{zmq_config['port']}")
-    # TODO: allow reception of more topics, i.e. handle events.
-    socket.setsockopt(zmq.SUBSCRIBE, b"misp_json_attribute")
-    poller = zmq.Poller()
-    poller.register(socket, zmq.POLLIN)
-
-    while True:
-        socks = dict(poller.poll(timeout=None))
-        if socket in socks and socks[socket] == zmq.POLLIN:
-            raw = socket.recv()
-            _, message = raw.decode("utf-8").split(" ", 1)
-            try:
-                msg = json.loads(message)
-            except Exception as e:
-                logger.error(f"Error decoding message {message}: {e}")
-                continue
-            if not is_whitelisted(msg, filter_config):
-                continue
-            intel = map_to_internal(msg["Attribute"], msg.get("action", None), logger)
-            if not intel:
-                logger.debug(f"Discarding unparsable intel {msg['Attribute']}")
-            else:
-                inq.put(intel)
-
-
 @threatbus.app
-def snapshot(snapshot_request: SnapshotRequest, result_q: Queue):
+def snapshot(snapshot_request: SnapshotRequest, result_q: JoinableQueue):
     global logger, misp, lock, filter_config
     if snapshot_request.snapshot_type != MessageType.INTEL:
         logger.debug("Sighting snapshot feature not yet implemented.")
@@ -190,11 +223,11 @@ def snapshot(snapshot_request: SnapshotRequest, result_q: Queue):
 def run(
     config: Subview,
     logging: Subview,
-    inq: Queue,
+    inq: JoinableQueue,
     subscribe_callback: Callable,
     unsubscribe_callback: Callable,
 ):
-    global logger, filter_config
+    global logger, filter_config, workers
     logger = threatbus.logger.setup(logging, __name__)
     config = config[plugin_name]
     try:
@@ -205,15 +238,10 @@ def run(
     filter_config = config["filter"].get(list)
 
     # start Attribute-update receiver
-    receiver_thread = None
     if config["zmq"].get():
-        receiver_thread = threading.Thread(
-            target=receive_zmq, args=(config["zmq"], inq), daemon=True
-        )
+        workers.append(ZmqReceiver(config["zmq"], inq))
     elif config["kafka"].get():
-        receiver_thread = threading.Thread(
-            target=receive_kafka, args=(config["kafka"], inq), daemon=True
-        )
+        workers.append(KafkaReceiver(config["kafka"], inq))
 
     # bind to MISP
     if config["api"].get(dict):
@@ -242,9 +270,17 @@ def run(
             "Starting MISP plugin without API connection, cannot report back sightings or request snapshots."
         )
 
-    outq = Queue()
+    outq = JoinableQueue()
     subscribe_callback("threatbus/sighting", outq)
-    threading.Thread(target=publish_sightings, args=(outq,), daemon=True).start()
-    if receiver_thread is not None:
-        receiver_thread.start()
+    workers.append(SightingsPublisher(outq))
+    for w in workers:
+        w.start()
     logger.info("MISP plugin started")
+
+
+@threatbus.app
+def stop():
+    global logger, workers
+    for w in workers:
+        w.join()
+    logger.info("MISP plugin stopped")

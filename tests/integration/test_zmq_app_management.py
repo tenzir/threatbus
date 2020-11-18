@@ -1,7 +1,6 @@
 import confuse
 import json
-import threading
-from threatbus import start
+from threatbus import start as start_threatbus
 import time
 import unittest
 import zmq
@@ -37,12 +36,12 @@ class TestMessageRoundtrip(unittest.TestCase):
         super(TestMessageRoundtrip, cls).setUpClass()
         config = confuse.Configuration("threatbus")
         config.set_file("config_integration_test.yaml")
-        cls.threatbus = threading.Thread(
-            target=start,
-            args=(config,),
-            daemon=True,
-        )
-        cls.threatbus.start()
+        cls.threatbus = start_threatbus(config)
+        time.sleep(1)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.threatbus.stop()
         time.sleep(1)
 
     def setUp(self):

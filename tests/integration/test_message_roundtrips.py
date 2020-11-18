@@ -3,7 +3,7 @@ from datetime import datetime
 import json
 import queue
 import threading
-from threatbus import start
+from threatbus import start as start_threatbus
 from threatbus.data import (
     Intel,
     IntelData,
@@ -27,12 +27,12 @@ class TestMessageRoundtrip(unittest.TestCase):
         super(TestMessageRoundtrip, cls).setUpClass()
         config = confuse.Configuration("threatbus")
         config.set_file("config_integration_test.yaml")
-        cls.threatbus = threading.Thread(
-            target=start,
-            args=(config,),
-            daemon=True,
-        )
-        cls.threatbus.start()
+        cls.threatbus = start_threatbus(config)
+        time.sleep(1)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.threatbus.stop()
         time.sleep(1)
 
     def test_zeek_plugin_message_roundtrip(self):
@@ -47,6 +47,7 @@ class TestMessageRoundtrip(unittest.TestCase):
             target=zeek_receiver.forward, args=(items, result_q), daemon=False
         )
         rec.start()
+        time.sleep(1)
         zeek_sender.send_generic("threatbus/intel", items)
         time.sleep(1)
         self.assertEqual(result_q.qsize(), items)

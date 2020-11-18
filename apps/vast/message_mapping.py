@@ -1,4 +1,3 @@
-from datetime import datetime
 from dateutil import parser as dateutil_parser
 from ipaddress import ip_address
 import json

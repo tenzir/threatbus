@@ -3,14 +3,16 @@ import confuse
 from datetime import timedelta
 from logging import Logger
 import pluggy
-from queue import Queue
-from threatbus import appspecs, backbonespecs, logger
+from multiprocessing import JoinableQueue
+from queue import Empty
+import signal
+from threatbus import appspecs, backbonespecs, logger, stoppable_worker
 from threatbus.data import MessageType, SnapshotRequest, SnapshotEnvelope
 from threading import Lock
 from uuid import uuid4
 
 
-class ThreatBus:
+class ThreatBus(stoppable_worker.StoppableWorker):
     def __init__(
         self,
         backbones: pluggy.hooks._HookRelay,
@@ -18,12 +20,13 @@ class ThreatBus:
         logger: Logger,
         config: confuse.Subview,
     ):
+        super(ThreatBus, self).__init__()
         self.backbones = backbones
         self.apps = apps
         self.config = config
         self.logger = logger
-        self.inq = Queue()  # fan-in everything, provisioned by backbone
-        self.snapshot_q = Queue()
+        self.inq = JoinableQueue()  # fan-in everything, provisioned by backbone
+        self.snapshot_q = JoinableQueue()
         self.lock = Lock()
         self.snapshots = dict()
 
@@ -33,15 +36,16 @@ class ThreatBus:
         all implementing app plugins. Forwards envelopes to the requesting app
         or discards them accordingly.
         """
-        while True:
-            msg = self.snapshot_q.get(block=True)
+        while self._running():
+            try:
+                msg = self.snapshot_q.get(block=True, timeout=1)
+            except Empty:
+                continue
             if type(msg) is SnapshotRequest:
                 self.logger.debug(f"Received SnapshotRequest: {msg}")
                 self.apps.snapshot(snapshot_request=msg, result_q=self.inq)
-            elif type(msg) is SnapshotEnvelope:
+            elif type(msg) is SnapshotEnvelope and msg.snapshot_id in self.snapshots:
                 self.logger.debug(f"Received SnapshotEnvelope: {msg}")
-                if msg.snapshot_id not in self.snapshots:
-                    continue
                 self.snapshots[msg.snapshot_id].put(msg.body)
             else:
                 self.logger.warn(
@@ -50,7 +54,7 @@ class ThreatBus:
             self.snapshot_q.task_done()
 
     def request_snapshot(
-        self, topic: str, dst_q: Queue, snapshot_id: str, time_delta: timedelta
+        self, topic: str, dst_q: JoinableQueue, snapshot_id: str, time_delta: timedelta
     ):
         """
         Create a new SnapshotRequest and push it to the inq, so that the
@@ -81,7 +85,7 @@ class ThreatBus:
 
             self.inq.put(req)
 
-    def subscribe(self, topic: str, q: Queue, time_delta: timedelta = None):
+    def subscribe(self, topic: str, q: JoinableQueue, time_delta: timedelta = None):
         """
         Accepts a new subscription for a given topic and queue pointer.
         Forwards that subscription to all managed backbones.
@@ -99,13 +103,31 @@ class ThreatBus:
         self.request_snapshot(topic, q, snapshot_id, time_delta)
         return snapshot_id
 
-    def unsubscribe(self, topic: str, q: Queue):
+    def unsubscribe(self, topic: str, q: JoinableQueue):
         """
         Removes subscription for a given topic and queue pointer from all
         managed backbones.
         """
         assert isinstance(topic, str), "topic must be string"
         self.backbones.unsubscribe(topic=topic, q=q)
+
+    def stop(self):
+        """
+        Stops all running threads and Threat Bus
+        """
+        self.logger.info("Stopping plugins...")
+        self.backbones.stop()
+        self.apps.stop()
+        self.logger.info("Stopping Threat Bus...")
+        self.join()
+
+    def stop_signal(self, signal, frame):
+        """
+        Implements Python's signal.signal handler.
+        See https://docs.python.org/3/library/signal.html#signal.signal
+        Stops all running threads and Threat Bus
+        """
+        self.stop()
 
     def run(self):
         self.logger.info("Starting plugins...")
@@ -161,8 +183,10 @@ def start(config: confuse.Subview):
         )
         backbones.unregister(name=unwanted_backbones)
 
-    bus = ThreatBus(backbones.hook, apps.hook, tb_logger, config)
-    bus.run()
+    bus_thread = ThreatBus(backbones.hook, apps.hook, tb_logger, config)
+    signal.signal(signal.SIGINT, bus_thread.stop_signal)
+    bus_thread.start()
+    return bus_thread
 
 
 def main():
