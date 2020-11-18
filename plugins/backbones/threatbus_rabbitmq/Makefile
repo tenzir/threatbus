@@ -17,7 +17,8 @@ unit-tests:
 
 .PHONY: clean
 clean:
-	${RM} -r __pycache__ *egg-info build dist
+	find . -type d -name __pycache__ -exec $(RM) -r {} \;
+	${RM} -r *egg-info build dist
 
 .PHONY: build
 build:

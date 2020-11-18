@@ -28,7 +28,6 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     name="threatbus-rabbitmq",
-    package_dir={"": "plugins/backbones"},
     packages=["threatbus_rabbitmq"],
     python_requires=">=3.8",
     url="https://github.com/tenzir/threatbus",

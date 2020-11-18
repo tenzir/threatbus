@@ -99,8 +99,11 @@ jobs:
       id: create_release
       run: |
         NAME="Threat Bus $(date +%Y-%m-%d)"
-        ASSET="$NAME.tar.gz"
-        tar czf "$ASSET" dist apps/vast/dist apps/zeek
+        ARCHIVE="$NAME.tar"
+        tar cf "$ARCHIVE" apps/zeek
+        find -type d -name dist -exec tar uvf "$ARCHIVE" {} \;
+        gzip "$ARCHIVE"
+        ASSET="$ARCHIVE.gz"
         echo "::set-output name=name::$NAME"
         echo "::set-output name=asset::$ASSET"
     - name: Publish to GitHub
@@ -114,5 +117,4 @@ jobs:
         asset_content_type: application/gzip
     - name: Publish to PyPI
       run: |
-        python -m twine upload --verbose --non-interactive dist/*
-        python -m twine upload --verbose --non-interactive apps/vast/dist/*
+        find -type d -name dist -exec python -m twine upload --verbose --non-interactive {}/* \;

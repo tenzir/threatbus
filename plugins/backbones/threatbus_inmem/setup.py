@@ -28,7 +28,6 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     name="threatbus-inmem",
-    package_dir={"": "plugins/backbones"},
     packages=["threatbus_inmem"],
     python_requires=">=3.7",
     url="https://github.com/tenzir/threatbus",

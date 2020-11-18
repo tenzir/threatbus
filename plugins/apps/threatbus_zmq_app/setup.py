@@ -41,7 +41,6 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     name="threatbus-zmq-app",
-    package_dir={"": "plugins/apps"},
     packages=["threatbus_zmq_app"],
     python_requires=">=3.7",
     url="https://github.com/tenzir/threatbus",

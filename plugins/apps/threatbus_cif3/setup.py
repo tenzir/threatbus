@@ -43,7 +43,6 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     name="threatbus-cif3",
-    package_dir={"": "plugins/apps"},
     packages=["threatbus_cif3"],
     python_requires=">=3.6",
     url="https://github.com/tenzir/threatbus",

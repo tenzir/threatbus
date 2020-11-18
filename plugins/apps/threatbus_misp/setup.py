@@ -44,7 +44,6 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     name="threatbus-misp",
-    package_dir={"": "plugins/apps"},
     packages=["threatbus_misp"],
     python_requires=">=3.7",
     url="https://github.com/tenzir/threatbus",
