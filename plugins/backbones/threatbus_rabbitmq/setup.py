@@ -29,7 +29,7 @@ setup(
     long_description_content_type="text/markdown",
     name="threatbus-rabbitmq",
     packages=["threatbus_rabbitmq"],
-    python_requires=">=3.8",
+    python_requires=">=3.7",
     url="https://github.com/tenzir/threatbus",
     version="2020.11.26",
 )
