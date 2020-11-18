@@ -56,7 +56,7 @@ def validate_config(config: confuse.Subview):
     config["retro_match"].get(bool)
     config["retro_match_max_events"].get(int)
     config["unflatten"].get(bool)
-    config["ulimit"].get(int)
+    config["max_background_tasks"].get(int)
 
     # fallback values for the optional arguments
     config["transform_context"].add(None)
@@ -625,9 +625,9 @@ def main():
         help="If sink is specified, sightings are not reported back to Threat Bus. Instead, the context of a sighting (only the contents without the Threat Bus specific sighting structure) is forwarded to the specified sink via a UNIX pipe. This option takes a command line string to use and invokes it as direct subprocess without shell / globbing support.",
     )
     parser.add_argument(
-        "--ulimit",
+        "--max-background-tasks",
         "-U",
-        dest="ulimit",
+        dest="max-background-tasks",
         default=100,
         type=int,
         help="Controls the maximum number of concurrent background tasks for VAST queries. Default is 100.",
@@ -656,7 +656,7 @@ def main():
                     config["retro_match"].get(),
                     config["retro_match_max_events"].get(),
                     config["unflatten"].get(),
-                    config["ulimit"].get(),
+                    config["max_background_tasks"].get(),
                     config["transform_context"].get(),
                     config["sink"].get(),
                 )
