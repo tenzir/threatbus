@@ -7,7 +7,7 @@ import coloredlogs
 import confuse
 import json
 import logging
-from message_mapping import (
+from .message_mapping import (
     get_vast_intel_type,
     get_ioc,
     matcher_result_to_threatbus_sighting,

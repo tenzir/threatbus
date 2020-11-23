@@ -22,7 +22,9 @@ setup(
         "Topic :: System :: Distributed Computing",
     ],
     description="Connect the open source telemetry engine VAST with Threat Bus, the open source intelligence platform",
-    entry_points={"console_scripts": ["pyvast-threatbus=pyvast_threatbus:main"]},
+    entry_points={
+        "console_scripts": ["pyvast-threatbus=pyvast_threatbus.pyvast_threatbus:main"]
+    },
     include_package_data=True,
     install_requires=[
         "black>=19.10b",
