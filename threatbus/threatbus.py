@@ -119,6 +119,7 @@ class ThreatBus(stoppable_worker.StoppableWorker):
         self.backbones.stop()
         self.apps.stop()
         self.logger.info("Stopping Threat Bus...")
+        super(ThreatBus, self).stop()
         self.join()
 
     def stop_signal(self, signal, frame):
