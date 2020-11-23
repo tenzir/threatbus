@@ -19,16 +19,16 @@ virtualenv venv
 source venv/bin/activate
 
 # main threatbus
-python setup.py develop
+pip install -e .
 
 # zmq-app plugin
-python plugins/apps/threatbus_zmq_app/setup.py develop
+pip install -e plugins/apps/threatbus_zmq_app
 
 # benchmark backbone to publish faked messages
-python plugins/backbones/file_benchmark/setup.py develop
+pip install -e plugins/backbones/file_benchmark
 
 # rabbit backbone
-python plugins/backbones/rabbitmq/setup.py develop
+pip install -e plugins/backbones/threatbus_rabbitmq
 
 # start benchmarking
 cd benchmark
