@@ -199,7 +199,6 @@ class TestMessageMapping(unittest.TestCase):
         self.assertEqual(parsed_sighting.ts, self.ts)
         self.assertEqual(parsed_sighting.ioc, self.indicator)
 
-        # TODO: use self.valid_query_result for comparison, once VAST outputs ports as integers
         expected_context = json.loads(self.valid_query_result)
         expected_context["source"] = "VAST"
         self.assertEqual(parsed_sighting.context, expected_context)
