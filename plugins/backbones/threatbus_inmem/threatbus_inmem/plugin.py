@@ -86,5 +86,8 @@ def run(config: Subview, logging: Subview, inq: JoinableQueue):
 def stop():
     global logger, workers
     for w in workers:
+        if not w.is_alive():
+            continue
+        w.stop()
         w.join()
     logger.info("In-memory backbone stopped")

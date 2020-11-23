@@ -282,5 +282,8 @@ def run(
 def stop():
     global logger, workers
     for w in workers:
+        if not w.is_alive():
+            continue
+        w.stop()
         w.join()
     logger.info("MISP plugin stopped")
