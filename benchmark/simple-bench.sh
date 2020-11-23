@@ -5,7 +5,7 @@ rabbit_consumer() {
   rm threatbus.log
   python rabbitmq_sender.py $1
 
-  ../venv/bin/threatbus -c benchmark_config.yaml &
+  threatbus -c benchmark_config.yaml &
   sleep $2
   count=$(grep 'Relayed message from RabbitMQ' threatbus.log | wc -l)
   if [ $count != $1 ]; then
@@ -20,7 +20,7 @@ zmq() {
   # Starts Threat Bus and sends messages to `zmq-app` plugin endpoint. Starts a dummy consumer. Measures roundtrip of receiving and publishing messages.
   rm threatbus.log
   sed -i "s/repetitions.*/repetitions: $1/" benchmark_config.yaml
-  ../venv/bin/threatbus -c benchmark_config.yaml &
+  threatbus -c benchmark_config.yaml &
   sleep 0.5
   python ../tests/utils/zmq_receiver.py $1 1>/dev/null &
   sleep $2
