@@ -101,14 +101,6 @@ def query_result_to_threatbus_sighting(
         if not ts:
             return None
 
-        # TODO: remove the following logic that turns ports into integers.
-        for key, value in context.items():
-            if type(value) is str:
-                if value.endswith("/?"):
-                    context[key] = int(value[:-2])
-                elif value.endswith("/udp") or value.endswith("/tcp"):
-                    context[key] = int(value[:-4])
-
         return Sighting(
             dateutil_parser.parse(ts),
             intel.id,
