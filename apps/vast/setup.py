@@ -46,7 +46,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     name="pyvast-threatbus",
-    packages=[""],
+    packages=["pyvast_threatbus"],
     python_requires=">=3.7",
     setup_requires=["setuptools", "wheel"],
     url="https://github.com/tenzir/threatbus",

@@ -1,7 +1,7 @@
 import confuse
 from datetime import datetime, timedelta
 from multiprocessing import JoinableQueue
-from plugins.backbones.threatbus_rabbitmq import plugin
+from threatbus_rabbitmq import plugin
 from threatbus.data import (
     Intel,
     IntelData,
