@@ -11,6 +11,10 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+- 🐞 The Zeek app did not perform an outbound connection to Threat Bus in
+  cluster mode. Now the master peers with Threat Bus to establish a connection.
+  [#68](https://github.com/tenzir/threatbus/pull/68)
+
 - 🎁 The `zmq-app` and `zeek` plugins now use the Unix select system call for
   improved performance during message passing. The previous approach impacted
   the performance with a constant delay for every message and did not scale.

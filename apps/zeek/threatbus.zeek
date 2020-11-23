@@ -126,14 +126,13 @@ event zeek_init() &priority=1
   }
 @endif
 
-# If we operate in a cluster setting, we do not need to open another socket but
-# instead communicate over the already existing one. The endpoint for that is
-# Broker::default_listen_address and Broker::default_port
-@if ( ! Cluster::is_enabled() )
+# The manager peers with Threat Bus.
+@if ( ! Cluster::is_enabled()
+      || Cluster::local_node_type() == Cluster::MANAGER )
 event zeek_init() &priority=0
   {
   if ( log_operations )
-    Reporter::info(fmt("peering to threatbus at %s:%s",
+    Reporter::info(fmt("peering with threatbus at %s:%s",
                        broker_host, broker_port));
   Broker::peer(broker_host, broker_port, 5sec);
   }
