@@ -12,6 +12,10 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+- 🐞 `pyvast-threatbus` escapes backslashes and quotes in IoCs before it queries
+  VAST.
+  [#74](https://github.com/tenzir/threatbus/pull/74)
+
 - 🎁 `pyvast-threatbus` now uses asynchronous background tasks to query VAST
   concurrently. VAST queries were executed sequentially prior to this change.
   This boosts the performance by the factor of allowed concurrent background

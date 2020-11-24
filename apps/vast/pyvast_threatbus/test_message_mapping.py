@@ -16,6 +16,7 @@ from .message_mapping import (
     to_vast_query,
     query_result_to_threatbus_sighting,
     matcher_result_to_threatbus_sighting,
+    vast_escape_str,
 )
 
 
@@ -225,3 +226,11 @@ class TestMessageMapping(unittest.TestCase):
         self.assertEqual(parsed_sighting.ioc, self.indicator)
         self.assertEqual(parsed_sighting.context, {"source": "VAST"})
         self.assertEqual(parsed_sighting.intel, self.id)
+
+    def test_vast_escape_str(self):
+        self.assertEqual(vast_escape_str('e"vil.com'), 'e\\"vil.com')
+        self.assertEqual(vast_escape_str('"evil.com"'), '\\"evil.com\\"')
+        self.assertEqual(vast_escape_str("e\\vil.com"), "e\\\\vil.com")
+        self.assertEqual(vast_escape_str('e\\"vil.com'), 'e\\\\\\"vil.com')
+        self.assertEqual(vast_escape_str('e\\\\""vil.com'), 'e\\\\\\\\\\"\\"vil.com')
+        self.assertEqual(vast_escape_str("e'vil.com"), "e'vil.com")
