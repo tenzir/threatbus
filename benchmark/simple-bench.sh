@@ -6,6 +6,7 @@ rabbit_consumer() {
   python rabbitmq_sender.py $1
 
   threatbus -c benchmark_config.yaml &
+  tb=$!
   sleep $2
   count=$(grep 'Relayed message from RabbitMQ' threatbus.log | wc -l)
   if [ $count != $1 ]; then
@@ -13,7 +14,7 @@ rabbit_consumer() {
   fi
   grep 'Relayed message from RabbitMQ' threatbus.log | sed -n '1p;$p' | awk -F ' ' '{print $2}' | awk 'NR > 1 {"date -d "$0" +%s%N"|getline a; "date -d "prev" +%s%N"|getline b; print (a-b)/1000000} {prev=$0}'
 
-  kill $(pgrep threatbus)
+  kill $tb
 }
 
 zmq() {
@@ -21,6 +22,7 @@ zmq() {
   rm threatbus.log
   sed -i "s/repetitions.*/repetitions: $1/" benchmark_config.yaml
   threatbus -c benchmark_config.yaml &
+  tb=$!
   sleep 0.5
   python ../tests/utils/zmq_receiver.py $1 1>/dev/null &
   sleep $2
@@ -30,7 +32,7 @@ zmq() {
   fi
   grep 'Published' threatbus.log | sed -n '1p;$p' | awk -F ' ' '{print $2}' | awk 'NR > 1 {"date -d "$0" +%s%N"|getline a; "date -d "prev" +%s%N"|getline b; print (a-b)/1000000} {prev=$0}'
 
-  kill $(pgrep threatbus)
+  kill $tb
 }
 
 
