@@ -3,18 +3,18 @@
 rabbit_consumer() {
   # Injects messages into RabbitMQ, then starts Threat Bus and measures raw consumption times.
   rm threatbus.log
-  python rabbitmq_sender.py $1
+  python rabbitmq_sender.py "$1"
 
   threatbus -c benchmark_config.yaml &
   tb=$!
-  sleep $2
-  count=$(grep 'Relayed message from RabbitMQ' threatbus.log | wc -l)
-  if [ $count != $1 ]; then
+  sleep "$2"
+  count=$(grep -c 'Relayed message from RabbitMQ' threatbus.log)
+  if [ "$count" != "$1" ]; then
     echo "Fewer messages logged than sent! Try increasing the sleep interval: $count/$1"
   fi
   grep 'Relayed message from RabbitMQ' threatbus.log | sed -n '1p;$p' | awk -F ' ' '{print $2}' | awk 'NR > 1 {"date -d "$0" +%s%N"|getline a; "date -d "prev" +%s%N"|getline b; print (a-b)/1000000} {prev=$0}'
 
-  kill $tb
+  kill "$tb"
 }
 
 zmq() {
@@ -24,15 +24,15 @@ zmq() {
   threatbus -c benchmark_config.yaml &
   tb=$!
   sleep 0.5
-  python ../tests/utils/zmq_receiver.py $1 1>/dev/null &
-  sleep $2
-  count=$(grep 'Published' threatbus.log | wc -l)
-  if [ $count != $1 ]; then
+  python ../tests/utils/zmq_receiver.py "$1" 1>/dev/null &
+  sleep "$2"
+  count=$(grep -c 'Published' threatbus.log)
+  if [ "$count" != "$1" ]; then
     echo "Fewer messages logged than sent! Try increasing the sleep interval: $count/$1"
   fi
   grep 'Published' threatbus.log | sed -n '1p;$p' | awk -F ' ' '{print $2}' | awk 'NR > 1 {"date -d "$0" +%s%N"|getline a; "date -d "prev" +%s%N"|getline b; print (a-b)/1000000} {prev=$0}'
 
-  kill $tb
+  kill "$tb"
 }
 
 
@@ -48,17 +48,17 @@ if [ "$#" != 4 ]; then
   exit 1
 fi
 
-if [[ $1 == "rabbit_consumer" ]]; then
+if [ "$1" = "rabbit_consumer" ]; then
   echo "Benchmarking RabbitMQ consumer"
   echo "Calculating the difference between first and last message processed, in milliseconds:"
-  for i in $(seq 1 $2); do
-    rabbit_consumer $3 $4
+  for _ in $(seq 1 "$2"); do
+    rabbit_consumer "$3" "$4"
   done
-elif [[ $1 == "zmq" ]]; then
+elif [ "$1" = "zmq" ]; then
   echo "Benchmarking ZMQ consumer"
   echo "Calculating the difference between first and last message processed, in milliseconds:"
-  for i in $(seq 1 $2); do
-    zmq $3 $4
+  for _ in $(seq 1 "$2"); do
+    zmq "$3" "$4"
   done
 else
   echo "unknown bench"
