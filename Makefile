@@ -40,14 +40,14 @@ integration-tests:
 
 .PHONY: clean
 clean:
-	${RM} -r __pycache__ *egg-info build dist
-	$(MAKE) -C plugins/apps/threatbus_zeek clean
-	$(MAKE) -C plugins/apps/threatbus_misp clean
-	$(MAKE) -C plugins/apps/threatbus_zmq_app clean
-	$(MAKE) -C plugins/apps/threatbus_cif3 clean
-	$(MAKE) -C plugins/backbones/threatbus_inmem clean
-	$(MAKE) -C plugins/backbones/threatbus_rabbitmq clean
-	$(MAKE) -C apps/vast clean
+	-${RM} -r __pycache__ *egg-info build dist
+	-$(MAKE) -C plugins/apps/threatbus_zeek clean
+	-$(MAKE) -C plugins/apps/threatbus_misp clean
+	-$(MAKE) -C plugins/apps/threatbus_zmq_app clean
+	-$(MAKE) -C plugins/apps/threatbus_cif3 clean
+	-$(MAKE) -C plugins/backbones/threatbus_inmem clean
+	-$(MAKE) -C plugins/backbones/threatbus_rabbitmq clean
+	-$(MAKE) -C apps/vast clean
 
 .PHONY: build
 build:
