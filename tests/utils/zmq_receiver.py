@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
-import zmq
 from queue import Queue
+import zmq
+import sys
 
 
 def send_manage_message(action, topic):
@@ -65,5 +66,8 @@ def forward(n: int, topics: list, q: Queue):
 
 
 if __name__ == "__main__":
-    for topic, msg in receive(200, ["threatbus/intel", "threatbus/sighting"]):
+    count = 200
+    if len(sys.argv) > 1:
+        count = int(sys.argv[1])
+    for topic, msg in receive(count, ["threatbus/intel", "threatbus/sighting"]):
         print(topic, msg)
