@@ -27,7 +27,7 @@ setup(
     entry_points={"threatbus.app": ["misp = threatbus_misp.plugin"]},
     install_requires=[
         "threatbus>=2020.11.26",
-        "pymisp>=2.4.120",
+        "pymisp >= 2.4.120, <= 2.4.134",
         "pyzmq>=18.1.1",
         "confluent-kafka>=1.3.0",
     ],
