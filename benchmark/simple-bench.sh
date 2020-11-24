@@ -1,5 +1,18 @@
 #!/usr/bin/env sh
 
+function darwin_requires {
+  if [[ "${OSTYPE}" == "darwin"* ]]; then
+    if ! brew --prefix "${1}" >/dev/null 2>&1; then
+      >&2 echo "simple_bench requires ${1} to be installed on macOS"
+      >&2 echo "  brew install ${1}"
+      exit 1
+    fi
+    PATH="$(brew --prefix "${1}")/libexec/gnubin:${PATH}"
+  fi
+}
+
+darwin_requires coreutils
+
 rabbit_consumer() {
   # Injects messages into RabbitMQ, then starts Threat Bus and measures raw consumption times.
   rm threatbus.log
