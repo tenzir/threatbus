@@ -62,6 +62,16 @@ def to_vast_ioc(intel: Intel):
     )
 
 
+def vast_escape_str(val: str):
+    """
+    Strings need to be passed to VAST in double quotes. In consequence, we must
+    escape double quotes before querying VAST.
+    """
+
+    val = val.replace("\\", "\\\\")
+    return val.replace('"', '\\"')
+
+
 def to_vast_query(intel: Intel):
     """
     Creates a VAST query from a Threat Bus Intel item.
@@ -73,9 +83,12 @@ def to_vast_query(intel: Intel):
     if not vast_type:
         return None
     indicator = get_ioc(intel)
+    if not indicator:
+        return None
+    indicator = vast_escape_str(str(indicator))
 
     if vast_type == "ip":
-        return str(indicator)
+        return indicator
     if vast_type == "url":
         return f'"{indicator}" in net.uri'
     if vast_type == "domain":
