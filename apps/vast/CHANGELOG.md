@@ -10,7 +10,9 @@ Every entry has a category for which we use the following visual abbreviations:
 - ⚡️ breaking change
 - 🐞 bugfix
 
-## Unreleased
+<!-- ## Unreleased -->
+
+##  [2020.11.26]
 
 - 🐞 `pyvast-threatbus` escapes backslashes and quotes in IoCs before it queries
   VAST.
@@ -28,3 +30,4 @@ Every entry has a category for which we use the following visual abbreviations:
   install the package via `pip install pyvast-threatbus`.
   [#63](https://github.com/tenzir/threatbus/pull/63)
 
+[2020.11.26]: https://github.com/tenzir/threatbus/releases/tag/2020.11.26

@@ -9,7 +9,9 @@ Every entry has a category for which we use the following visual abbreviations:
 - ⚠️ change
 - 🐞 bugfix
 
-## Unreleased
+<!-- ## Unreleased -->
+
+##  [2020.11.26]
 
 - 🐞 The Zeek app did not perform an outbound connection to Threat Bus in
   cluster mode. Now the master peers with Threat Bus to establish a connection.
@@ -67,3 +69,4 @@ Every entry has a category for which we use the following visual abbreviations:
 
 
 [2020.10.29]: https://github.com/tenzir/threatbus/releases/tag/2020.10.29
+[2020.11.26]: https://github.com/tenzir/threatbus/releases/tag/2020.11.26
