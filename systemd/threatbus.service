@@ -1,0 +1,39 @@
+[Unit]
+Description=Threat Bus - Open Source Intelligence Platform
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+
+# user + privileges
+# We explicitly don't use DynamicUser because that can lead to recursive `chown`s.
+# Doing that is pretty slow on some file systems (e.g., xfs).
+User=threatbus
+Group=threatbus
+NoNewPrivileges=yes
+
+# capabilities
+RestrictNamespaces=yes
+RestrictAddressFamilies=
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictSUIDSGID=yes
+
+# system access
+ProtectSystem=strict
+ReadWritePaths=/var/log/threatbus
+PrivateTmp=yes
+ProtectHome=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+
+# service specifics
+TimeoutStopSec=600
+ExecStart=/opt/tenzir/threatbus/threatbus -c /opt/tenzir/threatbus/threatbus.yaml
+
+[Install]
+WantedBy=multi-user.target
