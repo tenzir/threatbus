@@ -266,7 +266,9 @@ class RabbitMQConsumer(threatbus.StoppableWorker):
         @param userdata A tuple of exchange_name and queue_name. The exchange with the given name was created, hence this method is invoked. The queue name should be created.
         """
         cb = partial(self.on_queue_declare_ok, userdata=userdata)
-        self._channel.queue_declare(queue=userdata[1], callback=cb)
+        queue_kwargs = self.queue_kwargs.copy()
+        queue_kwargs["callback"] = cb
+        self._channel.queue_declare(queue=userdata[1], **queue_kwargs)
 
     def on_queue_declare_ok(self, _frame, userdata: Tuple[str, str]):
         """
