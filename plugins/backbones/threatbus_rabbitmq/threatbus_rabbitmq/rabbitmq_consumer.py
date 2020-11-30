@@ -265,8 +265,15 @@ class RabbitMQConsumer(threatbus.StoppableWorker):
         @param _frame Unused pika response
         @param userdata A tuple of exchange_name and queue_name. The exchange with the given name was created, hence this method is invoked. The queue name should be created.
         """
+        if type(userdata) is not tuple or len(userdata) != 2:
+            self.logger.warn(
+                f"Aborting with unexpected `userdata` after exchange was declared: {userdata}"
+            )
+            return
         cb = partial(self.on_queue_declare_ok, userdata=userdata)
-        self._channel.queue_declare(queue=userdata[1], callback=cb)
+        queue_kwargs = self.queue_kwargs.copy()
+        queue_kwargs["callback"] = cb
+        self._channel.queue_declare(queue=userdata[1], **queue_kwargs)
 
     def on_queue_declare_ok(self, _frame, userdata: Tuple[str, str]):
         """
@@ -274,6 +281,11 @@ class RabbitMQConsumer(threatbus.StoppableWorker):
         @param _frame Unused pika response
         @param userdata A tuple of exchange_name and queue_name. Both have been created, hence this method is invoked.
         """
+        if type(userdata) is not tuple or len(userdata) != 2:
+            self.logger.warn(
+                f"Aborting with unexpected `userdata` after queue was declared: {userdata}"
+            )
+            return
         cb = partial(self.on_queue_bind_ok, userdata=userdata[1])
         self._channel.queue_bind(exchange=userdata[0], queue=userdata[1], callback=cb)
 

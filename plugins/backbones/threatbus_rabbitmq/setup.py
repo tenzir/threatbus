@@ -31,5 +31,5 @@ setup(
     packages=["threatbus_rabbitmq"],
     python_requires=">=3.7",
     url="https://github.com/tenzir/threatbus",
-    version="2020.11.26",
+    version="2020.11.30",
 )
