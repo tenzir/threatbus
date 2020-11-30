@@ -11,6 +11,12 @@ Every entry has a category for which we use the following visual abbreviations:
 
 <!-- ## Unreleased -->
 
+##  [2020.11.30]
+
+- 🐞 The RabbitMQ backbone plugin ignored user-defined queue parameters, such as
+  `durable` or `lazy` queues. It now respects such parameters again.
+  [#76](https://github.com/tenzir/threatbus/pull/76)
+
 ##  [2020.11.26]
 
 - 🐞 The Zeek app did not perform an outbound connection to Threat Bus in
@@ -70,3 +76,4 @@ Every entry has a category for which we use the following visual abbreviations:
 
 [2020.10.29]: https://github.com/tenzir/threatbus/releases/tag/2020.10.29
 [2020.11.26]: https://github.com/tenzir/threatbus/releases/tag/2020.11.26
+[2020.11.30]: https://github.com/tenzir/threatbus/releases/tag/2020.11.30
