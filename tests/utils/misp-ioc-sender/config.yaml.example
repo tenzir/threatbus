@@ -1,0 +1,13 @@
+logging:
+  console: true
+  console_verbosity: DEBUG
+  file: false
+  file_verbosity: DEBUG
+  filename: misp-ioc-sender.log
+
+misp:
+  host: https://localhost
+  ssl: false
+  key: <MISP_KEY>
+
+event-uuid: 5f7b2277-1ebc-4101-9152-032ac0a82fae  # this UUID is either retrieved or created.
