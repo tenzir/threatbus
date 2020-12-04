@@ -19,10 +19,13 @@ from pyvast import VAST
 import random
 from shlex import split as lexical_split
 from string import ascii_lowercase as letters
+import sys
+from threatbus.logger import setup as setup_logging_threatbus
 from threatbus.data import Intel, IntelDecoder, Sighting, SightingEncoder, Operation
 import zmq
 
-logger = logging.getLogger(__name__)
+logger_name = "pyvast-threatbus"
+logger = logging.getLogger(logger_name)
 matcher_name = None
 # list of all running async tasks of the bridge
 async_tasks = []
@@ -31,7 +34,11 @@ p2p_topic = None
 max_open_tasks = None
 
 
-def setup_logging(level):
+def setup_logging_with_level(level: str):
+    """
+    Sets up a the global logger for console logging with the given loglevel.
+    @param level The loglevel to use, e.g., "DEBUG"
+    """
     global logger
     log_level = logging.getLevelName(level.upper())
 
@@ -46,13 +53,21 @@ def setup_logging(level):
     logger.addHandler(handler)
 
 
+def setup_logging_with_config(config: confuse.Subview):
+    """
+    Sets up the global logger as configured in the `config` object.
+    @param config The user-defined logging configuration
+    """
+    global logger
+    logger = setup_logging_threatbus(config, logger_name)
+
+
 def validate_config(config: confuse.Subview):
     assert config, "config must not be None"
     config["vast"].get(str)
     config["vast_binary"].get(str)
     config["threatbus"].get(str)
     config["snapshot"].get(int)
-    config["loglevel"].get(str)
     config["retro_match"].get(bool)
     config["retro_match_max_events"].get(int)
     config["unflatten"].get(bool)
@@ -61,6 +76,25 @@ def validate_config(config: confuse.Subview):
     # fallback values for the optional arguments
     config["transform_context"].add(None)
     config["sink"].add(None)
+
+    # logging
+    config["logging"].add({})
+    config["loglevel"].add("")
+    if config["loglevel"].get(str) and config["logging"].get(dict):
+        raise AssertionError(
+            "Found two conflicting config settings: 'loglevel' and 'logging'. Either configure 'logging' (verbose) or use 'loglevel' for console logging only."
+        )
+    if not config["loglevel"].get(str) and not config["logging"].get(dict):
+        raise AssertionError(
+            "No logging configured. Either specify '--loglevel' or configure the 'logging' section in the config.yaml file."
+        )
+
+    if config["logging"]:
+        if config["logging"]["console"].get(bool):
+            config["logging"]["console_verbosity"].get(str)
+        if config["logging"]["file"].get(bool):
+            config["logging"]["file_verbosity"].get(str)
+            config["logging"]["filename"].get(str)
 
 
 def cancel_async_tasks():
@@ -588,8 +622,8 @@ def main():
         "--loglevel",
         "-l",
         dest="loglevel",
-        default="info",
-        help="Loglevel to use",
+        type=str,
+        help="Loglevel to use for console logging. Note that you can specify file logging only via the config.yaml file.",
     )
     parser.add_argument(
         "--retro-match",
@@ -642,9 +676,13 @@ def main():
     try:
         validate_config(config)
     except Exception as e:
-        raise ValueError(f"Invalid config: {e}")
+        sys.exit(ValueError(f"Invalid config: {e}"))
 
-    setup_logging(config["loglevel"].get(str))
+    if config["logging"].get(dict):
+        setup_logging_with_config(config["logging"])
+    else:
+        setup_logging_with_level(config["loglevel"].get(str))
+
     while True:
         try:
             asyncio.run(
