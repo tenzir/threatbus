@@ -1,14 +1,14 @@
 # MISP IoC Sender
 
 A script to trigger an Attribute update in MISP. The script is configured via a
-YAML file. See belog for details and check out the `config.yaml.example` file.
+YAML file. See below for details and check out the `config.yaml.example` file.
 
 The script works as follows:
 
-- It looks for a specific MISP Event, referenced by its UUID in the config file.
-- The script creates the Event if it doesn't exist yet.
-- The script checks the Attributes of the Event and either creates a new
-  Attribute or it toggles the `'to_ids'` flag if the Attribute already exists.
+- Look for a specific MISP Event, referenced by its UUID in the config file.
+- Create the Event if it doesn't exist.
+- Check the Attributes of the Event and either create a new Attribute or toggle
+  the `'to_ids'` flag if the Attribute already exists.
 
 Attributes created by this script always have the `"DOMAIN"` type. Attribute
 values contain the current day of the year and are always formatted like this:
