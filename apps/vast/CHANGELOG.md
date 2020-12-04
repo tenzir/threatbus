@@ -10,7 +10,13 @@ Every entry has a category for which we use the following visual abbreviations:
 - ⚡️ breaking change
 - 🐞 bugfix
 
-<!-- ## Unreleased -->
+ ## Unreleased
+
+- 🎁 `pyvast-threatbus` now uses the Threat Bus `logger` module. Users can
+  configure logging the same way as in Threat Bus, via a `logging` section in
+  the `config.yaml` file. The new configuration section and the `--loglevel`
+  option are mutually exclusive.
+  [#80](https://github.com/tenzir/threatbus/pull/80)
 
 ##  [2020.11.26]
 
