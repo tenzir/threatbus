@@ -634,7 +634,14 @@ def main():
     )
     args = parser.parse_args()
 
-    config = confuse.Configuration("pyvast-threatbus")
+    # we need to use an underscore in the configuration name "pyvast_threatbus"
+    # confuse uses the configuration name to lookup environment variables, but
+    # it simply upper-cases that name. Dashes are not replaced properly. Using a
+    # dash in the configuration name makes it impossible to configure the
+    # APPNAMEDIR env variable to overwrite search paths, i.e., in systemd
+    # https://confit.readthedocs.io/en/latest/#search-paths
+    # https://github.com/beetbox/confuse/blob/v1.4.0/confuse/core.py#L555
+    config = confuse.Configuration("pyvast_threatbus")
     config.set_args(args)
     if args.config:
         config.set_file(args.config)

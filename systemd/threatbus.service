@@ -18,7 +18,6 @@ RestrictSUIDSGID=yes
 
 # system access
 ProtectSystem=strict
-ReadWritePaths=/var/log/threatbus
 PrivateTmp=yes
 ProtectHome=yes
 PrivateDevices=yes
@@ -29,6 +28,8 @@ ProtectKernelLogs=yes
 
 # service specifics
 TimeoutStopSec=600
+# confuse requires this environment variable to not lookup config directories that are restricted by systemd.
+Environment=THREATBUSDIR=/opt/tenzir/threatbus
 ExecStart=/opt/tenzir/threatbus/threatbus -c /opt/tenzir/threatbus/threatbus.yaml
 
 [Install]
