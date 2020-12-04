@@ -1,8 +1,14 @@
+logging:
+  console: true
+  console_verbosity: DEBUG
+  file: true
+  file_verbosity: DEBUG
+  filename: pyvast-threatbus.log
+
 vast: "localhost:42000"
 vast_binary: vast
 threatbus: "localhost:13370"
 snapshot: 30
-loglevel: DEBUG
 retro_match: true
 retro_match_max_events: 0
 unflatten: true
