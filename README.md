@@ -32,8 +32,14 @@ Chat with us on [Matrix][chat-url].
   sightings from IDS deployments to some data base.
 
 - **Plugin-based Architecture**: The project is plugin-based and can be extended
-  easily. We welcome contributions to adopt new open source tools! So far, there
-  exist plugins for [VAST][vast], [MISP][misp], [Zeek][zeek], and [CIFv3][cif].
+  easily. Read about the different [plugin types][plugin-types] and
+  [how to write your own][plugin-development].
+  We welcome contributions to adopt new open source tools! 
+
+- **Official Plugins**: We maintain many plugins right in the official Threat
+  Bus repository. Check out our integrations for [MISP][misp], [Zeek][zeek],
+  [CIFv3][cif], and generally apps that connect via [ZeroMQ][zmq], like
+  [pyvast-threatbus][pyvast-threatbus].
 
 - **Snapshotting**: The snapshot feature allows subscribers to directly request
   threat intelligence data for a certain time range from other applications.
@@ -90,13 +96,13 @@ Install `threatbus` and all plugins that you require. Optionally, use a virtual
 environment.
 
 ```
-virtualenv venv           # optional
-source venv/bin/activate  # optional
+virtualenv venv                       # optional
+source venv/bin/activate              # optional
 pip install threatbus
-pip install threatbus-inmem
-pip install threatbus-misp
-pip install threatbus-zeek
-pip install threatbus-rabbitmq
+pip install threatbus-inmem           # inmemory backbone plugin
+pip install threatbus-rabbitmq        # RabbitMQ backbone plugin
+pip install threatbus-misp            # MISP application plugin
+pip install threatbus-zeek            # Zeek application plugin
 pip install threatbus-<plugin_name>
 ```
 
@@ -109,7 +115,8 @@ make unit-tests
 make integration-tests
 ```
 
-The integration tests require a local [Zeek][zeek] installation.
+The integration tests require a local [Zeek][zeek] and
+[Docker](https://www.docker.com/) installation.
 
 
 ## Plugin Development
@@ -144,9 +151,9 @@ Example:
   ```sh
   plugins
   ├── apps
-  |   └── threatbus-zeek
+  |   └── threatbus-myapp
   │       ├── setup.py
-  |       └── threatbus_zeek.py
+  |       └── threatbus_myapp.py
   └── backbones
       └── threatbus-inmem
           ├── setup.py
@@ -181,9 +188,20 @@ App plugins are provided two callback functions to use for subscription
 management. Internally, Threat Bus will propagate subscription requests to all
 installed backbone plugins.
 
-The subscription callback allows applications to request an optinal snapshot
+The subscription callback allows applications to request an optional snapshot
 time delta. Threat Bus will forward snapshot requests to all those apps that
 have implemented the snapshot feature (see `threatbus/appspecs.py`).
+
+### Implementation
+
+Please use the
+[StoppableWorker](https://github.com/tenzir/threatbus/blob/master/threatbus/stoppable_worker.py)
+base class to model your plugin's busy work. Plugins should never block the main
+thread of the application. Implementing that class also facilitates a graceful
+shutdown.
+
+All officially maintained Threat Bus plugins implement `StoppableWorker`. Refer
+to any of the existing plugins for an example.
 
 ## License
 
@@ -192,11 +210,14 @@ Threat Bus comes with a [3-clause BSD license][license-url].
 
 [misp]: https://github.com/misp/misp
 [vast]: https://github.com/tenzir/vast
-[broker]: https://github.com/zeek/broker
 [docs]: https://docs.tenzir.com/threatbus
 [zeek]: https://www.zeek.org
 [cif]: https://github.com/csirtgadgets/bearded-avenger
+[zmq]: https://zeromq.org/
 [misp-zmq-config]: https://github.com/MISP/misp-book/tree/master/misp-zmq#misp-zeromq-configuration
+[plugin-types]: https://docs.tenzir.com/threatbus/plugins/overview
+[plugin-development]: https://docs.tenzir.com/threatbus/plugins/plugin-development
+[pyvast-threatbus]: https://github.com/tenzir/threatbus/tree/master/apps/vast
 
 [pypi-badge]: https://img.shields.io/pypi/v/threatbus.svg
 [pypi-url]: https://pypi.org/project/threatbus
