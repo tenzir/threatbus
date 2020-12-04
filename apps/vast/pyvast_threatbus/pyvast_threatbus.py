@@ -55,7 +55,7 @@ def setup_logging_with_level(level: str):
 
 def setup_logging_with_config(config: confuse.Subview):
     """
-    Sets up a the global logger as configured in the `config` object.
+    Sets up the global logger as configured in the `config` object.
     @param config The user-defined logging configuration
     """
     global logger
