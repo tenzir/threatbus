@@ -62,8 +62,8 @@ executable packages and configuration files.
 Then copy (or symlink) the unit file to `/etc/systemd/system`.
 
 ```bash
-ln -s $(echo $PWD)/threatbus.service /etc/systemd/system
-ln -s $(echo $PWD)/pyvast-threatbus.service /etc/systemd/system
+systemctl link "$PWD/threatbus.service"
+systemctl link "$PWD/pyvast-threatbus.service"
 ```
 
 To have the services start up automatically with system boot, you can `enable`

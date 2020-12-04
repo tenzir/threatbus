@@ -6,12 +6,8 @@ After=network-online.target
 [Service]
 Type=simple
 
-# user + privileges
-# We explicitly don't use DynamicUser because that can lead to recursive `chown`s.
-# Doing that is pretty slow on some file systems (e.g., xfs).
-User=threatbus
-Group=threatbus
-NoNewPrivileges=yes
+DynamicUser=yes
+LogsDirectory=pyvast-threatbus
 
 # capabilities
 RestrictNamespaces=yes
