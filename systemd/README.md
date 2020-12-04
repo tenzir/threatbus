@@ -20,16 +20,19 @@ enable `sudo` or other privileged commands for this user.
 
 #### Log-Directories
 
-This section explains how to set up log-directories for file-logging. Skip the
-following instructions if you configure your applications to use console-logging.
+The systemd unit declares a private user. Hence, all logs go to
+`/var/log/private` by default. The following section explains how to configure
+file-logging for Threat Bus and `pyvast-threatbus`. Skip the following
+instructions if you configure your applications to use console-logging.
 
-```bash
-mkdir -p /var/log/threatbus /var/log/pyvast-threatbus
-chown -R threatbus:threatbus /var/log/threatbus /var/log/pyvast-threatbus
-```
+Find the `logging` config section at the top of your Threat Bus or
+`pyvast-threatbus` configuration file and change it to use the private log
+directory:
 
-For Threat Bus, find the logging config at the top of your Threat Bus
-configuration file and change it to use the new directory:
+- `/var/log/private/threatbus/threatbus.log` (Threat Bus)
+- `/var/log/private/pyvast-threatbus/pyvast-threatbus.log` (`pyvast-threatbus`)
+
+See the following YAML snippet for a configuration example.
 
 ```yaml
 logging:
@@ -37,26 +40,28 @@ logging:
   console_verbosity: INFO
   file: true
   file_verbosity: DEBUG
-  filename: /var/log/threatbus/threatbus.log
+  filename: /var/log/private/threatbus/threatbus.log
 ```
-
-For `pyvast-threatbus`, simply pipe the logput into a file.
 
 ## Usage
 
 Before you begin, find the line beginning with `ExecStart=` at the very bottom
 of the `[Service]` section in the unit file. Depending on your installation path
 you might need to change the location of the `threatbus` and `pyvast-threatbus`
-executable packages and configuration files.
+executable packages and configuration files. Similarly, you need to change the
+environmentvariables `THREATBUSDIR` and `PYVAST_THREATBUSDIR` according to your
+installation paths.
 
 - Threat Bus
   ```bash
-  ExecStart=/path/to/threatbus --config=/path/to/threatbus/config.yaml
+  Environment="THREATBUSDIR=/installation/path"
+  ExecStart=/installation/path/threatbus --config=/installation/path/threatbus/config.yaml
   ```
 
 - `pyvast-threabus`
   ```bash
-  ExecStart=/path/to/pyvast-threatbus --config=/path/to/pyvast-threatbus/config.yaml
+  Environment="PYVAST_THREATBUSDIR=/installation/path"
+  ExecStart=/installation/path/pyvast-threatbus --config=/installation/path/pyvast-threatbus/config.yaml
   ```
 
 Then copy (or symlink) the unit file to `/etc/systemd/system`.
