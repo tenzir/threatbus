@@ -1,0 +1,36 @@
+[Unit]
+Description=Threat Bus - Open Source Intelligence Platform
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+
+DynamicUser=yes
+LogsDirectory=threatbus
+
+# capabilities
+RestrictNamespaces=yes
+RestrictAddressFamilies=
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictSUIDSGID=yes
+
+# system access
+ProtectSystem=strict
+PrivateTmp=yes
+ProtectHome=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+
+# service specifics
+TimeoutStopSec=600
+# confuse requires this environment variable to not lookup config directories that are restricted by systemd.
+Environment="THREATBUSDIR=/opt/tenzir/threatbus"
+ExecStart=/opt/tenzir/threatbus/threatbus -c /opt/tenzir/threatbus/threatbus.yaml
+
+[Install]
+WantedBy=multi-user.target

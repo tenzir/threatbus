@@ -9,7 +9,12 @@ Every entry has a category for which we use the following visual abbreviations:
 - ⚠️ change
 - 🐞 bugfix
 
-<!-- ## Unreleased -->
+## Unreleased
+
+- 🎁 New systemd unit files are now available in the Threat Bus
+  [repository](https://github.com/tenzir/threatbus/tree/master/threatbus)
+  to run both Threat Bus and `pyvast-threatbus` as system services.
+  [#77](https://github.com/tenzir/threatbus/pull/77)
 
 ##  [2020.11.30]
 

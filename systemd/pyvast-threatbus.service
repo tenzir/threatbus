@@ -1,0 +1,36 @@
+[Unit]
+Description=PyVAST-Threat Bus - Connect VAST with Threat Bus
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+
+DynamicUser=yes
+LogsDirectory=pyvast-threatbus
+
+# capabilities
+RestrictNamespaces=yes
+RestrictAddressFamilies=
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictSUIDSGID=yes
+
+# system access
+ProtectSystem=strict
+PrivateTmp=yes
+ProtectHome=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+
+# service specifics
+TimeoutStopSec=600
+# confuse requires this environment variable to not lookup config directories that are restricted by systemd.
+Environment="PYVAST_THREATBUSDIR=/opt/tenzir/threatbus"
+ExecStart=/opt/tenzir/threatbus/pyvast-threatbus -c /opt/tenzir/threatbus/pyvast-threatbus.yaml
+
+[Install]
+WantedBy=multi-user.target
