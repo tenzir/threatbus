@@ -7,19 +7,6 @@ limited privileges.
 
 ## Prepare the Host System
 
-Please note that all subsequent commands require `root` privileges. The services
-run with the privileges of a user and group called `threatbus`. You can create
-them as follows.
-
-```bash
-useradd --system --user-group threatbus
-```
-
-Make sure that you don't grant any special rights to this user, i.e., do not
-enable `sudo` or other privileged commands for this user.
-
-#### Log-Directories
-
 The systemd unit declares a private user. Hence, all logs go to
 `/var/log/private` by default. The following section explains how to configure
 file-logging for Threat Bus and `pyvast-threatbus`. Skip the following
