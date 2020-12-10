@@ -12,6 +12,10 @@ Every entry has a category for which we use the following visual abbreviations:
 
  ## Unreleased
 
+- 🎁 `pyvast-threatbus` now supports basic metric collection. It stores metrics
+  in [influx line protocol](https://docs.influxdata.com/influxdb/v2.0/reference/syntax/line-protocol/)
+  syntax in a configurable file on disk.
+
 - ⚠️ `pyvast-threatbus` cannot be started with command line arguments anymore.
   From now on, the application only supports one option, `-c`, to pass a config
   file.
