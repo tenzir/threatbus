@@ -12,6 +12,10 @@ Every entry has a category for which we use the following visual abbreviations:
 
  ## Unreleased
 
+- ⚠️ `pyvast-threatbus` cannot be started with command line arguments anymore.
+  From now on, the application only supports one option, `-c`, to pass a config
+  file.
+
 - 🎁 `pyvast-threatbus` now uses the Threat Bus `logger` module. Users can
   configure logging the same way as in Threat Bus, via a `logging` section in
   the `config.yaml` file. The new configuration section and the `--loglevel`

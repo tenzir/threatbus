@@ -77,24 +77,11 @@ def validate_config(config: confuse.Subview):
     config["transform_context"].add(None)
     config["sink"].add(None)
 
-    # logging
-    config["logging"].add({})
-    config["loglevel"].add("")
-    if config["loglevel"].get(str) and config["logging"].get(dict):
-        raise AssertionError(
-            "Found two conflicting config settings: 'loglevel' and 'logging'. Either configure 'logging' (verbose) or use 'loglevel' for console logging only."
-        )
-    if not config["loglevel"].get(str) and not config["logging"].get(dict):
-        raise AssertionError(
-            "No logging configured. Either specify '--loglevel' or configure the 'logging' section in the config.yaml file."
-        )
-
-    if config["logging"]:
-        if config["logging"]["console"].get(bool):
-            config["logging"]["console_verbosity"].get(str)
-        if config["logging"]["file"].get(bool):
-            config["logging"]["file_verbosity"].get(str)
-            config["logging"]["filename"].get(str)
+    if config["logging"]["console"].get(bool):
+        config["logging"]["console_verbosity"].get(str)
+    if config["logging"]["file"].get(bool):
+        config["logging"]["file_verbosity"].get(str)
+        config["logging"]["filename"].get(str)
 
 
 def cancel_async_tasks():
@@ -589,83 +576,6 @@ async def heartbeat(endpoint: str, p2p_topic: str, interval: int = 5):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", "-c", help="Path to a configuration file")
-    parser.add_argument(
-        "--vast",
-        "-v",
-        dest="vast",
-        default="localhost:42000",
-        help="Endpoint of a running VAST node",
-    )
-    parser.add_argument(
-        "--vast-binary",
-        "-b",
-        dest="vast_binary",
-        default="vast",
-        help="The vast command to use (either absolte path or a command available in $PATH)",
-    )
-    parser.add_argument(
-        "--threatbus",
-        "-t",
-        dest="threatbus",
-        default="localhost:13370",
-        help="Management endpoint of a VAST Threat Bus node",
-    )
-    parser.add_argument(
-        "--snapshot",
-        "-s",
-        dest="snapshot",
-        default=0,
-        type=int,
-        help="Request intelligence snapshot for past n days",
-    )
-    parser.add_argument(
-        "--loglevel",
-        "-l",
-        dest="loglevel",
-        type=str,
-        help="Loglevel to use for console logging. Note that you can specify file logging only via the config.yaml file.",
-    )
-    parser.add_argument(
-        "--retro-match",
-        dest="retro_match",
-        action="store_true",
-        help="Use plain vast queries instead of live-matcher",
-    )
-    parser.add_argument(
-        "--unflatten",
-        dest="unflatten",
-        action="store_true",
-        help="Only applicable when --retro-match is used. Unflatten the JSON results from VAST. The unflattening is applied immediately after retrieving the results from VAST, i.e., unflatten is applied before all further processing steps like --transform-context, --sink, or reporting back to Threat Bus.",
-    )
-    parser.add_argument(
-        "--retro-match-max-events",
-        dest="retro_match_max_events",
-        default=0,
-        type=int,
-        help="Use this options to fine-tune '--retro-match'. The app passes this option to VAST to at most return the configured number of sightings per IoC.",
-    )
-    parser.add_argument(
-        "--transform-context",
-        "-T",
-        dest="transform_context",
-        default=None,
-        help="Forward the context of each sighting (only the contents without the Threat Bus specific sighting structure) via a UNIX pipe. This option takes a command line string to use and invokes it as direct subprocess without shell / globbing support. Note: Treated as template string. Occurrences of '%%ioc' get replaced with the matched IoC.",
-    )
-    parser.add_argument(
-        "--sink",
-        "-S",
-        dest="sink",
-        default=None,
-        help="If sink is specified, sightings are not reported back to Threat Bus. Instead, the context of a sighting (only the contents without the Threat Bus specific sighting structure) is forwarded to the specified sink via a UNIX pipe. This option takes a command line string to use and invokes it as direct subprocess without shell / globbing support.",
-    )
-    parser.add_argument(
-        "--max-background-tasks",
-        "-U",
-        dest="max-background-tasks",
-        default=100,
-        type=int,
-        help="Controls the maximum number of concurrent background tasks for VAST queries. Default is 100.",
-    )
     args = parser.parse_args()
 
     # we need to use an underscore in the configuration name "pyvast_threatbus"
