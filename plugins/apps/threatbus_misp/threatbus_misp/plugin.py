@@ -52,7 +52,9 @@ class SightingsPublisher(threatbus.StoppableWorker):
             logger.debug(f"Reporting sighting: {sighting}")
             misp_sighting = map_to_misp(sighting)
             lock.acquire()
-            misp.add_sighting(misp_sighting)
+            resp = misp.add_sighting(misp_sighting)
+            if not resp or type(resp) is dict and resp.get("message", None):
+                logger.error(f"Error adding sighting to misp: {resp}")
             lock.release()
             self.outq.task_done()
 
