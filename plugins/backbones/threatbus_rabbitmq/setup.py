@@ -22,7 +22,7 @@ setup(
     ],
     description="A RabbitMQ backbone for threatbus.",
     entry_points={"threatbus.backbone": ["rabbitmq = threatbus_rabbitmq.plugin"]},
-    install_requires=["threatbus>=2020.11.26", "pika>=1.1.0", "retry"],
+    install_requires=["threatbus>=2020.12.16", "pika>=1.1.0", "retry"],
     keywords=["threatbus", "plugin"],
     license="BSD 3-clause",
     long_description=long_description,
@@ -31,5 +31,5 @@ setup(
     packages=["threatbus_rabbitmq"],
     python_requires=">=3.7",
     url="https://github.com/tenzir/threatbus",
-    version="2020.11.30",
+    version="2020.12.16",
 )

@@ -26,7 +26,7 @@ setup(
     description="A plugin to connect apps via ZeroMQ.",
     entry_points={"threatbus.app": ["zmq-app = threatbus_zmq_app.plugin"]},
     install_requires=[
-        "threatbus>=2020.11.26",
+        "threatbus>=2020.12.16",
         "pyzmq>=19",
         "python-dateutil>=2.8.1",
     ],
@@ -44,5 +44,5 @@ setup(
     packages=["threatbus_zmq_app"],
     python_requires=">=3.7",
     url="https://github.com/tenzir/threatbus",
-    version="2020.11.26",
+    version="2020.12.16",
 )
