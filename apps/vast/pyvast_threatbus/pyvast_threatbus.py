@@ -18,10 +18,13 @@ from .message_mapping import (
 from pyvast import VAST
 import random
 from shlex import split as lexical_split
+import socket
 from string import ascii_lowercase as letters
 import sys
+from .metrics import Gauge, Summary
 from threatbus.logger import setup as setup_logging_threatbus
 from threatbus.data import Intel, IntelDecoder, Sighting, SightingEncoder, Operation
+import time
 import zmq
 
 logger_name = "pyvast-threatbus"
@@ -32,6 +35,15 @@ async_tasks = []
 # the p2p topic that was given to the vast-bridge upon successful subscription
 p2p_topic = None
 max_open_tasks = None
+
+# metric definitions
+metrics = []
+g_iocs_added = Gauge("added_iocs")
+g_iocs_removed = Gauge("removed_iocs")
+metrics += [g_iocs_added, g_iocs_removed]
+s_retro_matches_per_ioc = Summary("retro_matches_per_ioc")
+s_retro_query_time_s_per_ioc = Summary("retro_query_time_per_ioc")
+g_live_matcher_sightings = Gauge("live_matcher_sightings")
 
 
 def setup_logging_with_level(level: str):
@@ -78,23 +90,15 @@ def validate_config(config: confuse.Subview):
     config["sink"].add(None)
 
     # logging
-    config["logging"].add({})
-    config["loglevel"].add("")
-    if config["loglevel"].get(str) and config["logging"].get(dict):
-        raise AssertionError(
-            "Found two conflicting config settings: 'loglevel' and 'logging'. Either configure 'logging' (verbose) or use 'loglevel' for console logging only."
-        )
-    if not config["loglevel"].get(str) and not config["logging"].get(dict):
-        raise AssertionError(
-            "No logging configured. Either specify '--loglevel' or configure the 'logging' section in the config.yaml file."
-        )
+    if config["logging"]["console"].get(bool):
+        config["logging"]["console_verbosity"].get(str)
+    if config["logging"]["file"].get(bool):
+        config["logging"]["file_verbosity"].get(str)
+        config["logging"]["filename"].get(str)
 
-    if config["logging"]:
-        if config["logging"]["console"].get(bool):
-            config["logging"]["console_verbosity"].get(str)
-        if config["logging"]["file"].get(bool):
-            config["logging"]["file_verbosity"].get(str)
-            config["logging"]["filename"].get(str)
+    # metrics
+    config["metrics"]["interval"].get(int)
+    config["metrics"]["filename"].get(str)
 
 
 def cancel_async_tasks():
@@ -117,6 +121,8 @@ async def start(
     retro_match_max_events: int,
     unflatten: bool,
     max_open_files: int,
+    metrics_interval: int,
+    metrics_filename: str,
     transform_cmd: str = None,
     sink: str = None,
 ):
@@ -132,11 +138,13 @@ async def start(
     @param retro_match_max_events Max amount of retro match results
     @param unflatten Boolean flag to unflatten JSON when received from VAST
     @param max_open_files The maximum number of concurrent background tasks for VAST queries.
+    @param merics_interval The interval in seconds to bucketize metrics
+    @param metrics_filename The filename (system path) to store metrics at
     @param transform_cmd The command to use to transform Sighting context with
     @param sink Forward sighting context to this sink (subprocess) instead of
         reporting back to Threat Bus
     """
-    global logger, async_tasks, p2p_topic, max_open_tasks
+    global logger, async_tasks, p2p_topic, max_open_tasks, metrics
     # needs to be created inside the same eventloop where it is used
     max_open_tasks = asyncio.Semaphore(max_open_files)
     vast = VAST(binary=vast_binary, endpoint=vast_endpoint, logger=logger)
@@ -193,15 +201,54 @@ async def start(
         )
     )
 
-    if not retro_match:
+    if retro_match:
+        # add metrics for retro-matching to the metric output
+        metrics += [s_retro_matches_per_ioc, s_retro_query_time_s_per_ioc]
+    else:
+        # add metrics for live-matching to the metric output
+        metrics.append(g_live_matcher_sightings)
         async_tasks.append(
             asyncio.create_task(
                 live_match_vast(vast_binary, vast_endpoint, sightings_queue)
             )
         )
 
+    if metrics_interval:
+        async_tasks.append(
+            asyncio.create_task(write_metrics(metrics_interval, metrics_filename))
+        )
+
     atexit.register(cancel_async_tasks)
     return await asyncio.gather(*async_tasks)
+
+
+async def write_metrics(every: int, to: str):
+    """
+    Periodically writes metrics to a file.
+    @param every The interval to write metrics, in seconds
+    @param to the filepath to write to
+    """
+    while True:
+        line = f"pyvast-threatbus,host={socket.gethostname()}"
+        start_length = len(line)
+        for m in metrics:
+            if not m.is_set:
+                continue
+            if type(m) is Gauge:
+                line += f" {m.name}={m.value}"
+            if type(m) is Summary:
+                line += (
+                    f" {m.name}_min={m.min},{m.name}_max={m.max},{m.name}_avg={m.avg}"
+                )
+            m.reset()
+
+        if len(line) > start_length:
+            # only update the file if there were metrics collected.
+            line += f" {time.time_ns()}"  # append current nanoseconds ts
+            with open(to, "a") as f:
+                f.write(line + "\n")
+
+        await asyncio.sleep(every)
 
 
 async def receive(pub_endpoint: str, topic: str, intel_queue: asyncio.Queue):
@@ -258,6 +305,7 @@ async def retro_match_vast(
     @param sightings_queue The queue to put new sightings into
     @param unflatten Boolean flag to unflatten JSON when received from VAST
     """
+    start = time.time()
     query = to_vast_query(intel)
     if not query:
         return
@@ -276,6 +324,8 @@ async def retro_match_vast(
                 reported += 1
                 await sightings_queue.put(sighting)
         logger.debug(f"Retro-matched {reported} sighting(s) for intel: {intel}")
+        s_retro_matches_per_ioc.observe(reported)
+        s_retro_query_time_s_per_ioc.observe(time.time() - start)
 
 
 async def ingest_vast_ioc(vast_binary, vast_endpoint, intel):
@@ -350,6 +400,7 @@ async def match_intel(
             )
             continue
         if intel.operation == Operation.ADD:
+            g_iocs_added.inc()
             if retro_match:
                 asyncio.create_task(
                     retro_match_vast(
@@ -364,6 +415,7 @@ async def match_intel(
             else:
                 asyncio.create_task(ingest_vast_ioc(vast_binary, vast_endpoint, intel))
         elif intel.operation == Operation.REMOVE:
+            g_iocs_removed.inc()
             if retro_match:
                 continue
             asyncio.create_task(remove_vast_ioc(vast_binary, vast_endpoint, intel))
@@ -399,6 +451,7 @@ async def live_match_vast(
         if not sighting:
             logger.error(f"Cannot parse sighting-output from VAST: {vast_sighting}")
             continue
+        g_live_matcher_sightings.inc()
         await sightings_queue.put(sighting)
 
 
@@ -589,83 +642,6 @@ async def heartbeat(endpoint: str, p2p_topic: str, interval: int = 5):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", "-c", help="Path to a configuration file")
-    parser.add_argument(
-        "--vast",
-        "-v",
-        dest="vast",
-        default="localhost:42000",
-        help="Endpoint of a running VAST node",
-    )
-    parser.add_argument(
-        "--vast-binary",
-        "-b",
-        dest="vast_binary",
-        default="vast",
-        help="The vast command to use (either absolte path or a command available in $PATH)",
-    )
-    parser.add_argument(
-        "--threatbus",
-        "-t",
-        dest="threatbus",
-        default="localhost:13370",
-        help="Management endpoint of a VAST Threat Bus node",
-    )
-    parser.add_argument(
-        "--snapshot",
-        "-s",
-        dest="snapshot",
-        default=0,
-        type=int,
-        help="Request intelligence snapshot for past n days",
-    )
-    parser.add_argument(
-        "--loglevel",
-        "-l",
-        dest="loglevel",
-        type=str,
-        help="Loglevel to use for console logging. Note that you can specify file logging only via the config.yaml file.",
-    )
-    parser.add_argument(
-        "--retro-match",
-        dest="retro_match",
-        action="store_true",
-        help="Use plain vast queries instead of live-matcher",
-    )
-    parser.add_argument(
-        "--unflatten",
-        dest="unflatten",
-        action="store_true",
-        help="Only applicable when --retro-match is used. Unflatten the JSON results from VAST. The unflattening is applied immediately after retrieving the results from VAST, i.e., unflatten is applied before all further processing steps like --transform-context, --sink, or reporting back to Threat Bus.",
-    )
-    parser.add_argument(
-        "--retro-match-max-events",
-        dest="retro_match_max_events",
-        default=0,
-        type=int,
-        help="Use this options to fine-tune '--retro-match'. The app passes this option to VAST to at most return the configured number of sightings per IoC.",
-    )
-    parser.add_argument(
-        "--transform-context",
-        "-T",
-        dest="transform_context",
-        default=None,
-        help="Forward the context of each sighting (only the contents without the Threat Bus specific sighting structure) via a UNIX pipe. This option takes a command line string to use and invokes it as direct subprocess without shell / globbing support. Note: Treated as template string. Occurrences of '%%ioc' get replaced with the matched IoC.",
-    )
-    parser.add_argument(
-        "--sink",
-        "-S",
-        dest="sink",
-        default=None,
-        help="If sink is specified, sightings are not reported back to Threat Bus. Instead, the context of a sighting (only the contents without the Threat Bus specific sighting structure) is forwarded to the specified sink via a UNIX pipe. This option takes a command line string to use and invokes it as direct subprocess without shell / globbing support.",
-    )
-    parser.add_argument(
-        "--max-background-tasks",
-        "-U",
-        dest="max-background-tasks",
-        default=100,
-        type=int,
-        help="Controls the maximum number of concurrent background tasks for VAST queries. Default is 100.",
-    )
     args = parser.parse_args()
 
     # we need to use an underscore in the configuration name "pyvast_threatbus"
@@ -702,6 +678,8 @@ def main():
                     config["retro_match_max_events"].get(),
                     config["unflatten"].get(),
                     config["max_background_tasks"].get(),
+                    config["metrics"]["interval"].get(),
+                    config["metrics"]["filename"].get(),
                     config["transform_context"].get(),
                     config["sink"].get(),
                 )

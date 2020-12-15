@@ -12,10 +12,19 @@ Every entry has a category for which we use the following visual abbreviations:
 
  ## Unreleased
 
+- 🎁 `pyvast-threatbus` now supports basic metric collection. It stores metrics
+  in [influx line protocol](https://docs.influxdata.com/influxdb/v2.0/reference/syntax/line-protocol/)
+  syntax in a configurable file on disk.
+  [#85](https://github.com/tenzir/threatbus/pull/85)
+
+- ⚠️ `pyvast-threatbus` cannot be started with command line arguments anymore.
+  From now on, the application only supports one option, `-c`, to pass a config
+  file.
+  [#85](https://github.com/tenzir/threatbus/pull/85)
+
 - 🎁 `pyvast-threatbus` now uses the Threat Bus `logger` module. Users can
   configure logging the same way as in Threat Bus, via a `logging` section in
-  the `config.yaml` file. The new configuration section and the `--loglevel`
-  option are mutually exclusive.
+  the `config.yaml` file.
   [#80](https://github.com/tenzir/threatbus/pull/80)
 
 ##  [2020.11.26]

@@ -5,6 +5,10 @@ logging:
   file_verbosity: DEBUG
   filename: pyvast-threatbus.log
 
+metrics:
+  interval: 10 # set to 0 to disable metrics
+  filename: metrics.log
+
 vast: "localhost:42000"
 vast_binary: vast
 threatbus: "localhost:13370"
