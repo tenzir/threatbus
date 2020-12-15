@@ -9,20 +9,22 @@ Every entry has a category for which we use the following visual abbreviations:
 - ⚠️ change
 - 🐞 bugfix
 
-## Unreleased
+<!-- ## Unreleased -->
+
+## [2020.12.16]
 
 - 🎁 New systemd unit files are now available in the Threat Bus
   [repository](https://github.com/tenzir/threatbus/tree/master/threatbus)
   to run both Threat Bus and `pyvast-threatbus` as system services.
   [#77](https://github.com/tenzir/threatbus/pull/77)
 
-##  [2020.11.30]
+## [2020.11.30]
 
 - 🐞 The RabbitMQ backbone plugin ignored user-defined queue parameters, such as
   `durable` or `lazy` queues. It now respects such parameters again.
   [#76](https://github.com/tenzir/threatbus/pull/76)
 
-##  [2020.11.26]
+## [2020.11.26]
 
 - 🐞 The Zeek app did not perform an outbound connection to Threat Bus in
   cluster mode. Now the master peers with Threat Bus to establish a connection.
@@ -82,3 +84,4 @@ Every entry has a category for which we use the following visual abbreviations:
 [2020.10.29]: https://github.com/tenzir/threatbus/releases/tag/2020.10.29
 [2020.11.26]: https://github.com/tenzir/threatbus/releases/tag/2020.11.26
 [2020.11.30]: https://github.com/tenzir/threatbus/releases/tag/2020.11.30
+[2020.12.16]: https://github.com/tenzir/threatbus/releases/tag/2020.12.16

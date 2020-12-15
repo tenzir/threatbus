@@ -10,7 +10,9 @@ Every entry has a category for which we use the following visual abbreviations:
 - ⚡️ breaking change
 - 🐞 bugfix
 
- ## Unreleased
+ <!-- ## Unreleased -->
+
+## [2020.12.16]
 
 - 🎁 `pyvast-threatbus` now uses the Threat Bus `logger` module. Users can
   configure logging the same way as in Threat Bus, via a `logging` section in
@@ -18,7 +20,7 @@ Every entry has a category for which we use the following visual abbreviations:
   option are mutually exclusive.
   [#80](https://github.com/tenzir/threatbus/pull/80)
 
-##  [2020.11.26]
+## [2020.11.26]
 
 - 🐞 `pyvast-threatbus` escapes backslashes and quotes in IoCs before it queries
   VAST.
@@ -37,3 +39,4 @@ Every entry has a category for which we use the following visual abbreviations:
   [#63](https://github.com/tenzir/threatbus/pull/63)
 
 [2020.11.26]: https://github.com/tenzir/threatbus/releases/tag/2020.11.26
+[2020.12.16]: https://github.com/tenzir/threatbus/releases/tag/2020.12.16
