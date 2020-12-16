@@ -10,7 +10,9 @@ Every entry has a category for which we use the following visual abbreviations:
 - ⚡️ breaking change
 - 🐞 bugfix
 
- ## Unreleased
+ <!-- ## Unreleased -->
+
+## [2020.12.16]
 
 - 🎁 `pyvast-threatbus` now supports basic metric collection. It stores metrics
   in [influx line protocol](https://docs.influxdata.com/influxdb/v2.0/reference/syntax/line-protocol/)
@@ -27,7 +29,7 @@ Every entry has a category for which we use the following visual abbreviations:
   the `config.yaml` file.
   [#80](https://github.com/tenzir/threatbus/pull/80)
 
-##  [2020.11.26]
+## [2020.11.26]
 
 - 🐞 `pyvast-threatbus` escapes backslashes and quotes in IoCs before it queries
   VAST.
@@ -46,3 +48,4 @@ Every entry has a category for which we use the following visual abbreviations:
   [#63](https://github.com/tenzir/threatbus/pull/63)
 
 [2020.11.26]: https://github.com/tenzir/threatbus/releases/tag/2020.11.26
+[2020.12.16]: https://github.com/tenzir/threatbus/releases/tag/2020.12.16

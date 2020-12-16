@@ -22,7 +22,7 @@ setup(
     ],
     description="A simplistic in-memory backbone for threatbus.",
     entry_points={"threatbus.backbone": ["file_benchmark = file_benchmark.plugin"]},
-    install_requires=["threatbus>=2020.11.26"],
+    install_requires=["threatbus>=2020.12.16"],
     keywords=["threatbus", "plugin"],
     license="BSD 3-clause",
     long_description=long_description,
@@ -31,5 +31,5 @@ setup(
     packages=["file_benchmark"],
     python_requires=">=3.7",
     url="https://github.com/tenzir/threatbus",
-    version="2020.11.26",
+    version="2020.12.16",
 )

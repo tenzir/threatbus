@@ -32,7 +32,7 @@ setup(
         "confuse",
         "pyzmq>=19",
         "pyvast>=2020.10.29",
-        "threatbus>=2020.11.26",
+        "threatbus>=2020.12.16",
         "unflatten",
     ],
     keywords=[
@@ -52,5 +52,5 @@ setup(
     python_requires=">=3.7",
     setup_requires=["setuptools", "wheel"],
     url="https://github.com/tenzir/threatbus",
-    version="2020.11.26",
+    version="2020.12.16",
 )
