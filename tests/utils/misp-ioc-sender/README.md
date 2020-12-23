@@ -9,6 +9,7 @@ The script works as follows:
 - Create the Event if it doesn't exist.
 - Check the Attributes of the Event and either create a new Attribute or toggle
   the `'to_ids'` flag if the Attribute already exists.
+- If configured, additionally report a sighting for the attribute.
 
 Attributes created by this script always have the `"DOMAIN"` type. Attribute
 values contain the current day of the year and are always formatted like this:

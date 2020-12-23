@@ -118,6 +118,7 @@ def create_attribute(misp: pymisp.api.PyMISP, event: pymisp.MISPEvent, ioc: str)
         logger.critical(f"Error creating MISP Attribute with IoC {ioc}: {errors}")
         return
     logger.info(f"Created new MISP Attribute with IoC '{ioc}'")
+    return attr
 
 
 def toggle_attribute(misp: pymisp.api.PyMISP, attr: pymisp.MISPAttribute):
@@ -136,7 +137,32 @@ def toggle_attribute(misp: pymisp.api.PyMISP, attr: pymisp.MISPAttribute):
     resp = misp.update_attribute(attr)
     if not resp or resp.get("errors", {}):
         logger.error(f"Error enabling 'to_ids' flag for Attribute {attr}")
+        return
     logger.info(f"Toggled 'to_ids' flag for Attibute {attr}")
+
+
+def report_sighting(misp: pymisp.api.PyMISP, attr: pymisp.MISPAttribute):
+    """
+    Reports a sighting for the given attribute
+    @param misp The PyMISP instance to use
+    @param attr The MISP Attribute to send the sighting for
+    """
+    misp_sighting = pymisp.MISPSighting()
+    misp_sighting.from_dict(
+        id=attr.id,
+        source="TEST",
+        type="0",  # true positive sighting: https://www.circl.lu/doc/misp/automation/#post-sightingsadd
+        timestamp=datetime.now(),
+    )
+    resp = misp.add_sighting(misp_sighting)
+    if (
+        not resp
+        or type(resp) is dict
+        and (resp.get("message", None) or resp.get("errors", None))
+    ):
+        logger.error(f"Failed to add sighting to MISP: {resp}")
+        return
+    logger.info(f"Reported sighting: {resp}")
 
 
 def start(config: confuse.Subview):
@@ -164,14 +190,18 @@ def start(config: confuse.Subview):
         if attr.to_dict().get("value", None) == ioc
     ]
     if not attrs:
-        create_attribute(misp, event, ioc)
+        attr = create_attribute(misp, event, ioc)
     elif len(attrs) == 1:
         logger.info(f"Found MISP Attribute with IoC '{ioc}'")
-        toggle_attribute(misp, attrs[0])
+        attr = attrs[0]
+        toggle_attribute(misp, attr)
     else:
         logger.critical(
             f"Found too many matching attributes for IoC '{ioc}' in the MISP event with UUID {event_uuid}"
         )
+        return
+    if config["report_sighting"].get(bool):
+        report_sighting(misp, attr)
 
 
 def main():
