@@ -183,6 +183,12 @@ def start(config: confuse.Subview):
             f"Disabling installed, but unconfigured backbones '{unwanted_backbones}'"
         )
         backbones.unregister(name=unwanted_backbones)
+    for unconfigured_app in (configured_apps - installed_apps).union(
+        configured_backbones - installed_backbones
+    ):
+        tb_logger.warn(
+            f"Found configuration for '{unconfigured_app}' but no corresponding plugin is installed."
+        )
 
     bus_thread = ThreatBus(backbones.hook, apps.hook, tb_logger, config)
     signal.signal(signal.SIGINT, bus_thread.stop_signal)
