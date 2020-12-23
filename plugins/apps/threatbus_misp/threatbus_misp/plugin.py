@@ -53,8 +53,7 @@ class SightingsPublisher(threatbus.StoppableWorker):
             misp_sighting = map_to_misp(sighting)
             lock.acquire()
             resp = misp.add_sighting(misp_sighting)
-            if not resp or type(resp) is dict and resp.get("message", None):
-                logger.error(f"Failed to add sighting to MISP: {resp}")
+            logger.debug(f"MISP API response: {resp}")
             lock.release()
             self.outq.task_done()
 
