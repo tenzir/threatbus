@@ -187,7 +187,7 @@ def start(config: confuse.Subview):
         configured_backbones - installed_backbones
     ):
         tb_logger.warn(
-            f"Found configuration for '{unconfigured_app}' but no plugin with that name is installed."
+            f"Found configuration for '{unconfigured_app}' but no corresponding plugin is installed."
         )
 
     bus_thread = ThreatBus(backbones.hook, apps.hook, tb_logger, config)
