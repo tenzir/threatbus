@@ -51,6 +51,11 @@ class SightingsPublisher(threatbus.StoppableWorker):
                 continue
             logger.debug(f"Reporting sighting: {sighting}")
             misp_sighting = map_to_misp(sighting)
+            if not misp_sighting:
+                logger.warn(f"Error converting sighting to MISP representation: {sighting}")
+                self.outq.task_done()
+                continue
+            logger.debug(f"Converted sighting: {misp_sighting.to_json()}")
             lock.acquire()
             resp = misp.add_sighting(misp_sighting)
             logger.debug(f"MISP API response: {resp}")
