@@ -10,7 +10,12 @@ Every entry has a category for which we use the following visual abbreviations:
 - ⚡️ breaking change
 - 🐞 bugfix
 
- <!-- ## Unreleased -->
+## Unreleased
+
+- ⚠️ `pyvast-threatbus` drops support to unflatten JSON that it receives from
+  `vast export`, because VAST now returns unflattened JSON
+  [by default](https://github.com/tenzir/vast/pull/1257).
+  [#92](https://github.com/tenzir/threatbus/pull/92)
 
 ## [2020.12.16]
 
