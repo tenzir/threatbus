@@ -33,7 +33,6 @@ setup(
         "pyzmq>=19",
         "pyvast>=2020.10.29",
         "threatbus>=2020.12.16",
-        "unflatten",
     ],
     keywords=[
         "threatbus",

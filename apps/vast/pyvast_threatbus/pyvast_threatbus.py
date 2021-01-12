@@ -82,7 +82,6 @@ def validate_config(config: confuse.Subview):
     config["snapshot"].get(int)
     config["retro_match"].get(bool)
     config["retro_match_max_events"].get(int)
-    config["unflatten"].get(bool)
     config["max_background_tasks"].get(int)
 
     # fallback values for the optional arguments
@@ -119,7 +118,6 @@ async def start(
     snapshot: int,
     retro_match: bool,
     retro_match_max_events: int,
-    unflatten: bool,
     max_open_files: int,
     metrics_interval: int,
     metrics_filename: str,
@@ -136,7 +134,6 @@ async def start(
     @param snapshot An integer value to request n days of past intel items
     @param retro_match Boolean flag to use retro-matching over live-matching
     @param retro_match_max_events Max amount of retro match results
-    @param unflatten Boolean flag to unflatten JSON when received from VAST
     @param max_open_files The maximum number of concurrent background tasks for VAST queries.
     @param merics_interval The interval in seconds to bucketize metrics
     @param metrics_filename The filename (system path) to store metrics at
@@ -196,7 +193,6 @@ async def start(
                 sightings_queue,
                 retro_match,
                 retro_match_max_events,
-                unflatten,
             )
         )
     )
@@ -293,7 +289,6 @@ async def retro_match_vast(
     retro_match_max_events,
     intel,
     sightings_queue,
-    unflatten,
 ):
     """
     Turns the given intel into a valid VAST query and forwards all all query
@@ -303,7 +298,6 @@ async def retro_match_vast(
     @param retro_match_max_events  Max amount of retro match results
     @param intel The IoC to query VAST for
     @param sightings_queue The queue to put new sightings into
-    @param unflatten Boolean flag to unflatten JSON when received from VAST
     """
     start = time.time()
     query = to_vast_query(intel)
@@ -317,7 +311,7 @@ async def retro_match_vast(
         while not proc.stdout.at_eof():
             line = (await proc.stdout.readline()).decode().rstrip()
             if line:
-                sighting = query_result_to_threatbus_sighting(line, intel, unflatten)
+                sighting = query_result_to_threatbus_sighting(line, intel)
                 if not sighting:
                     logger.error(f"Could not parse VAST query result: {line}")
                     continue
@@ -373,7 +367,6 @@ async def match_intel(
     sightings_queue: asyncio.Queue,
     retro_match: bool,
     retro_match_max_events: int,
-    unflatten: bool,
 ):
     """
     Reads from the intel_queue and matches all IoCs, either via VAST's
@@ -384,7 +377,6 @@ async def match_intel(
     @param sightings_queue The queue to put new sightings into
     @param retro_match Boolean flag to use retro-matching over live-matching
     @param retro_match_max_events  Max amount of retro match results
-    @param unflatten Boolean flag to unflatten JSON when received from VAST
     """
     global logger, open_tasks
     while True:
@@ -409,7 +401,6 @@ async def match_intel(
                         retro_match_max_events,
                         intel,
                         sightings_queue,
-                        unflatten,
                     )
                 )
             else:
@@ -676,7 +667,6 @@ def main():
                     config["snapshot"].get(),
                     config["retro_match"].get(),
                     config["retro_match_max_events"].get(),
-                    config["unflatten"].get(),
                     config["max_background_tasks"].get(),
                     config["metrics"]["interval"].get(),
                     config["metrics"]["filename"].get(),
