@@ -31,8 +31,7 @@ class TestMessageMapping(unittest.TestCase):
         self.valid_intel = Intel(
             self.ts, self.id, self.valid_intel_data, self.operation
         )
-        self.valid_query_result = f'{{"timestamp": "{self.ts}", "flow_id": 1840147514011873, "pcap_cnt": 626, "src_ip": "{self.indicator[0]}", "src_port": 1193, "dest_ip": "65.54.95.64", "dest_port": 80, "proto": "TCP", "event_type": "http", "community_id": "1:AzSEWwmsqEKUX5qrReAHI3Rpizg=", "http.hostname": "download.windowsupdate.com", "http.url": "/v9/windowsupdate/a/selfupdate/WSUS3/x86/Other/wsus3setup.cab?0911180916", "http.http_port": null, "http.http_user_agent": "Windows-Update-Agent", "http.http_content_type": "application/octet-stream", "http.http_method": "HEAD", "http.http_refer": null, "http.protocol": "HTTP/1.1", "http.status": 200, "http.redirect": null, "http.length": 0, "tx_id": 0}}'
-        self.unflattened_query_result = f'{{"timestamp": "{self.ts}", "flow_id": 1840147514011873, "pcap_cnt": 626, "src_ip": "{self.indicator[0]}", "src_port": 1193, "dest_ip": "65.54.95.64", "dest_port": 80, "proto": "TCP", "event_type": "http", "community_id": "1:AzSEWwmsqEKUX5qrReAHI3Rpizg=", "http": {{"hostname": "download.windowsupdate.com", "url": "/v9/windowsupdate/a/selfupdate/WSUS3/x86/Other/wsus3setup.cab?0911180916", "http_port": null, "http_user_agent": "Windows-Update-Agent", "http_content_type": "application/octet-stream", "http_method": "HEAD", "http_refer": null, "protocol": "HTTP/1.1", "status": 200, "redirect": null, "length": 0}}, "tx_id": 0}}'
+        self.valid_query_result = f'{{"timestamp": "{self.ts}", "flow_id": 1840147514011873, "pcap_cnt": 626, "src_ip": "{self.indicator[0]}", "src_port": 1193, "dest_ip": "65.54.95.64", "dest_port": 80, "proto": "TCP", "event_type": "http", "community_id": "1:AzSEWwmsqEKUX5qrReAHI3Rpizg=", "http": {{"hostname": "download.windowsupdate.com", "url": "/v9/windowsupdate/a/selfupdate/WSUS3/x86/Other/wsus3setup.cab?0911180916", "http_port": null, "http_user_agent": "Windows-Update-Agent", "http_content_type": "application/octet-stream", "http_method": "HEAD", "http_refer": null, "protocol": "HTTP/1.1", "status": 200, "redirect": null, "length": 0}}, "tx_id": 0}}'
         self.valid_vast_sighting = f'{{"ts": "{self.ts}", "data_id": 8, "indicator_id": 5, "matcher": "threatbus-syeocdkfcy", "ioc": "{self.indicator[0]}", "reference": "threatbus__{self.id}"}}'
         self.invalid_intel_1 = {
             "ts": self.ts,
@@ -87,54 +86,42 @@ class TestMessageMapping(unittest.TestCase):
     def test_invalid_query_result_to_threatbus_sighting(self):
         # valid query result, invalid intel
         self.assertIsNone(
-            query_result_to_threatbus_sighting(self.valid_query_result, None, False)
+            query_result_to_threatbus_sighting(self.valid_query_result, None)
         )
         self.assertIsNone(
-            query_result_to_threatbus_sighting(self.valid_query_result, 42, False)
+            query_result_to_threatbus_sighting(self.valid_query_result, 42)
         )
         self.assertIsNone(
-            query_result_to_threatbus_sighting(self.valid_query_result, object, False)
+            query_result_to_threatbus_sighting(self.valid_query_result, object)
         )
         self.assertIsNone(
             query_result_to_threatbus_sighting(
-                self.valid_query_result, self.invalid_intel_1, False
+                self.valid_query_result, self.invalid_intel_1
             )
         )
         self.assertIsNone(
             query_result_to_threatbus_sighting(
-                self.valid_query_result, self.invalid_intel_2, False
+                self.valid_query_result, self.invalid_intel_2
             )
         )
         self.assertIsNone(
             query_result_to_threatbus_sighting(
-                self.valid_query_result, self.invalid_intel_3, False
+                self.valid_query_result, self.invalid_intel_3
             )
         )
 
         # invalid query result, valid intel
+        self.assertIsNone(query_result_to_threatbus_sighting(None, self.valid_intel))
+        self.assertIsNone(query_result_to_threatbus_sighting(42, self.valid_intel))
+        self.assertIsNone(query_result_to_threatbus_sighting(object, self.valid_intel))
         self.assertIsNone(
-            query_result_to_threatbus_sighting(None, self.valid_intel), False
+            query_result_to_threatbus_sighting("some non-json string", self.valid_intel)
         )
         self.assertIsNone(
-            query_result_to_threatbus_sighting(42, self.valid_intel), False
+            query_result_to_threatbus_sighting(self.invalid_intel_1, self.valid_intel)
         )
         self.assertIsNone(
-            query_result_to_threatbus_sighting(object, self.valid_intel), False
-        )
-        self.assertIsNone(
-            query_result_to_threatbus_sighting(
-                "some non-json string", self.valid_intel, False
-            )
-        )
-        self.assertIsNone(
-            query_result_to_threatbus_sighting(
-                self.invalid_intel_1, self.valid_intel, False
-            )
-        )
-        self.assertIsNone(
-            query_result_to_threatbus_sighting(
-                self.valid_intel, self.invalid_intel_2, False
-            )
+            query_result_to_threatbus_sighting(self.valid_intel, self.invalid_intel_2)
         )
 
     def test_invalid_matcher_result_to_threatbus_sighting(self):
@@ -193,7 +180,7 @@ class TestMessageMapping(unittest.TestCase):
 
     def test_valid_query_result_to_threatbus_sighting(self):
         parsed_sighting = query_result_to_threatbus_sighting(
-            self.valid_query_result, self.valid_intel, False
+            self.valid_query_result, self.valid_intel
         )
         self.assertIsNotNone(parsed_sighting)
         self.assertEqual(type(parsed_sighting), Sighting)
@@ -201,19 +188,6 @@ class TestMessageMapping(unittest.TestCase):
         self.assertEqual(parsed_sighting.ioc, self.indicator)
 
         expected_context = json.loads(self.valid_query_result)
-        expected_context["source"] = "VAST"
-        self.assertEqual(parsed_sighting.context, expected_context)
-        self.assertEqual(parsed_sighting.intel, self.id)
-
-        ## unflatten
-        parsed_sighting = query_result_to_threatbus_sighting(
-            self.valid_query_result, self.valid_intel, True
-        )
-        self.assertIsNotNone(parsed_sighting)
-        self.assertEqual(type(parsed_sighting), Sighting)
-        self.assertEqual(parsed_sighting.ts, self.ts)
-        self.assertEqual(parsed_sighting.ioc, self.indicator)
-        expected_context = json.loads(self.unflattened_query_result)
         expected_context["source"] = "VAST"
         self.assertEqual(parsed_sighting.context, expected_context)
         self.assertEqual(parsed_sighting.intel, self.id)
