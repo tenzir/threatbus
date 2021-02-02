@@ -66,7 +66,7 @@ def connect_misp(host: str, key: str, ssl: bool):
     try:
         return pymisp.ExpandedPyMISP(url=host, key=key, ssl=ssl)
     except Exception:
-        logger.ciritcal(f"Cannot connect to MISP at '{host}', using SSL '{ssl}'")
+        logger.critical(f"Cannot connect to MISP at '{host}', using SSL '{ssl}'")
 
 
 def get_or_create_event(misp: pymisp.api.PyMISP, event_uuid: str):
