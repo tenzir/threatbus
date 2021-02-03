@@ -12,6 +12,12 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+- ⚠️ Users now can use both, retro-matching and live-matching with VAST
+  simultaneously for any given IoC. On the flip side, there is no longer a
+  default mode of operation. To use live-matching, users now must specifically
+  configure it via setting `live_match: true` in their `config.yaml` file.
+  [#95](https://github.com/tenzir/threatbus/pull/95)
+
 - ⚠️ `pyvast-threatbus` drops support to unflatten JSON that it receives from
   `vast export` because VAST can now return unflattened JSON
   [by default](https://github.com/tenzir/vast/pull/1257).
