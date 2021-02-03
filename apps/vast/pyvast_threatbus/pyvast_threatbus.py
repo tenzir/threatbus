@@ -80,7 +80,11 @@ def validate_config(config: confuse.Subview):
     config["vast_binary"].get(str)
     config["threatbus"].get(str)
     config["snapshot"].get(int)
-    config["retro_match"].get(bool)
+    live_match = config["live_match"].get(bool)
+    retro_match = config["retro_match"].get(bool)
+    assert (
+        live_match or retro_match
+    ), "please enable at least one kind of matching (live_match and/or retro_match)"
     config["retro_match_max_events"].get(int)
     config["max_background_tasks"].get(int)
 
@@ -116,6 +120,7 @@ async def start(
     vast_endpoint: str,
     zmq_endpoint: str,
     snapshot: int,
+    live_match: bool,
     retro_match: bool,
     retro_match_max_events: int,
     max_open_files: int,
@@ -132,7 +137,8 @@ async def start(
     @param vast_endpoint The endpoint of a running VAST node ('host:port')
     @param zmq_endpoint The ZMQ management endpoint of Threat Bus ('host:port')
     @param snapshot An integer value to request n days of past intel items
-    @param retro_match Boolean flag to use retro-matching over live-matching
+    @param live_match Boolean flag to enable live-matching
+    @param retro_match Boolean flag to enable retro-matching
     @param retro_match_max_events Max amount of retro match results
     @param max_open_files The maximum number of concurrent background tasks for VAST queries.
     @param merics_interval The interval in seconds to bucketize metrics
@@ -665,6 +671,7 @@ def main():
                     config["vast"].get(),
                     config["threatbus"].get(),
                     config["snapshot"].get(),
+                    config["live_match"].get(),
                     config["retro_match"].get(),
                     config["retro_match_max_events"].get(),
                     config["max_background_tasks"].get(),
