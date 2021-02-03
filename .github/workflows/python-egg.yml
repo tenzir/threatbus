@@ -106,14 +106,25 @@ jobs:
         ASSET="$ARCHIVE.gz"
         echo "::set-output name=name::$NAME"
         echo "::set-output name=asset::$ASSET"
+    # This step ensures that assets from previous runs are cleaned up to avoid
+    # failure of the next step (asset upload)
+    - name: Delete existing Release Assets
+      if: github.event.action == 'published'
+      uses: mknejp/delete-release-assets@v1
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        tag: ${{ github.ref }}
+        fail-if-no-assets: false # don't fail if no previous assets exist
+        fail-if-no-release: true # only delete assets when `tag` refers to a release
+        assets: ${{ steps.create_release.outputs.asset }}
     - name: Publish to GitHub
-      uses: actions/upload-release-asset@v1.0.1
+      uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ${{ steps.create_release.outputs.asset}}
-        asset_name: ${{ steps.create_release.outputs.name}}
+        asset_path: ${{ steps.create_release.outputs.asset }}
+        asset_name: ${{ steps.create_release.outputs.name }}
         asset_content_type: application/gzip
     - name: Publish to PyPI
       run: |
