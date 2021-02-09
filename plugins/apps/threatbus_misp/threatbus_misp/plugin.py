@@ -17,7 +17,7 @@ import zmq
 
 warnings.simplefilter("ignore")  # pymisp produces urllib warnings
 
-"""MISP - Open Source Threat Intelligence Platform - plugin for Threat Bus"""
+"""MISP application plugin for Threat Bus"""
 
 
 plugin_name: str = "misp"

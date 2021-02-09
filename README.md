@@ -4,7 +4,7 @@
 </h1>
 <h4 align="center">
 
-The missing tool to interconnect open-source security applications.
+A threat intelligence dissemination layer for open-source security tools.
 
 [![PyPI Status][pypi-badge]][pypi-url]
 [![Build Status][ci-badge]][ci-url]

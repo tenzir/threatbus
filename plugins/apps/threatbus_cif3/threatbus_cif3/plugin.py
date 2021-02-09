@@ -7,7 +7,7 @@ from threatbus_cif3.message_mapping import map_to_cif
 from typing import Callable, List
 
 
-"""Threatbus - Open Source Threat Intelligence Platform - plugin for CIFv3"""
+"""CIFv3 application plugin for Threat Bus"""
 
 plugin_name = "cif3"
 workers: List[threatbus.StoppableWorker] = list()

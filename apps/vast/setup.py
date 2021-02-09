@@ -21,7 +21,7 @@ setup(
         "Topic :: Software Development :: Object Brokering",
         "Topic :: System :: Distributed Computing",
     ],
-    description="Connect the open source telemetry engine VAST with Threat Bus, the open source intelligence platform",
+    description="Connect the open source telemetry engine VAST with Threat Bus, the open source threat intelligence dissemination layer",
     entry_points={
         "console_scripts": ["pyvast-threatbus=pyvast_threatbus.pyvast_threatbus:main"]
     },
@@ -35,13 +35,13 @@ setup(
         "threatbus>=2020.12.16",
     ],
     keywords=[
-        "threatbus",
+        "open source",
         "vast",
+        "threatbus",
+        "Threat Bus",
         "threat intelligence",
-        "intel",
-        "sightings",
-        "open source threat intelligence",
-        "intelligence platform",
+        "TI",
+        "TI dissemination",
     ],
     license="BSD 3-clause",
     long_description=long_description,
