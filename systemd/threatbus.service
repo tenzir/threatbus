@@ -1,5 +1,5 @@
 [Unit]
-Description=Threat Bus - Open Source Threat Intelligence Dissemination Layer
+Description=Threat Bus - Open-Source Threat Intelligence Dissemination Layer
 Wants=network-online.target
 After=network-online.target
 
