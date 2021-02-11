@@ -9,29 +9,37 @@ Threat Bus In-Memory Backbone Plugin
 
 </h4>
 
-A very simplistic Threat Bus plugin that provides an in-memory backbone for data
-provisioning.
+A very simplistic Threat Bus plugin that is used for internal benchmarking. The
+backbone does not multiplex messages. Instead, it reads a file and sends the
+file contents in form of new messages to the subscribed app plugins.
 
 ## Installation
 
-```sh
-pip install threatbus-inmem
+This plugin is not published on PyPI. It is only used for testing. Run it
+directly from source.
+
+```
+pip install --editable .
 ```
 
-## Configuration
+## Usage & Configuration
 
-Add a placeholder for this plugin's config:
+You need to configure a line-delimited JSON file as input. The plugin accepts
+valid STIX-2 JSON (only STIX-2 `Indicators` and `Sightings`).
+
+It reads all lines from the configured file and sends them to all configured app
+plugins. You can configure a `repetitions` parameter, to send the file contents
+more than once.
 
 ```yaml
 ...
 plugins:
   backbones:
-    inmem:
+    file_benchmark:
+      input_file: bench.json
+      repetitions: 10
 ...
 ```
-
-There is no further configuration needed.
-
 
 ## License
 
