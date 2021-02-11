@@ -1,23 +1,12 @@
 from datetime import datetime
-import json
 import pika
-from threatbus.data import Intel, IntelData, IntelType, Operation, IntelEncoder
+from stix2 import Indicator
 
 ## Dummy intel data
-intel_id = "intel-42"
-indicator = "6.6.6.6"
-intel_type = IntelType.IPSRC
-operation = Operation.ADD
-intel_data = IntelData(indicator, intel_type, foo=23, more_args="MORE ARGS")
-intel = Intel(
-    datetime.strptime("2020-11-02 17:00:00", "%Y-%m-%d %H:%M:%S"),
-    intel_id,
-    intel_data,
-    operation,
-)
-
-intel_json = json.dumps(intel, cls=IntelEncoder)
-
+pattern = "[ipv4-addr:value = '6.6.6.6']"
+pattern_type = "stix2"
+indicator = Indicator(pattern=pattern, pattern_type=pattern_type)
+indicator_json = indicator.serialize()
 ## rabbitmq
 host = "localhost"
 port = "5672"
@@ -29,4 +18,4 @@ connection = pika.BlockingConnection(conn_params)
 channel = connection.channel()
 
 for i in range(100):
-    channel.basic_publish(exchange="threatbus.intel", routing_key="", body=intel_json)
+    channel.basic_publish(exchange="threatbus", routing_key="", body=indicator_json)
