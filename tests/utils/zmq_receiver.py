@@ -69,5 +69,5 @@ if __name__ == "__main__":
     count = 200
     if len(sys.argv) > 1:
         count = int(sys.argv[1])
-    for topic, msg in receive(count, ["threatbus/intel", "threatbus/sighting"]):
+    for topic, msg in receive(count, ["stix2/indicator", "stix2/sighting"]):
         print(topic, msg)

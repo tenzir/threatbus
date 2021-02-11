@@ -2,6 +2,7 @@
 
 import zmq
 import time
+from stix2 import Indicator
 
 
 def send(topic, msg, host="127.0.0.1", port=50000, bind=True):
@@ -19,5 +20,8 @@ def send(topic, msg, host="127.0.0.1", port=50000, bind=True):
 
 
 if __name__ == "__main__":
-    send("sighting", "hello", port=13371, bind=False)
+    indicator = Indicator(
+        pattern="[domain-name:value = 'evil.com']", pattern_type="stix"
+    )
+    send("stix2/indicator", indicator.serialize(), port=13372, bind=False)
     # send("sighting", "hello", bind=False)
