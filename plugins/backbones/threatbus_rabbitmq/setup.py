@@ -22,7 +22,12 @@ setup(
     ],
     description="A RabbitMQ backbone for threatbus.",
     entry_points={"threatbus.backbone": ["rabbitmq = threatbus_rabbitmq.plugin"]},
-    install_requires=["threatbus>=2020.12.16", "pika>=1.1.0", "retry"],
+    install_requires=[
+        "pika>=1.1.0",
+        "retry",
+        "stix2>=2.1",
+        "threatbus>=2020.12.16",
+    ],
     keywords=[
         "message broker",
         "rabbitmq",
