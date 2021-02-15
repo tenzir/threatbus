@@ -80,7 +80,11 @@ def validate_config(config: confuse.Subview):
     config["vast_binary"].get(str)
     config["threatbus"].get(str)
     config["snapshot"].get(int)
-    config["retro_match"].get(bool)
+    live_match = config["live_match"].get(bool)
+    retro_match = config["retro_match"].get(bool)
+    assert (
+        live_match or retro_match
+    ), "please enable at least one kind of matching (live_match and/or retro_match)"
     config["retro_match_max_events"].get(int)
     config["max_background_tasks"].get(int)
 
@@ -116,6 +120,7 @@ async def start(
     vast_endpoint: str,
     zmq_endpoint: str,
     snapshot: int,
+    live_match: bool,
     retro_match: bool,
     retro_match_max_events: int,
     max_open_files: int,
@@ -132,7 +137,8 @@ async def start(
     @param vast_endpoint The endpoint of a running VAST node ('host:port')
     @param zmq_endpoint The ZMQ management endpoint of Threat Bus ('host:port')
     @param snapshot An integer value to request n days of past intel items
-    @param retro_match Boolean flag to use retro-matching over live-matching
+    @param live_match Boolean flag to enable live-matching
+    @param retro_match Boolean flag to enable retro-matching
     @param retro_match_max_events Max amount of retro match results
     @param max_open_files The maximum number of concurrent background tasks for VAST queries.
     @param merics_interval The interval in seconds to bucketize metrics
@@ -191,6 +197,7 @@ async def start(
                 vast_endpoint,
                 intel_queue,
                 sightings_queue,
+                live_match,
                 retro_match,
                 retro_match_max_events,
             )
@@ -200,7 +207,7 @@ async def start(
     if retro_match:
         # add metrics for retro-matching to the metric output
         metrics += [s_retro_matches_per_ioc, s_retro_query_time_s_per_ioc]
-    else:
+    if live_match:
         # add metrics for live-matching to the metric output
         metrics.append(g_live_matcher_sightings)
         async_tasks.append(
@@ -365,6 +372,7 @@ async def match_intel(
     vast_endpoint: str,
     intel_queue: asyncio.Queue,
     sightings_queue: asyncio.Queue,
+    live_match: bool,
     retro_match: bool,
     retro_match_max_events: int,
 ):
@@ -375,7 +383,8 @@ async def match_intel(
     @param vast_endpoint The endpoint of a running vast node ('host:port')
     @param intel_queue The queue to read new IoCs from
     @param sightings_queue The queue to put new sightings into
-    @param retro_match Boolean flag to use retro-matching over live-matching
+    @param live_match Boolean flag to use retro-matching
+    @param retro_match Boolean flag to use live-matching
     @param retro_match_max_events  Max amount of retro match results
     """
     global logger, open_tasks
@@ -403,13 +412,12 @@ async def match_intel(
                         sightings_queue,
                     )
                 )
-            else:
+            if live_match:
                 asyncio.create_task(ingest_vast_ioc(vast_binary, vast_endpoint, intel))
         elif intel.operation == Operation.REMOVE:
             g_iocs_removed.inc()
-            if retro_match:
-                continue
-            asyncio.create_task(remove_vast_ioc(vast_binary, vast_endpoint, intel))
+            if live_match:
+                asyncio.create_task(remove_vast_ioc(vast_binary, vast_endpoint, intel))
         else:
             logger.warning(f"Unsupported operation for indicator: {intel}")
         intel_queue.task_done()
@@ -430,7 +438,8 @@ async def live_match_vast(
     vast = VAST(binary=vast_binary, endpoint=vast_endpoint, logger=logger)
     matcher_name = "threatbus-" + "".join(random.choice(letters) for i in range(10))
     proc = await vast.matcher().start(name=matcher_name).exec()
-    while True:
+    # returncode is None as long as the process did not terminate yet
+    while proc.returncode is None:
         data = await proc.stdout.readline()
         if not data:
             if not await vast.test_connection():
@@ -444,6 +453,12 @@ async def live_match_vast(
             continue
         g_live_matcher_sightings.inc()
         await sightings_queue.put(sighting)
+    stderr = await proc.stderr.read()
+    if stderr:
+        logger.error(
+            "VAST matcher process exited with message: {}".format(stderr.decode())
+        )
+    logger.critical("Unexpected exit of VAST matcher process.")
 
 
 async def invoke_cmd_for_context(cmd: str, context: dict, ioc: str = "%ioc"):
@@ -665,6 +680,7 @@ def main():
                     config["vast"].get(),
                     config["threatbus"].get(),
                     config["snapshot"].get(),
+                    config["live_match"].get(),
                     config["retro_match"].get(),
                     config["retro_match_max_events"].get(),
                     config["max_background_tasks"].get(),
