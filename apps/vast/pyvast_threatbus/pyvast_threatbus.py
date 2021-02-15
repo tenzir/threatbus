@@ -439,7 +439,7 @@ async def live_match_vast(
     matcher_name = "threatbus-" + "".join(random.choice(letters) for i in range(10))
     proc = await vast.matcher().start(name=matcher_name).exec()
     # returncode is None as long as the process did not terminate yet
-    while proc.returncode == None:
+    while proc.returncode is None:
         data = await proc.stdout.readline()
         if not data:
             if not await vast.test_connection():
