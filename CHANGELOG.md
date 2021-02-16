@@ -4,12 +4,35 @@ This changelog documents all notable user-facing changes of Threat Bus.
 
 Every entry has a category for which we use the following visual abbreviations:
 
-- 🎁 feature
-- 🧬 experimental feature
-- ⚠️ change
-- 🐞 bugfix
+- 🎁 Feature
+- ⚠️ Change
+- ⚡️ Breaking Change
+- 🧬 Experimental feature
+- 🐞 Bugfix
 
-<!-- ## Unreleased -->
+## Unreleased
+
+- 🎁 Feature
+  The RabbitMQ backbone plugin, the In-memory backbone plugins, and the Zmq-app
+  plugin now support the
+  [STIX-2 (version 2.1)](https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html)
+  standard for
+  [Indicators](https://docs.oasis-open.org/cti/stix/v2.1/cs02/stix-v2.1-cs02.html#_muftrcpnf89v)
+  and [Sightings](https://docs.oasis-open.org/cti/stix/v2.1/cs02/stix-v2.1-cs02.html#_a795guqsap3r).
+  [#97](https://github.com/tenzir/threatbus/pull/97)
+
+- ⚡️ Threat Bus now uses
+  [STIX-2 (version 2.1)](https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html)
+  as internal transport format for
+  [Indicators](https://docs.oasis-open.org/cti/stix/v2.1/cs02/stix-v2.1-cs02.html#_muftrcpnf89v)
+  and [Sightings](https://docs.oasis-open.org/cti/stix/v2.1/cs02/stix-v2.1-cs02.html#_a795guqsap3r).
+  App-plugins now have to provide required mappings between the STIX-2 format
+  and app-specific formats (e.g., the Zeek plugin needs to map STIX-2 to the
+  Zeek intel format). The home-made types `threatbus.data.Sighting` and
+  `threatbus.data.Indicator` are removed from the codebase.
+  Plugins with versions earlier than 2021.02.24 are incompatible to the new
+  Threat Bus version.
+  [#97](https://github.com/tenzir/threatbus/pull/97)
 
 ## [2020.12.16]
 
