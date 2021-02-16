@@ -18,13 +18,13 @@ test: unit-tests integration-tests
 .PHONY: unit-tests
 unit-tests:
 	python -m unittest discover threatbus
-	$(MAKE) -C plugins/apps/threatbus_zeek unit-tests
-	$(MAKE) -C plugins/apps/threatbus_misp unit-tests
-	$(MAKE) -C plugins/apps/threatbus_zmq_app unit-tests
-	$(MAKE) -C plugins/apps/threatbus_cif3 unit-tests
 	$(MAKE) -C plugins/backbones/threatbus_inmem unit-tests
 	$(MAKE) -C plugins/backbones/threatbus_rabbitmq unit-tests
-	$(MAKE) -C apps/vast unit-tests
+	$(MAKE) -C plugins/apps/threatbus_zmq_app unit-tests
+	#$(MAKE) -C plugins/apps/threatbus_zeek unit-tests
+	#$(MAKE) -C plugins/apps/threatbus_misp unit-tests
+	#$(MAKE) -C plugins/apps/threatbus_cif3 unit-tests
+	#$(MAKE) -C apps/vast unit-tests
 
 .PHONY: integration-tests
 integration-tests:
