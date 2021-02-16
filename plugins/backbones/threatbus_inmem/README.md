@@ -12,6 +12,18 @@ Threat Bus In-Memory Backbone Plugin
 A very simplistic Threat Bus plugin that provides an in-memory backbone for data
 provisioning.
 
+### Message Routing
+
+Messages are routed based on their data type. Stix2 data, like Indicators and
+Sightings are routed via the `stix2/` topic prefix. Threat Bus-internal messages
+like SnapshotRequests and SnapshotEnvelopes are routed via the `threatbus/`
+topic prefix.
+
+
+### Subscriptions
+
+Application plugins can subscribe to topics and topic prefixes.
+
 ## Installation
 
 ```sh

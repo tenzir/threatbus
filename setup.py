@@ -26,11 +26,12 @@ setup(
     entry_points={"console_scripts": ["threatbus=threatbus.threatbus:main"]},
     include_package_data=True,
     install_requires=[
+        "black>=19.10b",
         "coloredlogs>=10.0",
         "confuse>=1.0",
         "pluggy>=0.13",
-        "black>=19.10b",
         "python-dateutil>=2.8.1",
+        "stix2>=2.1",
     ],
     keywords=[
         "threatbus",

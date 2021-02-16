@@ -1,23 +1,18 @@
 from confuse import Subview
-from functools import partial
 import json
 import pika
 from logging import Logger
-from threatbus_rabbitmq import get_exchange_name, get_queue_name
+from stix2 import Indicator, Sighting, parse
 from socket import gethostname
 import threatbus
 from threatbus.data import (
-    Intel,
-    Sighting,
     SnapshotRequest,
     SnapshotEnvelope,
-    IntelDecoder,
-    SightingDecoder,
     SnapshotRequestDecoder,
     SnapshotEnvelopeDecoder,
 )
 import time
-from typing import Callable, List, Tuple, Union
+from typing import Callable, List, Union
 
 
 class RabbitMQConsumer(threatbus.StoppableWorker):
@@ -29,50 +24,38 @@ class RabbitMQConsumer(threatbus.StoppableWorker):
     def __init__(
         self,
         conn_params: pika.ConnectionParameters,
-        join_symbol: str,
+        exchange_name: str,
         queue_params: Subview,
         provision_callback: Callable[
-            [str, Union[Intel, Sighting, SnapshotEnvelope, SnapshotRequest]], None
+            [str, Union[Indicator, Sighting, SnapshotEnvelope, SnapshotRequest]], None
         ],
         logger: Logger,
     ):
         """
         @param conn_params Pika.ConnectionParameters to connect to RabbitMQ
-        @param join_symbol The symbol to use when determining queue and exchange names
+        @param exchange_name The name of the RabbitMQ Threat Bus exchange
         @param queue_params Confuse view of parameters to use for declaring queues
         @param provision_callback A callback to invoke after messages are retrieved and parsed successfully
         @param logger A pre-configured Logger instance
         """
         super(RabbitMQConsumer, self).__init__()
         self.conn_params: pika.ConnectionParameters = conn_params
-        self.__provision: Callable[
-            [str, Union[Intel, Sighting, SnapshotEnvelope, SnapshotRequest]], None
+        self.__provision_callback: Callable[
+            [str, Union[Indicator, Sighting, SnapshotEnvelope, SnapshotRequest]], None
         ] = provision_callback
         self.logger: Logger = logger
         self.consumers: List[str] = list()  # RabbitMQ consumer tags
+        self.exchange_name = exchange_name
         self._reconnect_delay: int = 5
         self._connection: Union[pika.SelectConnection, None] = None
         self._channel: Union[pika.channel.Channel, None] = None
 
         # Create names and parameters for exchanges and queues
-        self.intel_exchange = get_exchange_name(join_symbol, "intel")
-        self.sighting_exchange = get_exchange_name(join_symbol, "sighting")
-        self.snapshot_request_exchange = get_exchange_name(
-            join_symbol, "snapshotrequest"
-        )
-        self.snapshot_envelope_exchange = get_exchange_name(
-            join_symbol, "snapshotenvelope"
-        )
+        join_symbol = queue_params["name_join_symbol"].get()
         queue_name_suffix = queue_params["name_suffix"].get()
         queue_name_suffix = queue_name_suffix if queue_name_suffix else gethostname()
-        self.intel_queue = get_queue_name(join_symbol, "intel", queue_name_suffix)
-        self.sighting_queue = get_queue_name(join_symbol, "sighting", queue_name_suffix)
-        self.snapshot_request_queue = get_queue_name(
-            join_symbol, "snapshotrequest", queue_name_suffix
-        )
-        self.snapshot_envelope_queue = get_queue_name(
-            join_symbol, "snapshotenvelope", queue_name_suffix
-        )
+        self.queue_name = f"threatbus{join_symbol}{queue_name_suffix}"
+
         queue_mode = "default" if not queue_params["lazy"].get(bool) else "lazy"
         self.queue_kwargs = {
             "durable": queue_params["durable"].get(bool),
@@ -84,73 +67,43 @@ class RabbitMQConsumer(threatbus.StoppableWorker):
         if max_items:
             self.queue_kwargs["arguments"]["x-max-length"] = max_items
 
-    def __decode(self, msg: str, decoder: json.JSONDecoder):
+    def __provision(self, _channel, method_frame, _header_frame, msg):
         """
-        Decodes a JSON message with the given decoder. Returns the decoded object or
-        None and logs an error.
-        @param msg The message to decode
-        @param decoder The decoder class to use for decoding
-        """
-        try:
-            return json.loads(msg, cls=decoder)
-        except Exception as e:
-            self.logger.error(f"RabbitMQ consumer: error decoding message {msg}: {e}")
-            return None
-
-    def __provision_intel(self, channel, method_frame, header_frame, body):
-        """
-        Callback to be invoked by the Pika library whenever a new message `body` has
+        Callback to be invoked by the Pika library whenever a new message `msg` has
         been received from RabbitMQ on the intel queue.
         @param channel: pika.Channel The channel that was received on
         @param method: pika.spec.Basic.Deliver The pika delivery method (e.g., ACK)
         @param properties: pika.spec.BasicProperties Pika properties
-        @param body: bytes The received message
+        @param msg: bytes The received message
         """
-        msg = self.__decode(body, IntelDecoder)
-        if msg:
-            self.__provision("threatbus/intel", msg)
-        self._channel.basic_ack(delivery_tag=method_frame.delivery_tag)
+        msg_type = None
+        try:
+            dct = json.loads(msg)
+            msg_type = dct.get("type", None)
+        except Exception as e:
+            self.logger.error(f"RabbitMQ consumer: error reading message {msg}: {e}")
 
-    def __provision_sighting(self, channel, method_frame, header_frame, body):
-        """
-        Callback to be invoked by the Pika library whenever a new message `body` has
-        been received from RabbitMQ on the sighting queue.
-        @param channel: pika.Channel The channel that was received on
-        @param method: pika.spec.Basic.Deliver The pika delivery method (e.g., ACK)
-        @param properties: pika.spec.BasicProperties Pika properties
-        @param body: bytes The received message
-        """
-        msg = self.__decode(body, SightingDecoder)
-        if msg:
-            self.__provision("threatbus/sighting", msg)
-        self._channel.basic_ack(delivery_tag=method_frame.delivery_tag)
+        try:
+            if msg_type == "indicator" or msg_type == "sighting":
+                self.__provision_callback(
+                    f"stix2/{msg_type}", parse(msg, allow_custom=True)
+                )
+            elif msg_type == "snapshotrequest":
+                self.__provision_callback(
+                    f"threatbus/{msg_type}", json.loads(msg, cls=SnapshotRequestDecoder)
+                )
+            elif msg_type == "snapshotenvelope":
+                self.__provision_callback(
+                    f"threatbus/{msg_type}",
+                    json.loads(msg, cls=SnapshotEnvelopeDecoder),
+                )
+            else:
+                self.logger.error(
+                    f"RabbitMQ consumer: received message with unknown or missing 'type' field {msg}"
+                )
+        except Exception as e:
+            self.logger.error(f"RabbitMQ consumer: error decoding message {msg}: {e}")
 
-    def __provision_snapshot_request(self, channel, method_frame, header_frame, body):
-        """
-        Callback to be invoked by the Pika library whenever a new message `body` has
-        been received from RabbitMQ on the snapshot-request queue.
-        @param channel: pika.Channel The channel that was received on
-        @param method: pika.spec.Basic.Deliver The pika delivery method (e.g., ACK)
-        @param properties: pika.spec.BasicProperties Pika properties
-        @param body: bytes The received message
-        """
-        msg = self.__decode(body, SnapshotRequestDecoder)
-        if msg:
-            self.__provision("threatbus/snapshotrequest", msg)
-        self._channel.basic_ack(delivery_tag=method_frame.delivery_tag)
-
-    def __provision_snapshot_envelope(self, channel, method_frame, header_frame, body):
-        """
-        Callback to be invoked by the Pika library whenever a new message `body` has
-        been received from RabbitMQ on the snapshot-envelope queue.
-        @param channel: pika.Channel The channel that was received on
-        @param method: pika.spec.Basic.Deliver The pika delivery method (e.g., ACK)
-        @param properties: pika.spec.BasicProperties Pika properties
-        @param body: bytes The received message
-        """
-        msg = self.__decode(body, SnapshotEnvelopeDecoder)
-        if msg:
-            self.__provision("threatbus/snapshotenvelope", msg)
         self._channel.basic_ack(delivery_tag=method_frame.delivery_tag)
 
     def __shutdown(self):
@@ -210,39 +163,10 @@ class RabbitMQConsumer(threatbus.StoppableWorker):
         self._channel = channel
         self._channel.add_on_close_callback(self.on_channel_closed)
 
-        intel_cb = partial(
-            self.on_exchange_declare_ok,
-            userdata=(self.intel_exchange, self.intel_queue),
-        )
         self._channel.exchange_declare(
-            exchange=self.intel_exchange, exchange_type="fanout", callback=intel_cb
-        )
-        sighting_cb = partial(
-            self.on_exchange_declare_ok,
-            userdata=(self.sighting_exchange, self.sighting_queue),
-        )
-        self._channel.exchange_declare(
-            exchange=self.sighting_exchange,
+            exchange=self.exchange_name,
             exchange_type="fanout",
-            callback=sighting_cb,
-        )
-        snapshotrequest_cb = partial(
-            self.on_exchange_declare_ok,
-            userdata=(self.snapshot_request_exchange, self.snapshot_request_queue),
-        )
-        self._channel.exchange_declare(
-            exchange=self.snapshot_request_exchange,
-            exchange_type="fanout",
-            callback=snapshotrequest_cb,
-        )
-        snapshotenvelope_cb = partial(
-            self.on_exchange_declare_ok,
-            userdata=(self.snapshot_envelope_exchange, self.snapshot_envelope_queue),
-        )
-        self._channel.exchange_declare(
-            exchange=self.snapshot_envelope_exchange,
-            exchange_type="fanout",
-            callback=snapshotenvelope_cb,
+            callback=self.on_exchange_declare_ok,
         )
 
     def on_channel_closed(self, channel: pika.channel.Channel, reason: Exception):
@@ -258,52 +182,34 @@ class RabbitMQConsumer(threatbus.StoppableWorker):
         self.logger.warning(f"RabbitMQ consumer: channel closed unexpectedly: {reason}")
         self.__shutdown()  # will restart automatically
 
-    def on_exchange_declare_ok(self, _frame, userdata: Tuple[str, str]):
+    def on_exchange_declare_ok(self, _frame):
         """
         Invoked as callback from exchange_declare. See self.on_channel_open.
-        Issues declaration of a queue.
+        Issues declaration of the queues.
         @param _frame Unused pika response
-        @param userdata A tuple of exchange_name and queue_name. The exchange with the given name was created, hence this method is invoked. The queue name should be created.
         """
-        if type(userdata) is not tuple or len(userdata) != 2:
-            self.logger.warn(
-                f"Aborting with unexpected `userdata` after exchange was declared: {userdata}"
-            )
-            return
-        cb = partial(self.on_queue_declare_ok, userdata=userdata)
         queue_kwargs = self.queue_kwargs.copy()
-        queue_kwargs["callback"] = cb
-        self._channel.queue_declare(queue=userdata[1], **queue_kwargs)
+        queue_kwargs["callback"] = self.on_queue_declare_ok
+        self._channel.queue_declare(queue=self.queue_name, **queue_kwargs)
 
-    def on_queue_declare_ok(self, _frame, userdata: Tuple[str, str]):
+    def on_queue_declare_ok(self, _frame):
         """
-        Inspects the given userdata (exchange_name, queue_name) and binds the queue to the exchange.
+        Binds the freshly declared queue to the exchange.
         @param _frame Unused pika response
-        @param userdata A tuple of exchange_name and queue_name. Both have been created, hence this method is invoked.
         """
-        if type(userdata) is not tuple or len(userdata) != 2:
-            self.logger.warn(
-                f"Aborting with unexpected `userdata` after queue was declared: {userdata}"
-            )
-            return
-        cb = partial(self.on_queue_bind_ok, userdata=userdata[1])
-        self._channel.queue_bind(exchange=userdata[0], queue=userdata[1], callback=cb)
+        self._channel.queue_bind(
+            exchange=self.exchange_name,
+            queue=self.queue_name,
+            callback=self.on_queue_bind_ok,
+        )
 
-    def on_queue_bind_ok(self, _frame, userdata: str):
+    def on_queue_bind_ok(self, _frame):
         """
         Inspects the given userdata (exchange_name, queue_name) and binds the queue to the exchange.
         @param _frame Unused pika response
         @param userdata The name of the bound queue queue_name
         """
-        callbacks_by_type = {
-            self.intel_queue: self.__provision_intel,
-            self.sighting_queue: self.__provision_sighting,
-            self.snapshot_request_queue: self.__provision_snapshot_request,
-            self.snapshot_envelope_queue: self.__provision_snapshot_envelope,
-        }
-        self.consumers.append(
-            self._channel.basic_consume(userdata, callbacks_by_type[userdata])
-        )
+        self.consumer = self._channel.basic_consume(self.queue_name, self.__provision)
 
     def run(self):
         """

@@ -3,17 +3,12 @@ import json
 from multiprocessing import JoinableQueue
 import random
 import select
+from stix2 import Indicator, Sighting, parse
 import string
 import threading
 from threatbus_zmq_app.message_mapping import Heartbeat, map_management_message
 import threatbus
 from threatbus.data import (
-    Intel,
-    IntelDecoder,
-    IntelEncoder,
-    Sighting,
-    SightingDecoder,
-    SightingEncoder,
     SnapshotEnvelope,
     SnapshotEnvelopeDecoder,
     SnapshotRequest,
@@ -175,15 +170,11 @@ class ZmqPublisher(threatbus.StoppableWorker):
                 if not msg:
                     q.task_done()
                     continue
-                if type(msg) is Intel:
-                    encoded = json.dumps(msg, cls=IntelEncoder)
-                    topic += "intel"
-                elif type(msg) is Sighting:
-                    encoded = json.dumps(msg, cls=SightingEncoder)
-                    topic += "sighting"
+                topic += type(msg).__name__.lower()
+                if type(msg) is Indicator or Sighting:
+                    encoded = msg.serialize()
                 elif type(msg) is SnapshotRequest:
                     encoded = json.dumps(msg, cls=SnapshotRequestEncoder)
-                    topic += "snapshotrequest"
                 else:
                     logger.warn(
                         f"Skipping unknown message type '{type(msg)}' for topic subscription {topic}."
@@ -218,11 +209,9 @@ class ZmqReceiver(threatbus.StoppableWorker):
         context = zmq.Context()
         socket = context.socket(zmq.SUB)
         socket.bind(f"tcp://{self.zmq_config['host']}:{self.zmq_config['sub']}")
-        intel_topic = "threatbus/intel"
-        sighting_topic = "threatbus/sighting"
+        stix2_topic_prefix = "stix2/"
         snapshotenvelope_topic = "threatbus/snapshotenvelope"
-        socket.setsockopt(zmq.SUBSCRIBE, intel_topic.encode())
-        socket.setsockopt(zmq.SUBSCRIBE, sighting_topic.encode())
+        socket.setsockopt(zmq.SUBSCRIBE, stix2_topic_prefix.encode())
         socket.setsockopt(zmq.SUBSCRIBE, snapshotenvelope_topic.encode())
 
         poller = zmq.Poller()
@@ -234,18 +223,11 @@ class ZmqReceiver(threatbus.StoppableWorker):
                 continue
             try:
                 topic, msg = socket.recv().decode().split(" ", 1)
-                if topic == intel_topic:
-                    decoded = json.loads(msg, cls=IntelDecoder)
-                    if type(decoded) is not Intel:
+                if topic.startswith(stix2_topic_prefix):
+                    decoded = parse(msg, allow_custom=True)
+                    if type(decoded) is not Indicator and type(decoded) is not Sighting:
                         logger.warn(
-                            f"Ignoring unknown message type, expected Intel: {type(decoded)}"
-                        )
-                        continue
-                elif topic == sighting_topic:
-                    decoded = json.loads(msg, cls=SightingDecoder)
-                    if type(decoded) is not Sighting:
-                        logger.warn(
-                            f"Ignoring unknown message type, expected Sighting: {type(decoded)}"
+                            f"Ignoring unknown message type, expected STIX-2 Indicator or Sighting: {type(decoded)}"
                         )
                         continue
                 elif topic == snapshotenvelope_topic:

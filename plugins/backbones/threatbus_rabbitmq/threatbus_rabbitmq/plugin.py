@@ -3,17 +3,12 @@ from confuse import Subview
 import pika
 from multiprocessing import JoinableQueue
 from retry import retry
+from stix2 import Indicator, Sighting
 import threading
 import threatbus
-from threatbus.data import (
-    Intel,
-    Sighting,
-    SnapshotRequest,
-    SnapshotEnvelope,
-)
+from threatbus.data import SnapshotRequest, SnapshotEnvelope
 from threatbus_rabbitmq import RabbitMQConsumer, RabbitMQPublisher
 from typing import Dict, List, Union
-
 
 """RabbitMQ backbone plugin for Threat Bus"""
 
@@ -31,8 +26,9 @@ def validate_config(config: Subview):
     config["username"].get(str)
     config["password"].get(str)
     config["vhost"].get(str)
-    config["naming_join_pattern"].get(str)
+    config["exchange_name"].get(str)
     config["queue"].get(dict)
+    config["queue"]["name_join_symbol"].get(str)
     config["queue"]["name_suffix"].add("")  # optional
     config["queue"]["name_suffix"].get(str)
     config["queue"]["durable"].get(bool)
@@ -44,7 +40,7 @@ def validate_config(config: Subview):
 
 
 def provision(
-    topic: str, msg: Union[Intel, Sighting, SnapshotEnvelope, SnapshotRequest]
+    topic: str, msg: Union[Indicator, Sighting, SnapshotEnvelope, SnapshotRequest]
 ):
     """
     Provisions the given `msg` to all subscribers of `topic`.
@@ -102,13 +98,13 @@ def run(config: Subview, logging: Subview, inq: JoinableQueue):
     username = config["username"].get(str)
     password = config["password"].get(str)
     vhost = config["vhost"].get(str)
+    exchange_name = config["exchange_name"].get(str)
     credentials = pika.PlainCredentials(username, password)
     conn_params = pika.ConnectionParameters(host, port, vhost, credentials)
-    name_pattern = config["naming_join_pattern"].get(str)
     workers.append(
-        RabbitMQConsumer(conn_params, name_pattern, config["queue"], provision, logger)
+        RabbitMQConsumer(conn_params, exchange_name, config["queue"], provision, logger)
     )
-    workers.append(RabbitMQPublisher(conn_params, name_pattern, inq, logger))
+    workers.append(RabbitMQPublisher(conn_params, exchange_name, inq, logger))
     for w in workers:
         w.start()
     logger.info("RabbitMQ backbone started.")

@@ -5,6 +5,7 @@ from queue import Empty
 import threading
 import threatbus
 from typing import Dict, List, Set
+from stix2 import Sighting, Indicator
 
 """In-Memory backbone plugin for Threat Bus"""
 
@@ -37,7 +38,10 @@ class Provisioner(threatbus.StoppableWorker):
             except Empty:
                 continue
             logger.debug(f"Backbone got message {msg}")
-            topic = f"threatbus/{type(msg).__name__.lower()}"
+            topic_prefix = "threatbus"
+            if type(msg) is Indicator or type(msg) is Sighting:
+                topic_prefix = "stix2"
+            topic = f"{topic_prefix}/{type(msg).__name__.lower()}"
             lock.acquire()
             for t in filter(
                 lambda t: str(topic).startswith(str(t)), subscriptions.keys()

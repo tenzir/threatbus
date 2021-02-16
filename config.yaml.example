@@ -13,9 +13,10 @@ plugins:
       username: guest
       password: guest
       vhost: /
-      naming_join_pattern: . # symbol to concatenate names with. Example queue-name: threatbus.intel."hostname"
+      exchange_name: threatbus
       queue:
         name_suffix: "my_suffix" # optional. remove property / set empty to use 'hostname'
+        name_join_symbol: . # queue will be named "threatbus" + join_symbol + name_suffix
         durable: true
         auto_delete: false
         lazy: true

@@ -1,7 +1,7 @@
 from collections import defaultdict
 from confuse import Subview
-import json
 from multiprocessing import JoinableQueue
+from stix2 import parse
 import threading
 import threatbus
 import time
@@ -16,7 +16,6 @@ subscriptions: Dict[str, Set[JoinableQueue]] = defaultdict(set)
 
 
 def validate_config(config):
-    config["input_type"].get(str)
     config["input_file"].as_filename()
     config["repetitions"].get(int)
 
@@ -26,18 +25,15 @@ class FileProvisioner(threading.Thread):
     Provisions all messages from the input_file to all subscribers.
     """
 
-    def __init__(self, input_type: str, input_file: str, reps: int):
+    def __init__(self, input_file: str, reps: int):
         self.file_path = input_file
         self.reps = reps
-        self.topic = f"threatbus/{input_type}"
-        self.decoder_cls = threatbus.data.IntelDecoder
-        if input_type == "sighting":
-            self.decoder_cls = threatbus.data.SightingDecoder
         # read file-contents in memory:
         self.input = []
         with open(self.file_path) as f:
             for line in f:
-                self.input.append(line)
+                msg = parse(line, allow_custom=True)
+                self.input.append(msg)
         super(FileProvisioner, self).__init__()
 
     def run(self):
@@ -46,9 +42,9 @@ class FileProvisioner(threading.Thread):
         logger.debug(f"waiting {wait} seconds before provisioning...")
         time.sleep(wait)
         for _ in range(self.reps):
-            for line in self.input:
-                msg = json.loads(line, cls=self.decoder_cls)
-                for outq in subscriptions[self.topic]:
+            for msg in self.input:
+                topic = f"stix2/{type(msg).__name__.lower()}"
+                for outq in subscriptions[topic]:
                     outq.put(msg)
 
 
@@ -78,7 +74,6 @@ def run(config: Subview, logging: Subview, inq: JoinableQueue):
         logger.fatal("Invalid config for plugin {}: {}".format(plugin_name, str(e)))
     workers.append(
         FileProvisioner(
-            config["input_type"].get(str),
             config["input_file"].get(str),
             config["repetitions"].get(int),
         )

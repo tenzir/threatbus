@@ -26,9 +26,10 @@ setup(
     description="A plugin to connect apps via ZeroMQ.",
     entry_points={"threatbus.app": ["zmq-app = threatbus_zmq_app.plugin"]},
     install_requires=[
-        "threatbus>=2020.12.16",
         "pyzmq>=19",
         "python-dateutil>=2.8.1",
+        "stix2>=2.1",
+        "threatbus>=2020.12.16",
     ],
     keywords=[
         "zeromq",
