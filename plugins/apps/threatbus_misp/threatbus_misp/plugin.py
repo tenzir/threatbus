@@ -1,4 +1,15 @@
-from confluent_kafka import Consumer
+## The MISP plugin lists two optional dependencies via `extras_requires`, so
+## users can either install `threatbus-misp[zmq]` or `threatbus-misp[kafka]`.
+## The plugin needs at least one of these to work properly, so we we need to log
+## an error if none of these is installed.
+dep_kafka = False
+dep_zmq = False
+try:
+    from confluent_kafka import Consumer
+
+    dep_kafka = True
+except ModuleNotFoundError:
+    pass
 from confuse import Subview
 from datetime import datetime
 from itertools import product
@@ -12,7 +23,13 @@ from threatbus.data import MessageType, SnapshotEnvelope, SnapshotRequest
 from threatbus_misp.message_mapping import map_to_internal, map_to_misp, is_whitelisted
 from typing import Callable, List, Dict
 import warnings
-import zmq
+
+try:
+    import zmq
+
+    dep_zmq = True
+except ModuleNotFoundError:
+    pass
 
 
 warnings.simplefilter("ignore")  # pymisp produces urllib warnings
@@ -162,9 +179,15 @@ def validate_config(config: Subview):
         config["api"]["ssl"].get(bool)
         config["api"]["key"].get(str)
     if config["zmq"].get(dict):
+        assert (
+            dep_zmq
+        ), "MISP attribute export is configured via ZeroMQ, but the dependency is not installed. Install `threatbus-misp[zmq]` to use this setting."
         config["zmq"]["host"].get(str)
         config["zmq"]["port"].get(int)
     if config["kafka"].get(dict):
+        assert (
+            dep_kafka
+        ), "MISP attribute export is configured via Apache Kafka, but the dependency is not installed. Install `threatbus-misp[kafka]` to use this setting."
         config["kafka"]["topics"].get(list)
         config["kafka"]["poll_interval"].add(1.0)
         config["kafka"]["poll_interval"].get(float)
