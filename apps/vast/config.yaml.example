@@ -16,7 +16,7 @@ snapshot: 30
 # live-matching requires you to install the VAST matcher plugin
 live_match: false
 retro_match: true
-retro_match_max_events: 0 # set to 0 for unlimited queries
+retro_match_max_events: 0 # set to 0 for unlimited results
 unflatten: true
 # optional. remove the field if you don't want to transform sighting context
 transform_context: fever alertify --alert-prefix 'MY PREFIX' --extra-key my-ioc --ioc %ioc

@@ -12,8 +12,8 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
-- 🐞 Users can now run unlimited retro-queries against VAST by setting the
-  `retro_match_max_events` parameter to `0`.
+- 🐞 Users can now run retro-queries with an unbounded number of results against
+  VAST by setting the `retro_match_max_events` parameter to `0`.
   [#98](https://github.com/tenzir/threatbus/pull/98)
 
 - ⚠️ Users now can use both, retro-matching and live-matching with VAST
