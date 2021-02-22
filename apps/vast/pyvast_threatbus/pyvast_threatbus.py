@@ -313,7 +313,10 @@ async def retro_match_vast(
     global logger, max_open_tasks
     async with max_open_tasks:
         vast = VAST(binary=vast_binary, endpoint=vast_endpoint, logger=logger)
-        proc = await vast.export(max_events=retro_match_max_events).json(query).exec()
+        kwargs = {}
+        if retro_match_max_events > 0:
+            kwargs["max_events"] = retro_match_max_events
+        proc = await vast.export(**kwargs).json(query).exec()
         reported = 0
         while not proc.stdout.at_eof():
             line = (await proc.stdout.readline()).decode().rstrip()

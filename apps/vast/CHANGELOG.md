@@ -12,6 +12,10 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+- 🐞 Users can now run retro-queries with an unbounded number of results against
+  VAST by setting the `retro_match_max_events` parameter to `0`.
+  [#98](https://github.com/tenzir/threatbus/pull/98)
+
 - ⚠️ Users now can use both, retro-matching and live-matching with VAST
   simultaneously for any given IoC. On the flip side, there is no longer a
   default mode of operation. To use live-matching, users now must specifically
