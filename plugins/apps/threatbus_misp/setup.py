@@ -26,7 +26,7 @@ setup(
     description="A plugin to enable threatbus communication with MISP.",
     entry_points={"threatbus.app": ["misp = threatbus_misp.plugin"]},
     install_requires=[
-        "threatbus>=2020.12.16",
+        "threatbus >= 2020.12.16, < 2021.2.24",
         "pymisp >= 2.4.120",
     ],
     extras_require={"kafka": ["confluent-kafka>=1.3.0"], "zmq": ["pyzmq>=18.1.1"]},
