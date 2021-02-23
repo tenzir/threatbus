@@ -10,7 +10,9 @@ Every entry has a category for which we use the following visual abbreviations:
 - 🧬 Experimental feature
 - 🐞 Bugfix
 
-## Unreleased
+<!-- ## Unreleased -->
+
+## [2021.02.24]
 
 - 🎁 Feature
   The MISP plugin now uses [extra dependencies](https://www.python.org/dev/peps/pep-0508/#extras).
@@ -117,3 +119,4 @@ Every entry has a category for which we use the following visual abbreviations:
 [2020.11.26]: https://github.com/tenzir/threatbus/releases/tag/2020.11.26
 [2020.11.30]: https://github.com/tenzir/threatbus/releases/tag/2020.11.30
 [2020.12.16]: https://github.com/tenzir/threatbus/releases/tag/2020.12.16
+[2021.02.24]: https://github.com/tenzir/threatbus/releases/tag/2021.02.24
