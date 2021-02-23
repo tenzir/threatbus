@@ -38,6 +38,10 @@ If neither of these dependencies is installed (i.e., you installed
 `threatbus-misp` without the `[...]` suffix for optional deps), the plugin throws
 an error and exits immediately.
 
+**Depending on your setup, you might want to use quotes to avoid shell expansion
+when using `[...]`**. For example, you can do `pip install ".[zmq]"` for local
+development.
+
 ### Kafka Prerequisites
 
 When you decide to use Kafka to receive IoC updates from MISP, you first need to
