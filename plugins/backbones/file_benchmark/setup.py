@@ -22,7 +22,7 @@ setup(
     ],
     description="A benchmark backbone for threatbus, that reads a file and provisions its contents.",
     entry_points={"threatbus.backbone": ["file_benchmark = file_benchmark.plugin"]},
-    install_requires=["stix2>=2.1", "threatbus>=2020.12.16"],
+    install_requires=["stix2>=2.1", "threatbus>=2021.2.24"],
     keywords=["threatbus", "plugin"],
     license="BSD 3-clause",
     long_description=long_description,
@@ -31,5 +31,5 @@ setup(
     packages=["file_benchmark"],
     python_requires=">=3.7",
     url="https://github.com/tenzir/threatbus",
-    version="2020.12.16",
+    version="2021.02.24",
 )

@@ -22,7 +22,7 @@ setup(
     ],
     description="A simplistic in-memory backbone for threatbus.",
     entry_points={"threatbus.backbone": ["inmem = threatbus_inmem.plugin"]},
-    install_requires=["stix2>=2.1", "threatbus>=2020.12.16"],
+    install_requires=["stix2>=2.1", "threatbus>=2021.2.24"],
     keywords=[
         "message broker",
         "threatbus",
@@ -38,5 +38,5 @@ setup(
     packages=["threatbus_inmem"],
     python_requires=">=3.7",
     url="https://github.com/tenzir/threatbus",
-    version="2020.12.16",
+    version="2021.02.24",
 )

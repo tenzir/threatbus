@@ -16,16 +16,16 @@ communicate via [ZeroMQ].
 ## Installation
 
 ```sh
-pip install threatbus-vast
+pip install threatbus-zmq-app
 ```
 
 ## Configuration
 
-The plugin uses ZeroMQ to communicate with applications, like the
-[VAST bridge](https://github.com/tenzir/threatbus/tree/master/apps/vast). The
-plugin serves three ZeroMQ endpoints to connect with. One endpoint for managing
-subscriptions (and thus snapshot requests). The other two endpoints exist
-for pub-sub operations.
+The plugin uses ZeroMQ to communicate with applications, like
+[pyvast-threatbus](https://github.com/tenzir/threatbus/tree/master/apps/vast).
+The plugin serves three ZeroMQ endpoints to connect with. One endpoint for
+managing subscriptions (and thus snapshot requests). The other two endpoints
+exist for pub-sub operations.
 
 ```yaml
 ...
@@ -160,7 +160,7 @@ pattern. Threat Bus answers immediately to each heartbeat request with either a
   }
   ```
 
-An `error` response indicates that either Threat Bus has internal erros or that
+An `error` response indicates that either Threat Bus has internal errors or that
 it lost track of the app's subscription. Note: This only happens when Threat Bus
 is restarted. Apps can then use that information to re-subscribe.
 
