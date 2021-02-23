@@ -13,6 +13,15 @@ Every entry has a category for which we use the following visual abbreviations:
 ## Unreleased
 
 - 🎁 Feature
+  The MISP plugin now uses [extra dependencies](https://www.python.org/dev/peps/pep-0508/#extras).
+  Users can now chose the wanted dependencies during installation by running
+  `pip install threatbus-misp[zmq]` to install the ZeroMQ dependency, or
+  `pip install threatbus-misp[kafka]` to install the Kafka dependency. The
+  plugin throws a fatal error if none of these dependencies is installed and
+  exits immediately.
+  [#99](https://github.com/tenzir/threatbus/pull/99)
+
+- 🎁 Feature
   The RabbitMQ backbone plugin, the In-memory backbone plugins, and the Zmq-app
   plugin now support the
   [STIX-2 (version 2.1)](https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html)

@@ -9,32 +9,59 @@ Threat Bus MISP Plugin
 
 </h4>
 
-A Threat Bus plugin that enables communication to [MISP](https://www.misp-project.org/).
+A Threat Bus plugin that enables communication with [MISP](https://www.misp-project.org/).
 
 The plugin goes against the pub/sub architecture of Threat Bus (for now),
-because the plugin subscribes a listener to ZeroMQ / Kafka, rather than having
-MISP subscribe itself to Threat Bus. That will be addressed with a MISP module
-in the near future.
+because it actively binds to a single MISP instance to receive attribute
+(IoC) updates, and report back sightings via the REST API. Following the strict
+pub/sub architecture of Threat Bus, it *should be the other way
+around*, with MISP binding to Threat Bus. This will eventually be resolved by a
+MISP module.
+
+For now, the plugin supports two ways to retrieve attribute (IoC) updates from
+MISP - either via ZeroMQ or via Kafka. Basically, the plugin makes itself a
+subscriber to MISP events.
 
 ## Installation
 
+Users can specify *optional dependencies* during installation. The plugin uses
+either ZeroMQ or Kafka to get IoC updates from MISP. As we don't want to burden
+the user to install unused dependencies, both options are available as follows:
+
+
 ```sh
-pip install threatbus-misp
+pip install threatbus-misp[zmq]
+pip install threatbus-misp[kafka]
 ```
 
-#### Prerequisites
+If neither of these dependencies is installed (i.e., you installed
+`threatbus-misp` without the `[...]` suffix for optional deps), the plugin throws
+an error and exits immediately.
 
-*Install Kafka on the Threat Bus host*
+**Depending on your setup, you might want to use quotes to avoid shell expansion
+when using `[...]`**. For example, you can do `pip install ".[zmq]"` for local
+development.
 
-The plugin enables communication either via ZeroMQ or Kafka. When using Kafka,
-you have to install `librdkafka` for the host system that is running
-`threatbus`. See also the [prerequisites](https://github.com/confluentinc/confluent-kafka-python#prerequisites)
-section of the `confluent-kafka` python client.
+### Kafka Prerequisites
+
+When you decide to use Kafka to receive IoC updates from MISP, you first need to
+install Kafka on the Threat Bus host. This plugin uses the
+[confluent-kafka](https://docs.confluent.io/platform/current/clients/confluent-kafka-python/index.html)
+Python package which requires `librdkafka`. See also the
+[prerequisites](https://github.com/confluentinc/confluent-kafka-python#prerequisites)
+section of the `confluent-kafka` Python client for details about setting it up
+for your distribution.
+
+Once installed, go ahead and install the Kafka version of this plugin:
+
+```
+pip install threatbus-misp[kafka]
+```
 
 ## Configuration
 
-The plugin can either use ZeroMQ or Kafka to retrieve intelligence items from
-MISP. It uses the MISP REST api to report back sightings of indicators.
+The plugin uses the MISP REST API to report back sightings of IoCs. You need to
+specify a MISP API key for it to work.
 
 ZeroMQ and Kafka are mutually exclusive, such that Threat Bus does not receive
 all attribute updates twice. See below for an example configuration.
@@ -79,7 +106,7 @@ plugins:
 ...
 ```
 
-### Filter
+### IoC Filter
 
 The plugin can be configured with a list of filters. Every filter describes a
 whitelist for MISP attributes (IoCs). The MISP plugin will only forward IoCs to
@@ -219,7 +246,7 @@ misp-server:
 make deploy
 ```
 
-*Enable the Kafka plugin in the MISP webview*
+*Enable the Kafka plugin in the MISP web-view*
 
 - Visit https://localhost:80
 - login with your configured credentials
@@ -250,7 +277,7 @@ service apache2 restart
 exit # leave the Docker container shell
 ```
 
-*Enable the ZMQ plugin in the MISP webview*
+*Enable the ZMQ plugin in the MISP web-view*
 
 - Visit https://localhost:80
 - login with your configured credentials
