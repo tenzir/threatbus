@@ -21,6 +21,9 @@ unit-tests:
 	$(MAKE) -C plugins/backbones/threatbus_inmem unit-tests
 	$(MAKE) -C plugins/backbones/threatbus_rabbitmq unit-tests
 	$(MAKE) -C plugins/apps/threatbus_zmq_app unit-tests
+  # Threat Bus is currently being migrated to use STIX-2 as internal format.
+  # For the time being, all un-migrated plugins cannot be not tested against the
+  # current master
 	#$(MAKE) -C plugins/apps/threatbus_zeek unit-tests
 	#$(MAKE) -C plugins/apps/threatbus_misp unit-tests
 	#$(MAKE) -C plugins/apps/threatbus_cif3 unit-tests
@@ -88,6 +91,9 @@ dev-mode:
 	$(MAKE) -C plugins/apps/threatbus_zmq_app dev-mode
 	$(MAKE) -C plugins/backbones/threatbus_inmem dev-mode
 	$(MAKE) -C plugins/backbones/threatbus_rabbitmq dev-mode
+  # Threat Bus is currently being migrated to use STIX-2 as internal format.
+  # For the time being, all un-migrated plugins cannot be run in conjunction
+  # with current master
 	# $(MAKE) -C plugins/apps/threatbus_zeek dev-mode
 	# $(MAKE) -C plugins/apps/threatbus_misp dev-mode
 	# $(MAKE) -C plugins/apps/threatbus_cif3 dev-mode
