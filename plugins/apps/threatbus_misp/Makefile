@@ -30,8 +30,8 @@ dist:
 
 .PHONY: install
 install:
-	pip install .
+	pip install .[zmq]
 
 .PHONY: dev-mode
 dev-mode:
-	pip install --editable .
+	pip install --editable .[zmq]
