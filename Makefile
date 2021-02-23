@@ -85,10 +85,10 @@ install:
 .PHONY: dev-mode
 dev-mode:
 	pip install --editable .
-	$(MAKE) -C plugins/apps/threatbus_zeek dev-mode
-	$(MAKE) -C plugins/apps/threatbus_misp dev-mode
 	$(MAKE) -C plugins/apps/threatbus_zmq_app dev-mode
-	$(MAKE) -C plugins/apps/threatbus_cif3 dev-mode
 	$(MAKE) -C plugins/backbones/threatbus_inmem dev-mode
 	$(MAKE) -C plugins/backbones/threatbus_rabbitmq dev-mode
-	$(MAKE) -C apps/vast dev-mode
+	# $(MAKE) -C plugins/apps/threatbus_zeek dev-mode
+	# $(MAKE) -C plugins/apps/threatbus_misp dev-mode
+	# $(MAKE) -C plugins/apps/threatbus_cif3 dev-mode
+	# $(MAKE) -C apps/vast dev-mode
