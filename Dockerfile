@@ -16,10 +16,10 @@ COPY README.md .
 COPY threatbus threatbus
 COPY plugins plugins
 RUN python3 -m pip install . && \
-  python3 -m pip install plugins/apps/threatbus_misp && \
-  python3 -m pip install plugins/apps/threatbus_zeek && \
+  #python3 -m pip install plugins/apps/threatbus_misp && \
+  #python3 -m pip install plugins/apps/threatbus_zeek && \
+  #python3 -m pip install plugins/apps/threatbus_cif3 && \
   python3 -m pip install plugins/apps/threatbus_zmq_app && \
-  python3 -m pip install plugins/apps/threatbus_cif3 && \
   python3 -m pip install plugins/backbones/threatbus_inmem && \
   python3 -m pip install plugins/backbones/threatbus_rabbitmq
 COPY config* ./
