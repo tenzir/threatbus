@@ -98,11 +98,11 @@ class TestJsonConversions(unittest.TestCase):
         self.assertEqual(py_dict["snapshot_type"], MessageType.SIGHTING.value)
         self.assertEqual(py_dict["snapshot_id"], self.snapshot_id)
         self.assertEqual(py_dict["snapshot"], self.snapshot.total_seconds())
-        self.assertEqual(py_dict["type"], type(SnapshotRequest).__name__.lower())
+        self.assertEqual(py_dict["type"], SnapshotRequest.__name__.lower())
 
     def test_valid_snapshot_request_decoding(self):
         encoded = f"""{{
-            "type": "{type(SnapshotRequest).__name__.lower()}",
+            "type": "{SnapshotRequest.__name__.lower()}",
             "snapshot_type": {MessageType.SIGHTING.value},
             "snapshot_id": "{self.snapshot_id}",
             "snapshot": {self.snapshot.total_seconds()}
@@ -132,7 +132,7 @@ class TestJsonConversions(unittest.TestCase):
         self.assertEqual(py_dict["body"]["id"], self.indicator_id)
         self.assertEqual(py_dict["body"]["pattern"], self.pattern)
         self.assertEqual(py_dict["body"]["pattern_type"], self.pattern_type)
-        self.assertEqual(py_dict["type"], type(SnapshotEnvelope).__name__.lower())
+        self.assertEqual(py_dict["type"], SnapshotEnvelope.__name__.lower())
 
         py_dict = json.loads(encoded_envelope_sighting)
         self.assertEqual(py_dict["snapshot_type"], MessageType.SIGHTING.value)
@@ -142,11 +142,11 @@ class TestJsonConversions(unittest.TestCase):
         self.assertEqual(
             py_dict["body"]["x_threatbus_sighting_context"], self.sighting_context
         )
-        self.assertEqual(py_dict["type"], type(SnapshotEnvelope).__name__.lower())
+        self.assertEqual(py_dict["type"], SnapshotEnvelope.__name__.lower())
 
     def test_valid_snapshot_envelope_decoding(self):
         encoded_envelope_indicator = f"""{{
-            "type": "{type(SnapshotEnvelope).__name__.lower()}",
+            "type": "{SnapshotEnvelope.__name__.lower()}",
             "snapshot_type": {MessageType.INDICATOR.value},
             "snapshot_id": "{self.snapshot_id}",
             "body": {{
@@ -164,7 +164,7 @@ class TestJsonConversions(unittest.TestCase):
         self.assertEqual(read_back, self.snapshot_envelope_indicator)
 
         encoded_envelope_sighting = f"""{{
-            "type": "{type(SnapshotEnvelope).__name__.lower()}",
+            "type": "{SnapshotEnvelope.__name__.lower()}",
             "snapshot_type": {MessageType.SIGHTING.value},
             "snapshot_id": "{self.snapshot_id}",
             "body": {{
