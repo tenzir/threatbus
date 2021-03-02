@@ -91,7 +91,7 @@ class KafkaReceiver(threatbus.StoppableWorker):
     def __init__(self, kafka_config: Subview, inq: JoinableQueue):
         """
         @param kafka_config A configuration object for Kafka binding
-        @param inq The queue to which intel items from MISP are forwarded to
+        @param inq The queue to which STIX-2 indicators are forwarded to
         """
         super(KafkaReceiver, self).__init__()
         self.kafka_config = kafka_config
@@ -117,13 +117,15 @@ class KafkaReceiver(threatbus.StoppableWorker):
                 continue
             if not is_whitelisted(msg, filter_config):
                 continue
-            intel = attribute_to_stix2_indicator(
-                msg["Attribute"], msg.get("action", None), logger
-            )
-            if not intel:
-                logger.warn(f"Discarding unparsable intel {msg['Attribute']}")
-            else:
-                self.inq.put(intel)
+            action = msg.get("action", None)
+            ioc = attribute_to_stix2_indicator(msg["Attribute"], action, logger)
+            if not ioc:
+                if action != "add":
+                    logger.warn(
+                        f"Discarding unparsable MISP attribute {msg['Attribute']}"
+                    )
+                continue
+            self.inq.put(ioc)
 
 
 class ZmqReceiver(threatbus.StoppableWorker):
@@ -134,7 +136,7 @@ class ZmqReceiver(threatbus.StoppableWorker):
     def __init__(self, zmq_config: Subview, inq: JoinableQueue):
         """
         @param zmq_config A configuration object for ZeroMQ binding
-        @param inq The queue to which intel items from MISP are forwarded to
+        @param inq The queue to which STIX-2 Indicators are forwarded to
         """
         super(ZmqReceiver, self).__init__()
         self.inq = inq
@@ -162,13 +164,15 @@ class ZmqReceiver(threatbus.StoppableWorker):
                 continue
             if not is_whitelisted(msg, filter_config):
                 continue
-            ioc = attribute_to_stix2_indicator(
-                msg.get("Attribute", None), msg.get("action", None), logger
-            )
+            action = msg.get("action", None)
+            ioc = attribute_to_stix2_indicator(msg["Attribute"], action, logger)
             if not ioc:
-                logger.debug(f"Discarding unparsable MISP attribute {msg['Attribute']}")
-            else:
-                self.inq.put(ioc)
+                if action != "add":
+                    logger.warn(
+                        f"Discarding unparsable MISP attribute {msg['Attribute']}"
+                    )
+                continue
+            self.inq.put(ioc)
 
 
 def validate_config(config: Subview):
