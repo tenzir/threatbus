@@ -20,7 +20,11 @@ from queue import Empty
 import threading
 import threatbus
 from threatbus.data import MessageType, SnapshotEnvelope, SnapshotRequest
-from threatbus_misp.message_mapping import map_to_internal, map_to_misp, is_whitelisted
+from threatbus_misp.message_mapping import (
+    attribute_to_stix2_indicator,
+    stix2_sighting_to_misp,
+    is_whitelisted,
+)
 from typing import Callable, List, Dict
 import warnings
 
@@ -66,12 +70,15 @@ class SightingsPublisher(threatbus.StoppableWorker):
                 sighting = self.outq.get(block=True, timeout=1)
             except Empty:
                 continue
-            logger.debug(f"Reporting sighting: {sighting}")
-            misp_sighting = map_to_misp(sighting)
+            misp_sighting = stix2_sighting_to_misp(sighting)
             lock.acquire()
             resp = misp.add_sighting(misp_sighting)
             if not resp or type(resp) is dict and resp.get("message", None):
-                logger.error(f"Failed to add sighting to MISP: {resp}")
+                logger.error(
+                    f"Failed to add sighting to MISP: '{sighting}' Error: {resp}"
+                )
+            else:
+                logger.debug(f"Reported sighting: {resp}")
             lock.release()
             self.outq.task_done()
 
@@ -110,9 +117,11 @@ class KafkaReceiver(threatbus.StoppableWorker):
                 continue
             if not is_whitelisted(msg, filter_config):
                 continue
-            intel = map_to_internal(msg["Attribute"], msg.get("action", None), logger)
+            intel = attribute_to_stix2_indicator(
+                msg["Attribute"], msg.get("action", None), logger
+            )
             if not intel:
-                logger.debug(f"Discarding unparsable intel {msg['Attribute']}")
+                logger.warn(f"Discarding unparsable intel {msg['Attribute']}")
             else:
                 self.inq.put(intel)
 
@@ -153,11 +162,13 @@ class ZmqReceiver(threatbus.StoppableWorker):
                 continue
             if not is_whitelisted(msg, filter_config):
                 continue
-            intel = map_to_internal(msg["Attribute"], msg.get("action", None), logger)
-            if not intel:
-                logger.debug(f"Discarding unparsable intel {msg['Attribute']}")
+            ioc = attribute_to_stix2_indicator(
+                msg.get("Attribute", None), msg.get("action", None), logger
+            )
+            if not ioc:
+                logger.debug(f"Discarding unparsable MISP attribute {msg['Attribute']}")
             else:
-                self.inq.put(intel)
+                self.inq.put(ioc)
 
 
 def validate_config(config: Subview):
@@ -233,7 +244,7 @@ def snapshot(snapshot_request: SnapshotRequest, result_q: JoinableQueue):
             if not data:
                 continue
             for attr in data["Attribute"]:
-                intel = map_to_internal(attr, "add", logger)
+                intel = attribute_to_stix2_indicator(attr, "add", logger)
                 if intel:
                     result_q.put(
                         SnapshotEnvelope(
@@ -296,7 +307,7 @@ def run(
         )
 
     outq = JoinableQueue()
-    subscribe_callback("threatbus/sighting", outq)
+    subscribe_callback("stix2/sighting", outq)
     workers.append(SightingsPublisher(outq))
     for w in workers:
         w.start()

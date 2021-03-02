@@ -1,57 +1,155 @@
 from datetime import datetime
-from threatbus.data import Intel, IntelData, IntelType, Operation, Sighting
+from functools import partial
+from threatbus.data import Operation, Update
 import pymisp
-from typing import Dict, List
+from stix2 import (
+    AndObservationExpression,
+    AutonomousSystem,
+    DomainName,
+    EmailAddress,
+    EqualityComparisonExpression,
+    Indicator,
+    IPv4Address,
+    MACAddress,
+    ObjectPath,
+    ObservationExpression,
+    Sighting,
+    URL,
+    X509Certificate,
+)
+from typing import Callable, Dict, List, Union
 
 
-misp_intel_type_mapping: Dict[str, IntelType] = {
-    "ip-src": IntelType.IPSRC,
-    "ip-dst": IntelType.IPDST,
-    "ip-src|port": IntelType.IPSRC_PORT,
-    "ip-dst|port": IntelType.IPDST_PORT,
-    "email-src": IntelType.EMAILSRC,
-    "email-dst": IntelType.EMAILDST,
-    "target-email": IntelType.TARGETEMAIL,
-    "email-attachment": IntelType.EMAILATTACHMENT,
-    "filename": IntelType.FILENAME,
-    "hostname": IntelType.HOSTNAME,
-    "domain": IntelType.DOMAIN,
-    "domain|ip": IntelType.DOMAIN_IP,
-    "url": IntelType.URL,
-    "uri": IntelType.URL,
-    "user-agent": IntelType.USERAGENT,
-    "md5": IntelType.MD5,
-    "malware-sample": IntelType.MALWARESAMPLE,
-    "filename|md5": IntelType.FILENAME_MD5,
-    "sha1": IntelType.SHA1,
-    "filename|sha1": IntelType.FILENAME_SHA1,
-    "sha256": IntelType.SHA256,
-    "filename|sha256": IntelType.FILENAME_SHA256,
-    "x509-fingerprint-sha1": IntelType.X509FINGERPRINTSHA1,
-    "pdb": IntelType.PDB,
-    "authentihash": IntelType.AUTHENTIHASH,
-    "ssdeep": IntelType.SSDEEP,
-    "imphash": IntelType.IMPHASH,
-    "pehash": IntelType.PEHASH,
-    "impfuzzy": IntelType.IMPFUZZY,
-    "sha224": IntelType.SHA224,
-    "sha384": IntelType.SHA384,
-    "sha512": IntelType.SHA512,
-    "sha512/224": IntelType.SHA512_224,
-    "sha512/256": IntelType.SHA512_256,
-    "tlsh": IntelType.TLSH,
-    "cdhash": IntelType.CDHASH,
-    "filename|authentihash": IntelType.FILENAME_AUTHENTIHASH,
-    "filename|ssdeep": IntelType.FILENAME_SSDEEP,
-    "filename|imphash": IntelType.FILENAME_IMPHASH,
-    "filename|pehash": IntelType.FILENAME_PEHASH,
-    "filename|impfuzzy": IntelType.FILENAME_IMPFUZZY,
-    "filename|sha224": IntelType.FILENAME_SHA224,
-    "filename|sha384": IntelType.FILENAME_SHA384,
-    "filename|sha512": IntelType.FILENAME_SHA512,
-    "filename|sha512/224": IntelType.FILENAME_SHA512_224,
-    "filename|sha512/256": IntelType.FILENAME_SHA512_256,
-    "filename|tlsh": IntelType.FILENAME_TLSH,
+def observable_value_to_expr(stix2_type, value: str) -> EqualityComparisonExpression:
+    """
+    Most STIX-2 observables have a 'value' property. This function takes a
+    STIX-2 observable type (e.g., DomainName) that uses a value property and
+    invokes it's constructor for the given value. Returns a STIX-2
+    EqualityComparisonExpression.
+    """
+    stix_obj = stix2_type(value=value)
+    return EqualityComparisonExpression(
+        ObjectPath(stix_obj.type, ["value"]), stix_obj.value
+    )
+
+
+def observable_AS_to_expr(number: str) -> EqualityComparisonExpression:
+    """
+    Autonomous Systems (AS) in STIX-2 have a 'number' property (as opposed to a
+    'value'). This function returns a STIX-2 EqualityComparisonExpression for
+    an AS number.
+    """
+    stix_obj = AutonomousSystem(number=int(number))
+    return EqualityComparisonExpression(
+        ObjectPath(stix_obj.type, ["number"]), stix_obj.number
+    )
+
+
+def observable_x509_to_expr(
+    stix2_type, hash_type: str, hash_str: str
+) -> EqualityComparisonExpression:
+    """
+    x509 certificates in STIX-2 have no 'value' property, but an optional field
+    'hashes'. This function creates a valid STIX-2 X509Certificate and wraps it
+    in an EqualityComparisonExpression.
+    """
+    hashes = {hash_type: hash_str}  # e.g., {"SHA-256": "aec078..." }
+    cert = X509Certificate(hashes=hashes)  # throws an error for invalid hashes
+    hash_type = list(cert.hashes.keys())[0]  # STIX-2 corrects case and spelling
+    return EqualityComparisonExpression(
+        ObjectPath(cert.type, ["hashes", hash_type]), cert.hashes[hash_type]
+    )
+
+
+# Map MISP attribute types [1] [2] to STIX-2 cyber observable objects [3]
+# [1]: https://www.misp-standard.org/rfc/misp-standard-core.html#type
+# [2]: https://www.circl.lu/doc/misp/categories-and-types/#types
+# [3]: https://docs.oasis-open.org/cti/stix/v2.1/cs01/stix-v2.1-cs01.html#_mlbmudhl16lr
+
+attribute_type_map: Dict[
+    str, Union[Callable[[str], Union[EqualityComparisonExpression, str]], None]
+] = {
+    # TODO: limited to MISP's `network activity` observables for now.
+    # Discuss & expand this if needed
+    "ip": partial(
+        observable_value_to_expr, IPv4Address
+    ),  # https://stix2.readthedocs.io/en/latest/api/stix2.v21.html?highlight=IPv4Address#stix2.v21.IPv4Address
+    "ip-src": partial(
+        observable_value_to_expr, IPv4Address
+    ),  # https://stix2.readthedocs.io/en/latest/api/stix2.v21.html?highlight=IPv4Address#stix2.v21.IPv4Address
+    "ip-dst": partial(
+        observable_value_to_expr, IPv4Address
+    ),  # https://stix2.readthedocs.io/en/latest/api/stix2.v21.html?highlight=IPv4Address#stix2.v21.IPv4Address
+    # "ip-dst|port" -> compound types are mapped via their individual parts
+    # "ip-src|port" -> compound types are mapped via their individual parts
+    "port": None,  # TODO no appropriate mapping to a STIX-2 observable
+    "hostname": partial(
+        observable_value_to_expr, DomainName
+    ),  # https://stix2.readthedocs.io/en/latest/api/stix2.v21.html#stix2.v21.DomainName
+    "domain": partial(
+        observable_value_to_expr, DomainName
+    ),  # https://stix2.readthedocs.io/en/latest/api/stix2.v21.html#stix2.v21.DomainName
+    # "domain|ip" -> compound types are mapped via their individual parts
+    "mac-address": partial(
+        observable_value_to_expr, MACAddress
+    ),  # https://stix2.readthedocs.io/en/latest/api/stix2.v21.html#stix2.v21.MACAddress
+    "mac-eui-64": partial(
+        observable_value_to_expr, MACAddress
+    ),  # https://stix2.readthedocs.io/en/latest/api/stix2.v21.html#stix2.v21.MACAddress
+    "email": partial(
+        observable_value_to_expr, EmailAddress
+    ),  # https://docs.oasis-open.org/cti/stix/v2.1/cs01/stix-v2.1-cs01.html#_wmenahkvqmgj
+    "email-dst": partial(
+        observable_value_to_expr, EmailAddress
+    ),  # https://docs.oasis-open.org/cti/stix/v2.1/cs01/stix-v2.1-cs01.html#_wmenahkvqmgj
+    "email-src": partial(
+        observable_value_to_expr, EmailAddress
+    ),  # https://docs.oasis-open.org/cti/stix/v2.1/cs01/stix-v2.1-cs01.html#_wmenahkvqmgj
+    "eppn": partial(
+        observable_value_to_expr, EmailAddress
+    ),  # EduPersonPricincipalName, looks like an Email. https://github.com/MISP/MISP/issues/5448 https://docs.oasis-open.org/cti/stix/v2.1/cs01/stix-v2.1-cs01.html#_wmenahkvqmgj
+    "url": partial(
+        observable_value_to_expr, URL
+    ),  # https://docs.oasis-open.org/cti/stix/v2.1/cs01/stix-v2.1-cs01.html#_ah3hict2dez0
+    "uri": partial(
+        observable_value_to_expr, URL
+    ),  # https://docs.oasis-open.org/cti/stix/v2.1/cs01/stix-v2.1-cs01.html#_ah3hict2dez0
+    "user-agent": None,  # no appropriate mapping to a STIX-2 observable
+    "http-method": None,  # no appropriate mapping to a STIX-2 observable
+    "AS": observable_AS_to_expr,  # https://docs.oasis-open.org/cti/stix/v2.1/cs01/stix-v2.1-cs01.html#_27gux0aol9e3
+    "snort": None,  # no appropriate mapping to a STIX-2 observable
+    "pattern-in-file": None,  # no appropriate mapping to a STIX-2 observable
+    "filename-pattern": None,  # no appropriate mapping to a STIX-2 observable
+    "stix2-pattern": lambda val: val[1:-1]
+    if val.startswith("[") and val.endswith("]")
+    else val,  # remove brackets, if any
+    "pattern-in-traffic": None,  # no appropriate mapping to a STIX-2 observable
+    "attachment": None,  # no appropriate mapping to a STIX-2 observable
+    "comment": None,  # no appropriate mapping to a STIX-2 observable
+    "text": None,  # no appropriate mapping to a STIX-2 observable
+    "x509-fingerprint-md5": partial(
+        observable_x509_to_expr, X509Certificate, "md5"
+    ),  # https://docs.oasis-open.org/cti/stix/v2.1/cs01/stix-v2.1-cs01.html#_8abcy1o5x9w1
+    "x509-fingerprint-sha1": partial(
+        observable_x509_to_expr, X509Certificate, "sha1"
+    ),  # https://docs.oasis-open.org/cti/stix/v2.1/cs01/stix-v2.1-cs01.html#_8abcy1o5x9w1
+    "x509-fingerprint-sha256": partial(
+        observable_x509_to_expr, X509Certificate, "sha256"
+    ),  # https://docs.oasis-open.org/cti/stix/v2.1/cs01/stix-v2.1-cs01.html#_8abcy1o5x9w1
+    "ja3-fingerprint-md5": None,  # no appropriate mapping to a STIX-2 observable
+    "jarm-fingerprint": None,  # no appropriate mapping to a STIX-2 observable
+    "hassh-md5": None,  # no appropriate mapping to a STIX-2 observable
+    "hasshserver-md5": None,  # no appropriate mapping to a STIX-2 observable
+    "other": None,  # no appropriate mapping to a STIX-2 observable
+    "hex": None,  # no appropriate mapping to a STIX-2 observable
+    "cookie": None,  # no appropriate mapping to a STIX-2 observable
+    # "hostname|port" -> compound types are mapped via their individual parts
+    "bro": None,  # no appropriate mapping to a STIX-2 observable
+    "zeek": None,  # no appropriate mapping to a STIX-2 observable
+    # "anonymised" -> compound types are mapped via their individual parts
+    "community-id": None,  # no appropriate mapping to a STIX-2 observable
+    "email-subject": None,  # no appropriate mapping to a STIX-2 observable
+    "favicon-mmh3": None,  # no appropriate mapping to a STIX-2 observable
 }
 
 
@@ -106,14 +204,34 @@ def is_whitelisted(misp_msg: dict, filter_config: List[Dict]):
     return False
 
 
-def map_to_internal(misp_attribute: dict, action: str, logger=None):
+def stix2_indicator_id(attr_uuid: str) -> str:
     """
-    Maps the given MISP attribute to the threatbus Intel format. Discards all
-    messages that do not match the given filter, if any.
-    @param misp_attribute The MISP attribute to map
+    Converts any given MISP attribute UUID to a STIX-2 indicator ID.
+    @param attr_id The MISP attribute ID to convert
+    @return a valid STIX-2 Indicator ID
+    """
+    return f"indicator--{attr_uuid}"
+
+
+def misp_id(stix2_indicator_uuid: str) -> str:
+    """
+    Converts any given STIX-2 indicator ID to a valid UUID.
+    @param stix2_indicator_uuid The STIX-2 Indicator ID to convert
+    @return a valid uuid
+    """
+    return stix2_indicator_uuid[len("indicator--") :]
+
+
+def attribute_to_stix2_indicator(
+    misp_attribute: dict, action: str, logger
+) -> Union[None, Update, Indicator]:
+    """
+    Maps the given MISP attribute to a STIX-2 cyber observable object.
+    @param misp_attribute The MISP attribute to map to STIX-2
     @param action A string from MISP, describing the action for the attribute
-        (either 'add' or 'delete')
-    @return The mapped intel item or None
+        (either 'add', 'edit', or 'delete')
+    @param logger The logger instance from the calling function
+    @return The mapped STIX-2 Indicator, a Threat Bus Update, or None
     """
     # parse MISP attribute
     if not misp_attribute:
@@ -121,54 +239,87 @@ def map_to_internal(misp_attribute: dict, action: str, logger=None):
     to_ids = misp_attribute.get("to_ids", False)
     if not to_ids and action != "edit" or not action:
         return None
-    operation = Operation.REMOVE
-    if (action == "edit" or action == "add") and to_ids:
-        operation = Operation.ADD
+    stix2_id = stix2_indicator_id(misp_attribute["uuid"])
+    stix2_timestamp = datetime.fromtimestamp(int(misp_attribute["timestamp"]))
+    if action == "edit" and not to_ids:
+        return Update(id=stix2_id, operation=Operation.REMOVE)
 
-    # parse values
-    intel_type = misp_attribute.get("type", None)
-    indicator = misp_attribute.get("value", None)
-    if not intel_type or not indicator:
+    ## parse MISP values
+    attr_type = misp_attribute.get("type", None)
+    attr_value = misp_attribute.get("value", None)
+    if not attr_type or not attr_value:
+        logger.debug(
+            f"Incomplete MISP attribute, missing `type` and/or `value` fields: '{misp_attribute}'"
+        )
         return None
 
-    # parse compound MISP intel:
-    if "|" in intel_type:
-        indicator = tuple(indicator.split("|"))
-        if len(indicator) != 2:
-            if logger:
+    ## parse compound MISP intel:
+    if "|" in attr_type:
+        obs_exprs = []  # list to hold all ObservationExpressions
+        value_splits = attr_value.split("|")
+        for idx, attr_type_split in enumerate(attr_type.split("|")):
+            stix2_create_func = attribute_type_map.get(attr_type_split, None)
+            if not stix2_create_func:
                 logger.debug(
-                    f"Expected '|'-separated composite values for MISP intel type {intel_type}"
+                    f"Cannot find matching STIX-2 type for MISP attribute type '{attr_type}'"
                 )
+                return None
+            try:
+                eq_expr = stix2_create_func(
+                    value_splits[idx]
+                )  # EqualitiComparisonExpression
+                obs_expr = ObservationExpression(eq_expr)
+                obs_exprs.append(obs_expr)
+            except Exception as e:
+                logger.error(f"Error creating STIX-2 expression: {e}")
+        try:
+            return Indicator(
+                id=stix2_id,
+                pattern_type="stix",
+                pattern=AndObservationExpression(obs_exprs),
+                created=stix2_timestamp,
+            )
+        except Exception as e:
+            logger.error(f"Error creating STIX-2 indicator: {e}")
             return None
-    tb_intel_type = misp_intel_type_mapping.get(intel_type, None)
-    if not tb_intel_type:
+
+    ## parse point-IoC
+    stix2_create_func = attribute_type_map.get(attr_type, None)
+    if not stix2_create_func:
+        logger.debug(
+            f"Cannot find matching STIX-2 type for MISP attribute type '{attr_type}'"
+        )
         return None
-    return Intel(
-        datetime.fromtimestamp(int(misp_attribute["timestamp"])),
-        str(misp_attribute["id"]),
-        IntelData(
-            indicator,
-            tb_intel_type,
-            source="MISP",
-        ),
-        operation,
-    )
+    try:
+        expr = stix2_create_func(attr_value)
+        return Indicator(
+            id=stix2_id,
+            pattern_type="stix",
+            pattern=ObservationExpression(expr),
+            created=stix2_timestamp,
+        )
+    except Exception as e:
+        logger.error(f"Error creating STIX-2 indicator: {e}")
+        return None
 
 
-def map_to_misp(sighting: Sighting):
+def stix2_sighting_to_misp(sighting: Sighting):
     """
-    Maps the threatbus sighting format to a MISP sighting.
-    @param sighting A threatbus Sighting object
+    Maps the STIX-2 sighting format to a MISP sighting.
+    @param sighting A STIX-2 Sighting object
     @return the mapped MISP sighting object or None
     """
-    if not sighting or not type(sighting) == Sighting:
+    if not sighting or type(sighting) != Sighting:
         return None
 
     misp_sighting = pymisp.MISPSighting()
+    source = None
+    if "x_threatbus_source" in sighting.object_properties():
+        source = str(sighting.x_threatbus_source)
     misp_sighting.from_dict(
-        id=sighting.intel,
-        source=sighting.context.get("source", None),
-        type="0",  # true positive sighting: https://www.circl.lu/doc/misp/automation/#post-sightingsadd
-        timestamp=sighting.ts,
+        id=misp_id(sighting.sighting_of_ref),
+        source=source,
+        type="0",  # true positive sighting: https://www.misp-standard.org/rfc/misp-standard-core.html#sighting
+        timestamp=sighting.created,
     )
     return misp_sighting
