@@ -2,8 +2,10 @@ from datetime import datetime
 import json
 from pymisp import MISPSighting
 from stix2 import Indicator, Sighting
+from stix2.exceptions import InvalidValueError
 from threatbus.data import Operation, Update
 from threatbus_misp.message_mapping import (
+    attribute_type_map,
     attribute_to_stix2_indicator,
     stix2_sighting_to_misp,
     is_whitelisted,
@@ -273,3 +275,95 @@ class TestMessageMapping(unittest.TestCase):
 
         filter_config = [{"tags": ["ASDF"]}, {"types": ["ASDF"]}]
         self.assertFalse(is_whitelisted(self.valid_misp_msg, filter_config))
+
+    def test_attribute_type_map(self):
+        def assert_expectation(attr_type, value, expectation):
+            if expectation is None:
+                self.assertIsNone(attribute_type_map[attr_type])
+                return
+            create_func = attribute_type_map[attr_type]
+            if expectation is InvalidValueError:
+                self.assertRaises(expectation, create_func, value)
+                return
+            self.assertEqual(str(create_func(value)), expectation)
+
+        misp_types_values_expectations = [
+            ("ip", "6.6.6.6", "ipv4-addr:value = '6.6.6.6'"),
+            ("ip-src", "6.6.6.6", "ipv4-addr:value = '6.6.6.6'"),
+            ("ip-dst", "6.6.6.6", "ipv4-addr:value = '6.6.6.6'"),
+            ("port", None, None),
+            ("hostname", "evil.com", "domain-name:value = 'evil.com'"),
+            ("domain", "evil.com", "domain-name:value = 'evil.com'"),
+            (
+                "mac-address",
+                "00:e0:f0:a0:a1:a2",
+                "mac-addr:value = '00:e0:f0:a0:a1:a2'",
+            ),
+            ("mac-eui-64", "00:e0:f0:a0:a1:a2", "mac-addr:value = '00:e0:f0:a0:a1:a2'"),
+            ("email", "foo@bar.com", "email-addr:value = 'foo@bar.com'"),
+            ("email-dst", "foo@bar.com", "email-addr:value = 'foo@bar.com'"),
+            ("email-src", "foo@bar.com", "email-addr:value = 'foo@bar.com'"),
+            ("eppn", "foo@bar.com", "email-addr:value = 'foo@bar.com'"),
+            (
+                "url",
+                "https://example.com/foo/bar",
+                "url:value = 'https://example.com/foo/bar'",
+            ),
+            (
+                "uri",
+                "https://example.com/foo/bar",
+                "url:value = 'https://example.com/foo/bar'",
+            ),
+            ("user-agent", None, None),
+            ("http-method", None, None),
+            ("AS", "123456", "autonomous-system:number = 123456"),
+            ("snort", None, None),
+            ("pattern-in-file", None, None),
+            ("filename-pattern", None, None),
+            (
+                "stix2-pattern",
+                "ipv4-addr:value = '6.6.6.6'",
+                "ipv4-addr:value = '6.6.6.6'",
+            ),  # w/o brackets
+            (
+                "stix2-pattern",
+                "[ipv4-addr:value = '6.6.6.6']",
+                "ipv4-addr:value = '6.6.6.6'",
+            ),  # w/ brackets
+            ("pattern-in-traffic", None, None),
+            ("attachment", None, None),
+            ("comment", None, None),
+            ("text", None, None),
+            (
+                "x509-fingerprint-md5",
+                "3d8c1104c6c2482eb4afc4458109a84e",
+                "x509-certificate:hashes.MD5 = '3d8c1104c6c2482eb4afc4458109a84e'",
+            ),
+            ("x509-fingerprint-md5", "fooo", InvalidValueError),  # invalid hash
+            (
+                "x509-fingerprint-sha1",
+                "6e6187d58483457f86eae49315a0a72d7543459a",
+                "x509-certificate:hashes.'SHA-1' = '6e6187d58483457f86eae49315a0a72d7543459a'",
+            ),
+            ("x509-fingerprint-sha1", "fooo", InvalidValueError),  # invalid hash
+            (
+                "x509-fingerprint-sha256",
+                "6aab1f6a6f58fb33fbf15050d7aae38a870e477f42a1707ab3aa243b512cdb6b",
+                "x509-certificate:hashes.'SHA-256' = '6aab1f6a6f58fb33fbf15050d7aae38a870e477f42a1707ab3aa243b512cdb6b'",
+            ),
+            ("x509-fingerprint-sha256", "fooo", InvalidValueError),  # invalid hash
+            ("ja3-fingerprint-md5", None, None),
+            ("jarm-fingerprint", None, None),
+            ("hassh-md5", None, None),
+            ("hasshserver-md5", None, None),
+            ("other", None, None),
+            ("hex", None, None),
+            ("cookie", None, None),
+            ("bro", None, None),
+            ("zeek", None, None),
+            ("community-id", None, None),
+            ("email-subject", None, None),
+            ("favicon-mmh3", None, None),
+        ]
+        for entry in misp_types_values_expectations:
+            assert_expectation(*entry)
