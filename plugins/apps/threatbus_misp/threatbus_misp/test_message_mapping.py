@@ -1,41 +1,51 @@
 from datetime import datetime
 import json
-import unittest
-
-from threatbus.data import Intel, IntelData, IntelType, Operation, Sighting
+from pymisp import MISPSighting
+from stix2 import Indicator, Sighting
+from threatbus.data import Operation, Update
 from threatbus_misp.message_mapping import (
-    map_to_internal,
-    map_to_misp,
+    attribute_to_stix2_indicator,
+    stix2_sighting_to_misp,
     is_whitelisted,
     get_tags,
 )
+import unittest
 
 
 class TestMessageMapping(unittest.TestCase):
     def setUp(self):
         self.raw_ts = 1579104545
         self.ts = datetime.fromtimestamp(self.raw_ts)
-        self.id = "15"
-        self.indicator = "example.com"
-        self.expected_intel_type = IntelType.DOMAIN
+        self.domain_ioc = "example.com"
+        self.ip_ioc = "example.com"
+        self.pattern = f"[domain-name:value = '{self.domain_ioc}'] AND [ipv4-addr:value = '{self.ip_ioc}']"
+        self.attr_uuid = "5e1f2787-fcfc-4718-a58a-00b4c0a82f06"
+        self.indicator_id = f"indicator--{self.attr_uuid}"
+        self.indicator = Indicator(
+            id=self.indicator_id,
+            created=self.ts,
+            pattern_type="stix",
+            pattern=self.pattern,
+        )
+        self.sighting = Sighting(created=self.ts, sighting_of_ref=self.indicator_id)
         self.valid_misp_attribute = {
             "id": self.id,
             "event_id": "1",
             "object_id": "0",
             "object_relation": None,
             "category": "Network activity",
-            "type": "domain",
-            "value1": self.indicator,
-            "value2": "",
+            "type": "domain|ip",
+            "value1": self.domain_ioc,
+            "value2": self.ip_ioc,
             "to_ids": True,
-            "uuid": "5e1f2787-fcfc-4718-a58a-00b4c0a82f06",
+            "uuid": self.attr_uuid,
             "timestamp": str(self.raw_ts),
             "distribution": "5",
             "sharing_group_id": "0",
             "comment": "",
             "deleted": False,
             "disable_correlation": False,
-            "value": self.indicator,
+            "value": f"{self.domain_ioc}|{self.ip_ioc}",
             "Sighting": [],
             "Tag": [],
         }
@@ -100,29 +110,57 @@ class TestMessageMapping(unittest.TestCase):
         """
         )
 
-    def test_invalid_threatbus_sightings(self):
-        self.assertIsNone(map_to_misp(None))
-        self.assertIsNone(map_to_misp("Hello"))
-        self.assertIsNone(map_to_misp(self))
+    def test_invalid_stix_sightings(self):
+        self.assertIsNone(stix2_sighting_to_misp(None))
+        self.assertIsNone(stix2_sighting_to_misp("Hello"))
+        self.assertIsNone(stix2_sighting_to_misp(self))
 
-    def test_invalid_misp_intel(self):
-        self.assertIsNone(map_to_internal(None, None))
-        self.assertIsNone(map_to_internal(None, "delete"))
-        self.assertIsNone(map_to_internal(self.valid_misp_attribute, None))
-
-    def test_default_action_remove(self):
-        self.assertIsNotNone(map_to_internal(self.valid_misp_attribute, "FOOOO"))
-
-    def test_valid_misp_intel(self):
-        intel_data = IntelData(self.indicator, self.expected_intel_type, source="MISP")
-        expected_intel = Intel(self.ts, self.id, intel_data, Operation.ADD)
-        self.assertEqual(
-            map_to_internal(self.valid_misp_attribute, "add"), expected_intel
+    def test_invalid_misp_attributes(self):
+        self.assertIsNone(attribute_to_stix2_indicator(None, None, None))
+        self.assertIsNone(attribute_to_stix2_indicator(None, "delete", None))
+        self.assertIsNone(
+            attribute_to_stix2_indicator(self.valid_misp_attribute, None, None)
         )
 
-    def test_valid_threatbus_sighting(self):
-        sighting = Sighting(self.ts, self.id, {}, (self.indicator,))
-        self.assertIsNotNone(map_to_misp(sighting))
+    def test_default_action_remove(self):
+        self.assertIsNotNone(
+            attribute_to_stix2_indicator(
+                self.valid_misp_attribute, "INVALID_ACTION", None
+            )
+        )
+
+    def test_valid_misp_attributes(self):
+        indicator = attribute_to_stix2_indicator(self.valid_misp_attribute, "add", None)
+        self.assertEqual(indicator.type, self.indicator.type)
+        self.assertEqual(indicator.id, self.indicator.id)
+        self.assertEqual(indicator.created, self.indicator.created)
+        self.assertEqual(indicator.pattern, self.indicator.pattern)
+
+        single_value_valid_misp_attribute = self.valid_misp_attribute.copy()
+        single_value_valid_misp_attribute["type"] = "domain"
+        single_value_valid_misp_attribute["value"] = self.domain_ioc
+        single_value_valid_misp_attribute["value1"] = self.domain_ioc
+        single_value_valid_misp_attribute["value2"] = None
+        indicator = attribute_to_stix2_indicator(
+            single_value_valid_misp_attribute, "add", None
+        )
+        self.assertEqual(indicator.type, self.indicator.type)
+        self.assertEqual(indicator.id, self.indicator.id)
+        self.assertEqual(indicator.created, self.ts)
+        self.assertEqual(
+            indicator.pattern, f"[domain-name:value = '{self.domain_ioc}']"
+        )
+
+    def test_valid_misp_attribute_removal(self):
+        valid_misp_attribute = self.valid_misp_attribute.copy()
+        valid_misp_attribute["to_ids"] = False
+        update = attribute_to_stix2_indicator(valid_misp_attribute, "edit", None)
+        self.assertEqual(update, Update(self.indicator_id, Operation.REMOVE))
+
+    def test_valid_stix_sighting(self):
+        misp_sighting = stix2_sighting_to_misp(self.sighting)
+        self.assertIsNotNone(misp_sighting)
+        self.assertEqual(type(misp_sighting), MISPSighting)
 
     def test_invalid_tags(self):
         attr = self.valid_misp_msg["Attribute"]
