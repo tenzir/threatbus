@@ -5,7 +5,7 @@ from datetime import timedelta
 import select
 
 
-def receive(items, topic="threatbus/intel", td=timedelta(days=0)):
+def receive(items, topic="stix2/indicator", td=timedelta(days=0)):
     ep = broker.Endpoint()
     ep.peer("127.0.0.1", 47761)
     subscribe_event = broker.zeek.Event("Tenzir::subscribe", topic, td)
@@ -30,7 +30,7 @@ def receive(items, topic="threatbus/intel", td=timedelta(days=0)):
     ep.publish("threatbus/manage", unsubscribe_event)
 
 
-def forward(items, q, topic="threatbus/intel"):
+def forward(items, q, topic="stix2/indicator"):
     """
     Receives the requested amount of items and forwards them to a queue.Queue
     """

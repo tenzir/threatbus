@@ -2,6 +2,7 @@
 import broker
 from datetime import datetime
 import select
+from stix2 import Sighting
 import time
 
 
@@ -38,12 +39,13 @@ def send_generic(topic, items):
         print("Threat Bus subscription failed")
         return
 
-    for i in range(items):
-        data = {
-            "indicator": "example.com",
-            "intel_type": "DOMAIN",
-        }
-        event = broker.zeek.Event("intel", datetime.now(), i, data, "ADD")
+    for _ in range(items):
+        event = broker.zeek.Event(
+            "sighting",
+            datetime.now(),
+            "indicator--cdd5791f-916e-4f62-8090-1a006005af76",
+            {},
+        )
 
         # Threat Bus will pickup the event type and hence forward on a different
         # topic.
@@ -54,4 +56,4 @@ def send_generic(topic, items):
 
 
 if __name__ == "__main__":
-    send_generic("threatbus/intel", 1)
+    send_generic("stix2/sighting", 1)
