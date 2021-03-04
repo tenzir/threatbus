@@ -9,20 +9,22 @@
 module Tenzir;
 
 export {
-  ## Threat Bus representation of intelligence.
+  ## Threat Bus representation of intelligence items (IoCs).
   type Intelligence: record {
     ## A timestamp
     ts: time;
     ## A unique identifier for the intel item.
     id: string;
     ## The intel type according to Intel::Type.
-    data: table[string] of string;
+    intel_type: string;
+    ## The IoC value, e.g., "evil.com"
+    indicator: string;
     ## The operation to perform (either ADD or REMOVE)
     operation: string;
   };
 
   ## Broker bind address.
-  option broker_host = "localhost" &redef;
+  option broker_host = "127.0.0.1" &redef;
 
   ## Broker port.
   option broker_port = 47761/tcp &redef;
@@ -43,7 +45,7 @@ export {
   option log_operations = T &redef;
 
   ## Threat Bus topic to subscribe to for receiving intel.
-  option intel_topic = "threatbus/intel" &redef;
+  option intel_topic = "stix2/indicator" &redef;
 
   ## Event to raise for intel item insertion.
   ##
@@ -51,7 +53,7 @@ export {
   global intel: event(item: Intelligence);
 
   ## Threat Bus topic to report sightings.
-  option sighting_topic = "threatbus/sighting" &redef;
+  option sighting_topic = "stix2/sighting" &redef;
 
   ## Event to report back sightings of (previously added) intel.
   ##
@@ -117,7 +119,8 @@ event zeek_init() &priority=1
   {
   if ( log_operations )
     {
-    Reporter::info(fmt("subscribing to management topic %s", management_topic));
+    Reporter::info(fmt("subscribing to management topic %s with snapshot request for %s",
+                       management_topic, snapshot_intel));
     Reporter::info(fmt("reporting noisy intel at %d matches/sec",
                        noisy_intel_threshold));
     }
@@ -146,6 +149,7 @@ event zeek_done() &priority=1
   Broker::publish(management_topic, unsubscribe, p2p_topic);
   if ( log_operations )
     Reporter::info(fmt("unsubscribing from p2p_topic %s", p2p_topic));
+  p2p_topic = "";
   }
 @endif
 
@@ -177,8 +181,8 @@ global intel_type_map: table[string] of Intel::Type = {
 function map_to_zeek_intel(item: Intelligence): Intel::Item
   {
   local intel_item: Intel::Item = [
-    $indicator = item$data["indicator"],
-    $indicator_type = intel_type_map[item$data["intel_type"]],
+    $indicator = item$indicator,
+    $indicator_type = intel_type_map[item$intel_type],
     $meta = record(
       $desc = item$id,
       $url = tb_intel_tag, # re-used to identify Threat Bus as sending entity
@@ -191,10 +195,10 @@ function map_to_zeek_intel(item: Intelligence): Intel::Item
 
 function is_mappable_intel(item: Intelligence): bool
   {
-  return item?$data && "indicator" in item$data && "intel_type" in item$data && item$data["intel_type"] in intel_type_map;
+  return item?$indicator && item?$intel_type && item$intel_type in intel_type_map;
   }
 
-# Event sent by Threat Bus to indicate a change of known intelligence to Zeek.
+# Event sent by Threat Bus to publish a new intelligence item (IoC) to Zeek.
 event intel(item: Intelligence)
   {
   if ( ! is_mappable_intel(item) ) {
@@ -214,6 +218,10 @@ event intel(item: Intelligence)
 # Event sent by Threat Bus to acknowledge new subscriptions.
 event subscription_acknowledged(topic: string)
   {
+  # already subscribed?
+  if ( p2p_topic != "" )
+    return;
+
   # This particular topic is used by Threat Bus to send dedicated messages to
   # only this Zeek instance.
   p2p_topic = topic;
