@@ -3,7 +3,7 @@ import json
 from pymisp import MISPSighting
 from stix2 import Indicator, Sighting
 from stix2.exceptions import InvalidValueError
-from threatbus.data import Operation, Update
+from threatbus.data import Operation
 from threatbus_misp.message_mapping import (
     attribute_type_map,
     attribute_to_stix2_indicator,
@@ -118,17 +118,25 @@ class TestMessageMapping(unittest.TestCase):
         self.assertIsNone(stix2_sighting_to_misp(self))
 
     def test_invalid_misp_attributes(self):
-        self.assertIsNone(attribute_to_stix2_indicator(None, None, None))
-        self.assertIsNone(attribute_to_stix2_indicator(None, "delete", None))
-        self.assertIsNone(
-            attribute_to_stix2_indicator(self.valid_misp_attribute, None, None)
+        self.assertRaises(ValueError, attribute_to_stix2_indicator, None, None, None)
+        self.assertRaises(
+            ValueError, attribute_to_stix2_indicator, None, "delete", None
+        )
+        self.assertRaises(
+            ValueError,
+            attribute_to_stix2_indicator,
+            self.valid_misp_attribute,
+            None,
+            None,
         )
 
-    def test_default_action_remove(self):
-        self.assertIsNotNone(
-            attribute_to_stix2_indicator(
-                self.valid_misp_attribute, "INVALID_ACTION", None
-            )
+    def test_invalid_action(self):
+        self.assertRaises(
+            ValueError,
+            attribute_to_stix2_indicator,
+            self.valid_misp_attribute,
+            "INVALID_ACTION",
+            None,
         )
 
     def test_valid_misp_attributes(self):
@@ -152,12 +160,15 @@ class TestMessageMapping(unittest.TestCase):
         self.assertEqual(
             indicator.pattern, f"[domain-name:value = '{self.domain_ioc}']"
         )
+        # test that no custom properties are set
+        for prop in indicator.object_properties():
+            self.assertTrue(not prop.startswith("x_threatbus_"))
 
     def test_valid_misp_attribute_removal(self):
         valid_misp_attribute = self.valid_misp_attribute.copy()
         valid_misp_attribute["to_ids"] = False
-        update = attribute_to_stix2_indicator(valid_misp_attribute, "edit", None)
-        self.assertEqual(update, Update(self.indicator_id, Operation.REMOVE))
+        indicator = attribute_to_stix2_indicator(valid_misp_attribute, "edit", None)
+        self.assertEqual(indicator.x_threatbus_update, Operation.REMOVE.value)
 
     def test_valid_stix_sighting(self):
         misp_sighting = stix2_sighting_to_misp(self.sighting)

@@ -1,6 +1,6 @@
 from datetime import datetime
 from functools import partial
-from threatbus.data import Operation, Update
+from threatbus.data import Operation, ThreatBusSTIX2Constants
 import pymisp
 from stix2 import (
     AndObservationExpression,
@@ -222,85 +222,97 @@ def misp_id(stix2_indicator_uuid: str) -> str:
     return stix2_indicator_uuid[len("indicator--") :]
 
 
+def to_equality_expr(
+    misp_attr_type: str, misp_value: str
+) -> Union[EqualityComparisonExpression, None]:
+    """
+    Returns a valid STIX-2 EqualityComparisonExpression for a given MISP
+    attribute type and a point-ioc value.
+    @param misp_attr_type The MISP attribute type (e.g., 'domain')
+    @param misp_value A MISP point-ioc value (e.g., 'evil.com')
+    @return EqualityComparisonExpression
+    """
+    stix2_create_func = attribute_type_map.get(misp_attr_type, None)
+    if not stix2_create_func:
+        raise ValueError(
+            f"Cannot find STIX-2 mapping for MISP attribute type '{misp_attr_type}'"
+        )
+    return stix2_create_func(misp_value)
+
+
 def attribute_to_stix2_indicator(
     misp_attribute: dict, action: str, logger
-) -> Union[None, Update, Indicator]:
+) -> Union[None, Indicator]:
     """
     Maps the given MISP attribute to a STIX-2 cyber observable object.
     @param misp_attribute The MISP attribute to map to STIX-2
     @param action A string from MISP, describing the action for the attribute
         (either 'add', 'edit', or 'delete')
     @param logger The logger instance from the calling function
-    @return The mapped STIX-2 Indicator, a Threat Bus Update, or None
+    @return The mapped STIX-2 Indicator or None
+    @throws ValueError for invalid inputs
     """
     # parse MISP attribute
-    if not misp_attribute:
-        return None
-    to_ids = misp_attribute.get("to_ids", False)
-    if not to_ids and action != "edit" or not action:
-        return None
-    stix2_id = stix2_indicator_id(misp_attribute["uuid"])
-    stix2_timestamp = datetime.fromtimestamp(int(misp_attribute["timestamp"]))
-    if action == "edit" and not to_ids:
-        return Update(id=stix2_id, operation=Operation.REMOVE)
-
-    ## parse MISP values
-    attr_type = misp_attribute.get("type", None)
-    attr_value = misp_attribute.get("value", None)
-    if not attr_type or not attr_value:
-        logger.debug(
-            f"Incomplete MISP attribute, missing `type` and/or `value` fields: '{misp_attribute}'"
+    if not misp_attribute or not action or action not in ["add", "edit", "delete"]:
+        raise ValueError(
+            f"Cannot parse MISP attribute {misp_attribute} with action '{action}'."
         )
+    ## parse MISP values
+    to_ids = misp_attribute.get("to_ids", None)
+    misp_ts = misp_attribute.get("timestamp", None)
+    misp_id = misp_attribute.get("uuid", None)
+    misp_attr_type = misp_attribute.get("type", None)
+    misp_attr_value = misp_attribute.get("value", None)
+    if (
+        to_ids is None
+        or not misp_ts
+        or not misp_id
+        or not misp_attr_type
+        or not misp_attr_value
+    ):
+        raise ValueError(
+            "Incomplete MISP attribute, missing one of the following properties: `timestamp`, `to_ids`, `uuid`, `type`, `value`"
+        )
+    if to_ids == False and action != "edit":
+        # A new attribute was created, but the `to_ids` flag is toggled off.
         return None
+
+    custom_properties = {}
+    if action == "edit" and to_ids == False:
+        # A previously published MISP attribute was edited and the `to_ids` flag
+        # was toggled off. We mark this with a custom STIX-2 property as deleted
+        custom_properties[
+            ThreatBusSTIX2Constants.X_THREATBUS_UPDATE.value
+        ] = Operation.REMOVE.value
+
+    stix2_timestamp = datetime.fromtimestamp(int(misp_ts))
+    stix2_id = stix2_indicator_id(misp_id)
 
     ## parse compound MISP intel:
-    if "|" in attr_type:
+    if "|" in misp_attr_type:
         obs_exprs = []  # list to hold all ObservationExpressions
-        value_splits = attr_value.split("|")
-        for idx, attr_type_split in enumerate(attr_type.split("|")):
-            stix2_create_func = attribute_type_map.get(attr_type_split, None)
-            if not stix2_create_func:
-                logger.debug(
-                    f"Cannot find matching STIX-2 type for MISP attribute type '{attr_type}'"
-                )
-                return None
-            try:
-                eq_expr = stix2_create_func(
-                    value_splits[idx]
-                )  # EqualitiComparisonExpression
-                obs_expr = ObservationExpression(eq_expr)
-                obs_exprs.append(obs_expr)
-            except Exception as e:
-                logger.error(f"Error creating STIX-2 expression: {e}")
-        try:
-            return Indicator(
-                id=stix2_id,
-                pattern_type="stix",
-                pattern=AndObservationExpression(obs_exprs),
-                created=stix2_timestamp,
-            )
-        except Exception as e:
-            logger.error(f"Error creating STIX-2 indicator: {e}")
-            return None
-
-    ## parse point-IoC
-    stix2_create_func = attribute_type_map.get(attr_type, None)
-    if not stix2_create_func:
-        logger.debug(
-            f"Cannot find matching STIX-2 type for MISP attribute type '{attr_type}'"
-        )
-        return None
-    try:
-        expr = stix2_create_func(attr_value)
+        value_splits = misp_attr_value.split("|")
+        for idx, misp_attr_type_split in enumerate(misp_attr_type.split("|")):
+            eq_expr = to_equality_expr(misp_attr_type_split, value_splits[idx])
+            obs_expr = ObservationExpression(eq_expr)
+            obs_exprs.append(obs_expr)
         return Indicator(
             id=stix2_id,
             pattern_type="stix",
-            pattern=ObservationExpression(expr),
+            pattern=AndObservationExpression(obs_exprs),
             created=stix2_timestamp,
+            custom_properties=custom_properties,
         )
-    except Exception as e:
-        logger.error(f"Error creating STIX-2 indicator: {e}")
-        return None
+
+    ## parse point-IoC
+    eq_expr = to_equality_expr(misp_attr_type, misp_attr_value)
+    return Indicator(
+        id=stix2_id,
+        pattern_type="stix",
+        pattern=ObservationExpression(eq_expr),
+        created=stix2_timestamp,
+        custom_properties=custom_properties,
+    )
 
 
 def stix2_sighting_to_misp(sighting: Sighting):

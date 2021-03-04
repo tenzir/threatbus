@@ -117,13 +117,17 @@ class KafkaReceiver(threatbus.StoppableWorker):
                 continue
             if not is_whitelisted(msg, filter_config):
                 continue
-            action = msg.get("action", None)
-            ioc = attribute_to_stix2_indicator(msg["Attribute"], action, logger)
+            ioc = None
+            attr = msg.get("Attribute", None)
+            try:
+                ioc = attribute_to_stix2_indicator(
+                    attr, msg.get("action", None), logger
+                )
+            except Exception as e:
+                logger.warn(f"Failed to parse MISP attribute {attr}: {e}")
             if not ioc:
-                if action != "add":
-                    logger.warn(
-                        f"Discarding unparsable MISP attribute {msg['Attribute']}"
-                    )
+                # the mapping function returns None e.g., in case a new MISP
+                # attribute is added without the `to_ids` flag enabled.
                 continue
             self.inq.put(ioc)
 
@@ -164,13 +168,17 @@ class ZmqReceiver(threatbus.StoppableWorker):
                 continue
             if not is_whitelisted(msg, filter_config):
                 continue
-            action = msg.get("action", None)
-            ioc = attribute_to_stix2_indicator(msg["Attribute"], action, logger)
+            ioc = None
+            attr = msg.get("Attribute", None)
+            try:
+                ioc = attribute_to_stix2_indicator(
+                    attr, msg.get("action", None), logger
+                )
+            except Exception as e:
+                logger.warn(f"Failed to parse MISP attribute {attr}: {e}")
             if not ioc:
-                if action != "add":
-                    logger.warn(
-                        f"Discarding unparsable MISP attribute {msg['Attribute']}"
-                    )
+                # the mapping function returns None e.g., in case a new MISP
+                # attribute is added without the `to_ids` flag enabled.
                 continue
             self.inq.put(ioc)
 
@@ -212,7 +220,7 @@ def validate_config(config: Subview):
 @threatbus.app
 def snapshot(snapshot_request: SnapshotRequest, result_q: JoinableQueue):
     global logger, misp, lock, filter_config
-    if snapshot_request.snapshot_type != MessageType.INTEL:
+    if snapshot_request.snapshot_type != MessageType.INDICATOR:
         logger.debug("Sighting snapshot feature not yet implemented.")
         return  # TODO sighting snapshot not yet implemented
     if not misp:
@@ -248,13 +256,16 @@ def snapshot(snapshot_request: SnapshotRequest, result_q: JoinableQueue):
             if not data:
                 continue
             for attr in data["Attribute"]:
-                intel = attribute_to_stix2_indicator(attr, "add", logger)
-                if intel:
+                try:
+                    ioc = attribute_to_stix2_indicator(attr, "add", logger)
+                except Exception as e:
+                    logger.warn(f"Failed to parse MISP attribute {attr}: {e}")
+                if ioc:
                     result_q.put(
                         SnapshotEnvelope(
                             snapshot_request.snapshot_type,
                             snapshot_request.snapshot_id,
-                            intel,
+                            ioc,
                         )
                     )
 
