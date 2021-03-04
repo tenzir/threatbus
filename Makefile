@@ -22,10 +22,10 @@ unit-tests:
 	$(MAKE) -C plugins/backbones/threatbus_rabbitmq unit-tests
 	$(MAKE) -C plugins/apps/threatbus_zmq_app unit-tests
 	$(MAKE) -C plugins/apps/threatbus_misp unit-tests
+	$(MAKE) -C plugins/apps/threatbus_zeek unit-tests
   # Threat Bus is currently being migrated to use STIX-2 as internal format.
   # For the time being, all un-migrated plugins cannot be not tested against the
   # current master
-	#$(MAKE) -C plugins/apps/threatbus_zeek unit-tests
 	#$(MAKE) -C plugins/apps/threatbus_cif3 unit-tests
 	#$(MAKE) -C apps/vast unit-tests
 

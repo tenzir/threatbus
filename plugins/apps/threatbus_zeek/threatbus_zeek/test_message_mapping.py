@@ -1,155 +1,188 @@
 import broker
 from datetime import datetime, timedelta, timezone
-import unittest
-
+import json
+from stix2 import Indicator, Sighting, parse
 from threatbus.data import (
-    Intel,
-    IntelData,
-    IntelType,
     Operation,
-    Sighting,
     Subscription,
     Unsubscription,
+    ThreatBusSTIX2Constants,
 )
 from threatbus_zeek.message_mapping import (
-    map_to_internal,
-    map_to_broker,
+    is_point_equality_ioc,
+    map_broker_event_to_sighting,
+    map_indicator_to_broker_event,
     map_management_message,
 )
+import unittest
 
 
 class TestMessageMapping(unittest.TestCase):
     def setUp(self):
         self.ts = datetime.now(timezone.utc).astimezone()
-        self.id = "42"
+        self.indicator_id = "indicator--de0c3d3f-02ee-4086-88f1-51200ac831f7"
+        self.point_ioc = "evil.com"
+        self.pattern = f"[domain-name:value = '{self.point_ioc}']"
+        self.indicator = Indicator(
+            id=self.indicator_id,
+            created=self.ts,
+            modified=self.ts,
+            pattern_type="stix",
+            pattern=self.pattern,
+        )
         self.module_namespace = "TestNamespace"
 
-    def test_invalid_inputs(self):
-        self.assertIsNone(map_to_broker(None, None))
-        self.assertIsNone(map_to_broker(None, ""))
-        self.assertIsNone(map_to_broker(None, self.module_namespace))
-        self.assertIsNone(map_to_broker(42, self.module_namespace))
-        self.assertIsNone(map_to_broker(object, self.module_namespace))
+    def test_invalid_indicator_inputs(self):
+        self.assertIsNone(map_indicator_to_broker_event(None, None, None))
+        self.assertIsNone(map_indicator_to_broker_event(None, "", None))
+        self.assertIsNone(
+            map_indicator_to_broker_event(None, self.module_namespace, None)
+        )
+        self.assertIsNone(
+            map_indicator_to_broker_event(42, self.module_namespace, None)
+        )
+        self.assertIsNone(
+            map_indicator_to_broker_event(object, self.module_namespace, None)
+        )
+        self.assertIsNone(
+            map_indicator_to_broker_event(
+                Sighting(sighting_of_ref=self.indicator_id),
+                self.module_namespace,
+                None,
+            )
+        )
 
     def test_invalid_zeek_inputs(self):
         broker_data = broker.zeek.Event("Hello")  # unknown event
-        self.assertIsNone(map_to_internal(broker_data, None))
-        self.assertIsNone(map_to_internal(broker_data, self.module_namespace))
+        self.assertIsNone(map_broker_event_to_sighting(broker_data, None, None))
+        self.assertIsNone(
+            map_broker_event_to_sighting(broker_data, self.module_namespace, None)
+        )
         self.assertIsNone(map_management_message(broker_data, None))
         self.assertIsNone(map_management_message(broker_data, self.module_namespace))
 
         # not enough arguments provided
         broker_data = broker.zeek.Event("sighting", 1, 2)
-        self.assertIsNone(map_to_internal(broker_data, None))
-        self.assertIsNone(map_to_internal(broker_data, self.module_namespace))
+        self.assertIsNone(map_broker_event_to_sighting(broker_data, None, None))
+        self.assertIsNone(
+            map_broker_event_to_sighting(broker_data, self.module_namespace, None)
+        )
         self.assertIsNone(map_management_message(broker_data, None))
         self.assertIsNone(map_management_message(broker_data, self.module_namespace))
 
         broker_data = broker.zeek.Event("intel", 42, {})
-        self.assertIsNone(map_to_internal(broker_data, None))
-        self.assertIsNone(map_to_internal(broker_data, self.module_namespace))
+        self.assertIsNone(map_broker_event_to_sighting(broker_data, None, None))
+        self.assertIsNone(
+            map_broker_event_to_sighting(broker_data, self.module_namespace, None)
+        )
         self.assertIsNone(map_management_message(broker_data, None))
         self.assertIsNone(map_management_message(broker_data, self.module_namespace))
 
         broker_data = broker.zeek.Event("subscribe", "topic")
-        self.assertIsNone(map_to_internal(broker_data, None))
-        self.assertIsNone(map_to_internal(broker_data, self.module_namespace))
+        self.assertIsNone(map_broker_event_to_sighting(broker_data, None, None))
+        self.assertIsNone(
+            map_broker_event_to_sighting(broker_data, self.module_namespace, None)
+        )
         self.assertIsNone(map_management_message(broker_data, None))
         self.assertIsNone(map_management_message(broker_data, self.module_namespace))
 
         broker_data = broker.zeek.Event("unsubscribe")
-        self.assertIsNone(map_to_internal(broker_data, None))
-        self.assertIsNone(map_to_internal(broker_data, self.module_namespace))
+        self.assertIsNone(map_broker_event_to_sighting(broker_data, None, None))
+        self.assertIsNone(
+            map_broker_event_to_sighting(broker_data, self.module_namespace, None)
+        )
         self.assertIsNone(map_management_message(broker_data, None))
         self.assertIsNone(map_management_message(broker_data, self.module_namespace))
 
-    def test_valid_intel(self):
-        data = IntelData("6.6.6.6", IntelType.IPDST_PORT, foo=23)
-        expected_broker_data = {"indicator": "6.6.6.6", "intel_type": "ADDR"}
-        op = Operation.REMOVE
-        intel = Intel(self.ts, self.id, data, op)
-        broker_msg = map_to_broker(intel, self.module_namespace)
+    def test_valid_indicator(self):
+        # test indicator added
+        broker_msg = map_indicator_to_broker_event(
+            self.indicator, self.module_namespace, None
+        )
         self.assertEqual(broker_msg.name(), self.module_namespace + "::intel")
         self.assertEqual(
-            broker_msg.args(), [(self.ts, self.id, expected_broker_data, op.value)]
+            broker_msg.args(),
+            [(self.ts, self.indicator_id, "DOMAIN", self.point_ioc, "ADD")],
         )
 
-    def test_valid_zeek_intel(self):
-        broker_intel_data = {"indicator": "6.6.6.6", "intel_type": "ADDR"}
-        expexted_intel_data = IntelData("6.6.6.6", IntelType.IPSRC)
-        op = Operation.REMOVE
-        # without namespace:
-        event = broker.zeek.Event(
-            "intel", self.ts, self.id, broker_intel_data, op.value
-        )
-        intel = map_to_internal(event, self.module_namespace)
-        self.assertEqual(type(intel), Intel)
-        self.assertEqual(intel.ts, self.ts)
-        self.assertEqual(intel.id, self.id)
-        self.assertEqual(intel.data, expexted_intel_data)
-        self.assertEqual(intel.operation, op)
+        # test indicator removed
+        # deep copy indicator, add custom property that indicates deletion
+        i_dct = json.loads(self.indicator.serialize())  # deep copy
+        i_dct[ThreatBusSTIX2Constants.X_THREATBUS_UPDATE.value] = Operation.REMOVE.value
+        indicator_copy = parse(json.dumps(i_dct), allow_custom=True)
 
-        # with namespace:
-        event = broker.zeek.Event(
-            self.module_namespace + "::intel",
-            self.ts,
-            self.id,
-            broker_intel_data,
-            op.value,
+        broker_msg = map_indicator_to_broker_event(
+            indicator_copy, self.module_namespace, None
         )
-        intel_ns = map_to_internal(event, self.module_namespace)
-        self.assertEqual(intel, intel_ns)
-
-    def test_valid_sighting(self):
-        context = {"last_seen": 1234, "count": 13}
-        sighting = Sighting(self.ts, self.id, context, None)
-        broker_msg = map_to_broker(sighting, self.module_namespace)
-        self.assertEqual(broker_msg.name(), self.module_namespace + "::sighting")
-        self.assertEqual(broker_msg.args(), [(self.ts, self.id, context)])
+        self.assertEqual(broker_msg.name(), self.module_namespace + "::intel")
+        self.assertEqual(
+            broker_msg.args(),
+            [(self.ts, self.indicator_id, "DOMAIN", self.point_ioc, "REMOVE")],
+        )
 
     def test_valid_zeek_sighting(self):
-        context = {"last_seen": 1234, "count": 13}
+        context = {"last_seen": 1234, "count": 13, "source": "Zeek"}
         # without namespace:
-        event = broker.zeek.Event("sighting", self.ts, self.id, context)
-        sighting = map_to_internal(event, self.module_namespace)
+        event = broker.zeek.Event("sighting", self.ts, self.indicator_id, context)
+        sighting = map_broker_event_to_sighting(event, self.module_namespace, None)
         self.assertEqual(type(sighting), Sighting)
-        self.assertEqual(sighting.ts, self.ts)
-        self.assertEqual(sighting.intel, self.id)
-        self.assertEqual(sighting.context, context)
+        self.assertEqual(sighting.created, self.ts)
+        self.assertEqual(sighting.sighting_of_ref, self.indicator_id)
+        self.assertTrue(
+            ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value
+            in sighting.object_properties()
+        )
+        self.assertEqual(sighting.x_threatbus_sighting_context, context)
 
         # with namespace:
         event = broker.zeek.Event(
-            self.module_namespace + "::sighting", self.ts, self.id, context
+            self.module_namespace + "::sighting", self.ts, self.indicator_id, context
         )
-        sighting_ns = map_to_internal(event, self.module_namespace)
-        self.assertEqual(sighting, sighting_ns)
+        sighting = map_broker_event_to_sighting(event, self.module_namespace, None)
+        self.assertEqual(type(sighting), Sighting)
+        self.assertEqual(sighting.created, self.ts)
+        self.assertEqual(sighting.sighting_of_ref, self.indicator_id)
+        self.assertTrue(
+            ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value
+            in sighting.object_properties()
+        )
+        self.assertEqual(sighting.x_threatbus_sighting_context, context)
 
-    def test_invalid_intel_data_is_not_mapped(self):
-        event = broker.zeek.Event("intel", self.ts, 0)
-        intel = map_to_internal(event, self.module_namespace)
-        self.assertIsNone(intel)
+    def test_is_point_equility_ioc(self):
+        # negative test
+        self.assertFalse(is_point_equality_ioc("Some string"))
+        self.assertFalse(is_point_equality_ioc("6.6.6.6 = ipv4-addr:value"))
+        # missing brackets
+        self.assertFalse(is_point_equality_ioc("ipv4-addr:value = '6.6.6.6'"))
+        # double ==
+        self.assertFalse(is_point_equality_ioc("[ipv4-addr:value == '6.6.6.6']"))
+        # mising closing bracket
+        self.assertFalse(is_point_equality_ioc("[ipv4-addr:value = '6.6.6.6'"))
+        # mising opening bracket
+        self.assertFalse(is_point_equality_ioc("ipv4-addr:value = '6.6.6.6']"))
+        # mising quotes
+        self.assertFalse(is_point_equality_ioc("[ipv4-addr:value = 6.6.6.6]"))
+        # valid compound IoC
+        self.assertFalse(
+            is_point_equality_ioc(
+                "[ipv4-addr:value = '6.6.6.6' AND domain-name:value = 'evil.com']"
+            )
+        )
+        self.assertFalse(
+            is_point_equality_ioc(
+                "[ipv4-addr:value = '6.6.6.6'] AND [domain-name:value = 'evil.com']"
+            )
+        )
 
-        event = broker.zeek.Event("intel", self.ts, 0, {})
-        intel = map_to_internal(event, self.module_namespace)
-        self.assertIsNone(intel)
-
-        event = broker.zeek.Event("intel", self.ts, 0, {"indicator": "6.6.6.6"})
-        intel = map_to_internal(event, self.module_namespace)
-        self.assertIsNone(intel)
-
-        event = broker.zeek.Event("intel", self.ts, 0, {"intel_type": "ADDR"})
-        intel = map_to_internal(event, self.module_namespace)
-        self.assertIsNone(intel)
-
-    def test_default_intel_operation(self):
-        broker_intel_data = {"indicator": "example.com", "intel_type": "DOMAIN"}
-        event = broker.zeek.Event("intel", self.ts, 0, broker_intel_data)
-        intel = map_to_internal(event, self.module_namespace)
-        self.assertEqual(intel.operation, Operation.ADD)
-
-        event = broker.zeek.Event("intel", self.ts, 0, broker_intel_data, "INVALID")
-        intel = map_to_internal(event, self.module_namespace)
-        self.assertEqual(intel.operation, Operation.ADD)
+        # postitve test
+        self.assertTrue(is_point_equality_ioc("[ipv4-addr:value = '6.6.6.6']"))
+        self.assertTrue(is_point_equality_ioc("[ipv6-addr:value = '::1']"))
+        self.assertTrue(is_point_equality_ioc("[domain-name:value = 'evil.com']"))
+        self.assertTrue(
+            is_point_equality_ioc(
+                "[x509-certificate:hashes.'SHA-1' = '6e6187d58483457f86eae49315a0a72d7543459a']"
+            )
+        )
 
     def test_valid_subscription(self):
         td = timedelta(days=5)

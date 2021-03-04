@@ -1,7 +1,6 @@
 import broker
-from contextlib import suppress
 import re
-from stix2 import EqualityComparisonExpression, Indicator, Sighting
+from stix2 import Indicator, Sighting
 from stix2patterns.v21.pattern import Pattern
 from threatbus.data import (
     Operation,
@@ -94,21 +93,25 @@ def is_point_equality_ioc(pattern_str: str) -> bool:
     only consists of a single EqualityComparisonExpression
     @param pattern_str The STIX-2 pattern string to inspect
     """
-    pattern = Pattern(pattern_str)
-    # InspectionListener https://github.com/oasis-open/cti-pattern-validator/blob/e926d0a14adf88de08acb908a51db1f453c13647/stix2patterns/v21/inspector.py#L5
-    # E.g.,   pattern = "[domain-name:value = 'evil.com']"
-    # =>           il = pattern_data(comparisons={'domain-name': [(['value'], '=', "'evil.com'")]}, observation_ops=set(), qualifiers=set())
-    # =>  cybox_types = ['domain-name']
-    il = pattern.inspect()
-    cybox_types = list(il.comparisons.keys())
-    return (
-        len(il.observation_ops) == 0
-        and len(il.qualifiers) == 0
-        and len(il.comparisons) == 1
-        and len(cybox_types) == 1  # must be point-indicator (one field only)
-        and len(il.comparisons[cybox_types[0]][0]) == 3  # ('value', '=', 'evil.com')
-        and il.comparisons[cybox_types[0]][0][1] == "="  # equality comparison
-    )
+    try:
+        pattern = Pattern(pattern_str)
+        # InspectionListener https://github.com/oasis-open/cti-pattern-validator/blob/e926d0a14adf88de08acb908a51db1f453c13647/stix2patterns/v21/inspector.py#L5
+        # E.g.,   pattern = "[domain-name:value = 'evil.com']"
+        # =>           il = pattern_data(comparisons={'domain-name': [(['value'], '=', "'evil.com'")]}, observation_ops=set(), qualifiers=set())
+        # =>  cybox_types = ['domain-name']
+        il = pattern.inspect()
+        cybox_types = list(il.comparisons.keys())
+        return (
+            len(il.observation_ops) == 0
+            and len(il.qualifiers) == 0
+            and len(il.comparisons) == 1
+            and len(cybox_types) == 1  # must be point-indicator (one field only)
+            and len(il.comparisons[cybox_types[0]][0])
+            == 3  # ('value', '=', 'evil.com')
+            and il.comparisons[cybox_types[0]][0][1] == "="  # equality comparison
+        )
+    except Exception:
+        return False
 
 
 def map_indicator_to_broker_event(
