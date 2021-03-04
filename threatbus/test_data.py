@@ -14,6 +14,7 @@ from data import (
     SnapshotRequestDecoder,
     SnapshotEnvelopeEncoder,
     SnapshotEnvelopeDecoder,
+    ThreatBusSTIX2Constants,
 )
 
 
@@ -33,6 +34,7 @@ class TestJsonConversions(unittest.TestCase):
             modified=self.created,
         )
 
+        self.sighting_source = "VAST"
         self.sighting_id = "sighting--df0f9a0e-c3b6-4f53-b0cf-5e9c454ee0cc"
         self.sighting_context = {
             "ts": "2017-03-03T23:56:09.652643840",
@@ -63,7 +65,6 @@ class TestJsonConversions(unittest.TestCase):
             },
             "event_type": "alert",
             "_extra": {"vast-ioc": "172.31.129.17"},
-            "source": "VAST",
         }
         self.sighting = Sighting(
             id=self.sighting_id,
@@ -71,8 +72,9 @@ class TestJsonConversions(unittest.TestCase):
             modified=self.created,
             sighting_of_ref=self.indicator_id,
             custom_properties={
-                "x_threatbus_sighting_context": self.sighting_context,
-                "x_threatbus_indicator": self.indicator,
+                ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value: self.sighting_context,
+                ThreatBusSTIX2Constants.X_THREATBUS_INDICATOR.value: self.indicator,
+                ThreatBusSTIX2Constants.X_THREATBUS_SOURCE.value: self.sighting_source,
             },
         )
 
@@ -140,7 +142,8 @@ class TestJsonConversions(unittest.TestCase):
         self.assertEqual(py_dict["body"]["created"], format_datetime(self.created))
         self.assertEqual(py_dict["body"]["sighting_of_ref"], self.indicator_id)
         self.assertEqual(
-            py_dict["body"]["x_threatbus_sighting_context"], self.sighting_context
+            py_dict["body"][ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value],
+            self.sighting_context,
         )
         self.assertEqual(py_dict["type"], SnapshotEnvelope.__name__.lower())
 
@@ -174,8 +177,9 @@ class TestJsonConversions(unittest.TestCase):
                 "type": "sighting",
                 "spec_version": "2.1",
                 "id": "{self.sighting_id}",
-                "x_threatbus_sighting_context": {json.dumps(self.sighting_context)},
-                "x_threatbus_indicator": {self.indicator.serialize()}
+                "{ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value}": {json.dumps(self.sighting_context)},
+                "{ThreatBusSTIX2Constants.X_THREATBUS_INDICATOR.value}": {self.indicator.serialize()},
+                "{ThreatBusSTIX2Constants.X_THREATBUS_SOURCE.value}": "{self.sighting_source}"
             }}
         }}"""
         read_back = json.loads(encoded_envelope_sighting, cls=SnapshotEnvelopeDecoder)

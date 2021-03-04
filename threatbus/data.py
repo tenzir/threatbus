@@ -6,6 +6,17 @@ from stix2 import Indicator, Sighting, parse
 from stix2.parsing import dict_to_stix2
 from typing import Union
 
+## Threat Bus custom STIX-2 attributes
+@unique
+class ThreatBusSTIX2Constants(Enum):
+    # used in Sighting.custom_properties to reference the full STIX-2 Indicator
+    X_THREATBUS_INDICATOR = "x_threatbus_indicator"
+    # used in Sighting.custom_properties.context
+    X_THREATBUS_SOURCE = "x_threatbus_source"
+    X_THREATBUS_SIGHTING_CONTEXT = "x_threatbus_sighting_context"
+    # Indicates an update operation for the STIX-2 item. See Operation enum.
+    X_THREATBUS_UPDATE = "x_threatbus_update"
+
 
 @dataclass
 class Subscription:
@@ -28,18 +39,6 @@ class Operation(Enum):
 class MessageType(Enum):
     INDICATOR = auto()
     SIGHTING = auto()
-
-
-@dataclass()
-class Update:
-    """
-    An Update consists of at least an ID and Operation. The operation should be
-    applied to items with the updated ID.
-    TODO: specify content changes
-    """
-
-    id: str
-    operation: Operation
 
 
 @dataclass()
