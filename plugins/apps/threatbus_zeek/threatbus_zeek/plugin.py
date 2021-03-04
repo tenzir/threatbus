@@ -88,14 +88,16 @@ class SubscriptionManager(threatbus.StoppableWorker):
             subscriptions[p2p_topic] = p2p_q
             lock.release()
         elif type(task) is Unsubscription:
-            logger.info(f"Received unsubscription from topic: {task.topic}")
+            logger.info(f"Received unsubscription from topic '{task.topic}'")
             threatbus_topic = task.topic[: len(task.topic) - self.rand_suffix_length]
             p2p_q = subscriptions.get(task.topic, None)
-            if p2p_q:
-                self.unsubscribe_callback(threatbus_topic, p2p_q)
-                lock.acquire()
-                del subscriptions[task.topic]
-                lock.release()
+            if not p2p_q:
+                logger.warning(f"No one was subscribed for topic '{task.topic}'")
+                return
+            self.unsubscribe_callback(threatbus_topic, p2p_q)
+            lock.acquire()
+            del subscriptions[task.topic]
+            lock.release()
         else:
             logger.debug(f"Skipping unknown management message of type: {type(task)}")
 
