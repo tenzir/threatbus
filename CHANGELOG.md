@@ -10,12 +10,28 @@ Every entry has a category for which we use the following visual abbreviations:
 - 🧬 Experimental feature
 - 🐞 Bugfix
 
-<!-- ## Unreleased -->
+## Unreleased
+
+- 🎁 The MISP plugin now supports the
+  [STIX-2 (version 2.1)](https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html)
+  standard for
+  [Indicators](https://docs.oasis-open.org/cti/stix/v2.1/cs02/stix-v2.1-cs02.html#_muftrcpnf89v)
+  and [Sightings](https://docs.oasis-open.org/cti/stix/v2.1/cs02/stix-v2.1-cs02.html#_a795guqsap3r).
+  The plugin converts MISP attributes to valid STIX-2 Indicators on best-effort
+  basis before publishing them on Threat Bus topics. Likewise, the plugin
+  converts STIX-2 sightings to MISP sightings before sending them the MISP.
+  [#102](https://github.com/tenzir/threatbus/pull/102)
+
+- 🐞 We fixed a bug in the JSON (de-)serialization logic for `SnapshotEnvelope`s
+  and `SnapshotRequest`s that lead to a malformed `type` field in the JSON
+  representations of both types.
+  [#102](https://github.com/tenzir/threatbus/pull/102)
+
 
 ## [2021.02.24]
 
-- 🎁 Feature
-  The MISP plugin now uses [extra dependencies](https://www.python.org/dev/peps/pep-0508/#extras).
+- 🎁 The MISP plugin now uses
+  [extra dependencies](https://www.python.org/dev/peps/pep-0508/#extras).
   Users can now chose the wanted dependencies during installation by running
   `pip install threatbus-misp[zmq]` to install the ZeroMQ dependency, or
   `pip install threatbus-misp[kafka]` to install the Kafka dependency. The
@@ -23,9 +39,8 @@ Every entry has a category for which we use the following visual abbreviations:
   exits immediately.
   [#99](https://github.com/tenzir/threatbus/pull/99)
 
-- 🎁 Feature
-  The RabbitMQ backbone plugin, the In-memory backbone plugins, and the Zmq-app
-  plugin now support the
+- 🎁 The RabbitMQ backbone plugin, the In-memory backbone plugins, and the
+  Zmq-app plugin now support the
   [STIX-2 (version 2.1)](https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html)
   standard for
   [Indicators](https://docs.oasis-open.org/cti/stix/v2.1/cs02/stix-v2.1-cs02.html#_muftrcpnf89v)

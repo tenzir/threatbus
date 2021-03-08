@@ -20,7 +20,11 @@ from queue import Empty
 import threading
 import threatbus
 from threatbus.data import MessageType, SnapshotEnvelope, SnapshotRequest
-from threatbus_misp.message_mapping import map_to_internal, map_to_misp, is_whitelisted
+from threatbus_misp.message_mapping import (
+    attribute_to_stix2_indicator,
+    stix2_sighting_to_misp,
+    is_whitelisted,
+)
 from typing import Callable, List, Dict
 import warnings
 
@@ -66,12 +70,15 @@ class SightingsPublisher(threatbus.StoppableWorker):
                 sighting = self.outq.get(block=True, timeout=1)
             except Empty:
                 continue
-            logger.debug(f"Reporting sighting: {sighting}")
-            misp_sighting = map_to_misp(sighting)
+            misp_sighting = stix2_sighting_to_misp(sighting)
             lock.acquire()
             resp = misp.add_sighting(misp_sighting)
             if not resp or type(resp) is dict and resp.get("message", None):
-                logger.error(f"Failed to add sighting to MISP: {resp}")
+                logger.error(
+                    f"Failed to add sighting to MISP: '{sighting}' Error: {resp}"
+                )
+            else:
+                logger.debug(f"Reported sighting: {resp}")
             lock.release()
             self.outq.task_done()
 
@@ -84,7 +91,7 @@ class KafkaReceiver(threatbus.StoppableWorker):
     def __init__(self, kafka_config: Subview, inq: JoinableQueue):
         """
         @param kafka_config A configuration object for Kafka binding
-        @param inq The queue to which intel items from MISP are forwarded to
+        @param inq The queue to which STIX-2 indicators are forwarded to
         """
         super(KafkaReceiver, self).__init__()
         self.kafka_config = kafka_config
@@ -110,11 +117,19 @@ class KafkaReceiver(threatbus.StoppableWorker):
                 continue
             if not is_whitelisted(msg, filter_config):
                 continue
-            intel = map_to_internal(msg["Attribute"], msg.get("action", None), logger)
-            if not intel:
-                logger.debug(f"Discarding unparsable intel {msg['Attribute']}")
-            else:
-                self.inq.put(intel)
+            ioc = None
+            attr = msg.get("Attribute", None)
+            try:
+                ioc = attribute_to_stix2_indicator(
+                    attr, msg.get("action", None), logger
+                )
+            except Exception as e:
+                logger.warn(f"Failed to parse MISP attribute {attr}: {e}")
+            if not ioc:
+                # the mapping function returns None e.g., in case a new MISP
+                # attribute is added without the `to_ids` flag enabled.
+                continue
+            self.inq.put(ioc)
 
 
 class ZmqReceiver(threatbus.StoppableWorker):
@@ -125,7 +140,7 @@ class ZmqReceiver(threatbus.StoppableWorker):
     def __init__(self, zmq_config: Subview, inq: JoinableQueue):
         """
         @param zmq_config A configuration object for ZeroMQ binding
-        @param inq The queue to which intel items from MISP are forwarded to
+        @param inq The queue to which STIX-2 Indicators are forwarded to
         """
         super(ZmqReceiver, self).__init__()
         self.inq = inq
@@ -153,11 +168,19 @@ class ZmqReceiver(threatbus.StoppableWorker):
                 continue
             if not is_whitelisted(msg, filter_config):
                 continue
-            intel = map_to_internal(msg["Attribute"], msg.get("action", None), logger)
-            if not intel:
-                logger.debug(f"Discarding unparsable intel {msg['Attribute']}")
-            else:
-                self.inq.put(intel)
+            ioc = None
+            attr = msg.get("Attribute", None)
+            try:
+                ioc = attribute_to_stix2_indicator(
+                    attr, msg.get("action", None), logger
+                )
+            except Exception as e:
+                logger.warn(f"Failed to parse MISP attribute {attr}: {e}")
+            if not ioc:
+                # the mapping function returns None e.g., in case a new MISP
+                # attribute is added without the `to_ids` flag enabled.
+                continue
+            self.inq.put(ioc)
 
 
 def validate_config(config: Subview):
@@ -197,7 +220,7 @@ def validate_config(config: Subview):
 @threatbus.app
 def snapshot(snapshot_request: SnapshotRequest, result_q: JoinableQueue):
     global logger, misp, lock, filter_config
-    if snapshot_request.snapshot_type != MessageType.INTEL:
+    if snapshot_request.snapshot_type != MessageType.INDICATOR:
         logger.debug("Sighting snapshot feature not yet implemented.")
         return  # TODO sighting snapshot not yet implemented
     if not misp:
@@ -233,13 +256,16 @@ def snapshot(snapshot_request: SnapshotRequest, result_q: JoinableQueue):
             if not data:
                 continue
             for attr in data["Attribute"]:
-                intel = map_to_internal(attr, "add", logger)
-                if intel:
+                try:
+                    ioc = attribute_to_stix2_indicator(attr, "add", logger)
+                except Exception as e:
+                    logger.warn(f"Failed to parse MISP attribute {attr}: {e}")
+                if ioc:
                     result_q.put(
                         SnapshotEnvelope(
                             snapshot_request.snapshot_type,
                             snapshot_request.snapshot_id,
-                            intel,
+                            ioc,
                         )
                     )
 
@@ -296,7 +322,7 @@ def run(
         )
 
     outq = JoinableQueue()
-    subscribe_callback("threatbus/sighting", outq)
+    subscribe_callback("stix2/sighting", outq)
     workers.append(SightingsPublisher(outq))
     for w in workers:
         w.start()

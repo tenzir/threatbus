@@ -6,6 +6,17 @@ from stix2 import Indicator, Sighting, parse
 from stix2.parsing import dict_to_stix2
 from typing import Union
 
+## Threat Bus custom STIX-2 attributes
+@unique
+class ThreatBusSTIX2Constants(Enum):
+    # used in Sighting.custom_properties to reference the full STIX-2 Indicator
+    X_THREATBUS_INDICATOR = "x_threatbus_indicator"
+    # used in Sighting.custom_properties.context
+    X_THREATBUS_SOURCE = "x_threatbus_source"
+    X_THREATBUS_SIGHTING_CONTEXT = "x_threatbus_sighting_context"
+    # Indicates an update operation for the STIX-2 item. See Operation enum.
+    X_THREATBUS_UPDATE = "x_threatbus_update"
+
 
 @dataclass
 class Subscription:
@@ -28,18 +39,6 @@ class Operation(Enum):
 class MessageType(Enum):
     INDICATOR = auto()
     SIGHTING = auto()
-
-
-@dataclass()
-class Update:
-    """
-    An Update consists of at least an ID and Operation. The operation should be
-    applied to items with the updated ID.
-    TODO: specify content changes
-    """
-
-    id: str
-    operation: Operation
 
 
 @dataclass()
@@ -79,7 +78,7 @@ class SnapshotRequestEncoder(json.JSONEncoder):
             # let the base class default method raise the TypeError
             return json.JSONEncoder.default(self, req)
         return {
-            "type": type(SnapshotRequest).__name__.lower(),
+            "type": SnapshotRequest.__name__.lower(),
             "snapshot_type": int(req.snapshot_type.value),
             "snapshot_id": str(req.snapshot_id),
             "snapshot": int(req.snapshot.total_seconds()),
@@ -96,7 +95,7 @@ class SnapshotRequestDecoder(json.JSONDecoder):
 
     def decode_hook(self, dct: dict):
         type_ = dct.get("type", None)
-        if not type_ or type_ != type(SnapshotRequest).__name__.lower():
+        if not type_ or type_ != SnapshotRequest.__name__.lower():
             return dct
         if "snapshot_type" in dct and "snapshot_id" in dct and "snapshot" in dct:
             return SnapshotRequest(
@@ -116,7 +115,7 @@ class SnapshotEnvelopeEncoder(json.JSONEncoder):
             # let the base class default method raise the TypeError
             return json.JSONEncoder.default(self, env)
         return {
-            "type": type(SnapshotEnvelope).__name__.lower(),
+            "type": SnapshotEnvelope.__name__.lower(),
             "snapshot_type": int(env.snapshot_type.value),
             "snapshot_id": str(env.snapshot_id),
             "body": json.loads(
@@ -137,7 +136,7 @@ class SnapshotEnvelopeDecoder(json.JSONDecoder):
         type_ = dct.get("type", None)
         if not type_:
             return dct
-        if type_ != type(SnapshotEnvelope).__name__.lower():
+        if type_ != SnapshotEnvelope.__name__.lower():
             # decoders walk through nested objects first (bottom up).
             # try to parse nested stix2 objs per best-effort, else bubble up
             try:

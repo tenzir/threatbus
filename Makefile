@@ -21,11 +21,11 @@ unit-tests:
 	$(MAKE) -C plugins/backbones/threatbus_inmem unit-tests
 	$(MAKE) -C plugins/backbones/threatbus_rabbitmq unit-tests
 	$(MAKE) -C plugins/apps/threatbus_zmq_app unit-tests
+	$(MAKE) -C plugins/apps/threatbus_misp unit-tests
   # Threat Bus is currently being migrated to use STIX-2 as internal format.
   # For the time being, all un-migrated plugins cannot be not tested against the
   # current master
 	#$(MAKE) -C plugins/apps/threatbus_zeek unit-tests
-	#$(MAKE) -C plugins/apps/threatbus_misp unit-tests
 	#$(MAKE) -C plugins/apps/threatbus_cif3 unit-tests
 	#$(MAKE) -C apps/vast unit-tests
 
@@ -34,10 +34,11 @@ integration-tests:
 	-docker kill rabbit-int > /dev/null 2>&1
 	docker pull rabbitmq$(:)3 > /dev/null 2>&1
 	docker run -d --rm --hostname=test-rabbit --name=rabbit-int -p 35672$(:)5672 rabbitmq$(:)3 > /dev/null 2>&1
-	-python -m unittest tests/integration/test_message_roundtrips.py
-	-python -m unittest tests/integration/test_zeek_app.py
-	-python -m unittest tests/integration/test_rabbitmq.py
+	-python -m unittest tests/integration/test_misp_inmem.py
 	-python -m unittest tests/integration/test_zmq_app_management.py
+	# -python -m unittest tests/integration/test_rabbitmq.py
+	# -python -m unittest tests/integration/test_zeek_app.py
+	# -python -m unittest tests/integration/test_message_roundtrips.py
 	-${RM} {broker,intel,reporter,weird}.log
 	docker kill rabbit-int > /dev/null 2>&1
 
@@ -91,10 +92,10 @@ dev-mode:
 	$(MAKE) -C plugins/apps/threatbus_zmq_app dev-mode
 	$(MAKE) -C plugins/backbones/threatbus_inmem dev-mode
 	$(MAKE) -C plugins/backbones/threatbus_rabbitmq dev-mode
+	$(MAKE) -C plugins/apps/threatbus_misp dev-mode
   # Threat Bus is currently being migrated to use STIX-2 as internal format.
   # For the time being, all un-migrated plugins cannot be run in conjunction
   # with current master
 	# $(MAKE) -C plugins/apps/threatbus_zeek dev-mode
-	# $(MAKE) -C plugins/apps/threatbus_misp dev-mode
 	# $(MAKE) -C plugins/apps/threatbus_cif3 dev-mode
 	# $(MAKE) -C apps/vast dev-mode
