@@ -36,9 +36,10 @@ integration-tests:
 	docker run -d --rm --hostname=test-rabbit --name=rabbit-int -p 35672$(:)5672 rabbitmq$(:)3 > /dev/null 2>&1
 	-python -m unittest tests/integration/test_misp_inmem.py
 	-python -m unittest tests/integration/test_zmq_app_management.py
+	-python -m unittest tests/integration/test_zmq_app_message_roundtrips.py
+	-python -m unittest tests/integration/test_zeek_app.py
+	-python -m unittest tests/integration/test_zeek_inmem.py
 	# -python -m unittest tests/integration/test_rabbitmq.py
-	# -python -m unittest tests/integration/test_zeek_app.py
-	# -python -m unittest tests/integration/test_message_roundtrips.py
 	-${RM} {broker,intel,reporter,weird}.log
 	docker kill rabbit-int > /dev/null 2>&1
 
