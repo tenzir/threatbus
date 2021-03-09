@@ -6,38 +6,39 @@ from stix2 import Sighting
 import time
 
 
-def send(topic, broker_event):
-    """Sends a single, user specified broker event"""
+def peer(host, port):
+    """
+    Peers via Broker with the Threat Bus Zeek plugin
+    """
     ep = broker.Endpoint()
     status_subscriber = ep.make_status_subscriber(True)
-    ep.peer("127.0.0.1", 47761)
+    ep.peer(host, port)
 
     fd_sets = select.select([status_subscriber.fd()], [], [])
     if not fd_sets[0]:
         print("Peering with remote machine failed")
-        return
+        return False
     status = status_subscriber.get()
     if type(status) != broker.Status or status.code() != broker.SC.PeerAdded:
         print("Threat Bus subscription failed")
-        return
+        return False
+    return ep
+
+
+def send(topic, broker_event):
+    """Sends a single, user specified broker event"""
+    ep = peer("127.0.0.1", 47761)
+    if not ep:
+        return False
 
     ep.publish(topic, broker_event)
     time.sleep(0.1)
 
 
 def send_generic(topic, items):
-    ep = broker.Endpoint()
-    status_subscriber = ep.make_status_subscriber(True)
-    ep.peer("127.0.0.1", 47761)
-
-    fd_sets = select.select([status_subscriber.fd()], [], [])
-    if not fd_sets[0]:
-        print("Peering with remote machine failed")
-        return
-    status = status_subscriber.get()
-    if type(status) != broker.Status or status.code() != broker.SC.PeerAdded:
-        print("Threat Bus subscription failed")
-        return
+    ep = peer("127.0.0.1", 47761)
+    if not ep:
+        return False
 
     for _ in range(items):
         event = broker.zeek.Event(
