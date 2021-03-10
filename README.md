@@ -60,7 +60,7 @@ Threat Bus. There are more integrations available, so make sure to check out all
 
 ```sh
 mv config.yaml.example config.yaml   # rename example config file
-venv/bin/threatbus -c config.yaml
+threatbus -c config.yaml
 ```
 
 *Start Zeek as Threat Bus app*
@@ -72,7 +72,7 @@ zeek -i <INTERFACE> -C ./apps/zeek/threatbus.zeek
 *Start Zeek and request a snapshot*
 
 ```sh
-zeek -i <INTERFACE> -C ./apps/zeek/threatbus.zeek -- "Tenzir::snapshot_intel=30 days"
+zeek -i <INTERFACE> -C ./apps/zeek/threatbus.zeek "Tenzir::snapshot_intel=30 days"
 ```
 
 Threat Bus also ships as pre-built Docker image and is available on
@@ -101,7 +101,7 @@ source venv/bin/activate              # optional
 pip install threatbus
 pip install threatbus-inmem           # inmemory backbone plugin
 pip install threatbus-rabbitmq        # RabbitMQ backbone plugin
-pip install threatbus-misp            # MISP application plugin
+pip install threatbus-misp[zmq]       # MISP application plugin
 pip install threatbus-zeek            # Zeek application plugin
 pip install threatbus-<plugin_name>
 ```
