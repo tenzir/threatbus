@@ -1,6 +1,4 @@
-import broker
 import confuse
-from datetime import datetime
 import os
 import queue
 from stix2 import Indicator, parse

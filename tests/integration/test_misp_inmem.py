@@ -5,7 +5,6 @@ from threatbus_inmem import plugin as inmem_backbone
 from queue import Queue
 import time
 import unittest
-from tests.utils import zmq_sender
 import zmq
 
 

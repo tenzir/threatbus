@@ -2,7 +2,6 @@
 import broker
 from datetime import datetime
 import select
-from stix2 import Sighting
 import time
 
 

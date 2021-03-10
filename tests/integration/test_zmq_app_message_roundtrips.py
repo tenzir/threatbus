@@ -1,6 +1,4 @@
 import confuse
-from datetime import datetime
-import json
 import queue
 import threading
 from stix2 import Indicator, parse, Sighting
@@ -8,7 +6,7 @@ from threatbus import start as start_threatbus
 import time
 import unittest
 
-from tests.utils import zeek_receiver, zeek_sender, zmq_receiver, zmq_sender
+from tests.utils import zmq_receiver, zmq_sender
 
 
 class TestZmqMessageRoundtrip(unittest.TestCase):
@@ -38,7 +36,6 @@ class TestZmqMessageRoundtrip(unittest.TestCase):
             target=zmq_receiver.forward, args=(items, topics, result_q), daemon=False
         )
         rec.start()
-        ts = datetime.now()
         ioc = Indicator(pattern_type="stix", pattern="[ipv4-addr:value = '6.6.6.6']")
         zmq_sender.send(
             "stix2/indicator",
