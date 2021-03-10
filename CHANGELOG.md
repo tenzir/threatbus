@@ -12,6 +12,10 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+- 🐞 We fixed a bug in the routing logic for SnapshotRequests. Apps can now
+  request snapshots as expected for all `stix2`-prefixed topics.
+  [#103](https://github.com/tenzir/threatbus/pull/103)
+
 - 🎁 The Zeek plugin now supports the
   [STIX-2 (version 2.1)](https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html)
   standard for

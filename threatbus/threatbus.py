@@ -60,22 +60,21 @@ class ThreatBus(stoppable_worker.StoppableWorker):
         Create a new SnapshotRequest and push it to the inq, so that the
         backbones can provision it.
         @param topic The topic for which the snapshot is requested
-        @param dst_q A queue that should be used to forward all snapshot
-            data to
+        @param dst_q A queue that should be used to forward all snapshot data to
         @param snapshot_id The UUID of the requested snapshot
         @param time_delta A timedelta object to mark the snapshot size
         """
         # Threat Bus follows a hierarchical pub-sub structure. Subscriptions
-        # to 'threatbus' must hence result in snapshots for both, intel
-        # and sightings
+        # to a prefix, must hence result in a snapshot for all message-types
+        # that are routed via that prefix. E.g., requesting a snapshot for
+        # 'stix2' should result in both Sightings and Indicators.
         message_types = []
-        prefix = "threatbus"
-        if topic == prefix:
-            message_types = [MessageType.INTEL, MessageType.SIGHTING]
+        if topic == "stix2" or topic == "stix2/":
+            message_types = [MessageType.INDICATOR, MessageType.SIGHTING]
         elif topic.endswith("sighting"):
             message_types.append(MessageType.SIGHTING)
-        elif topic.endswith("intel"):
-            message_types.append(MessageType.INTEL)
+        elif topic.endswith("indicator"):
+            message_types.append(MessageType.INDICATOR)
         for mt in message_types:
             self.logger.info(
                 f"Requesting snapshot from all plugins for message type {mt.name} and time delta {time_delta}"
