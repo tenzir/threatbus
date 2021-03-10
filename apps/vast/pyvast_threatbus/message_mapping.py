@@ -91,7 +91,7 @@ def to_vast_query(intel: Intel):
     if vast_type == "url":
         return f'"{indicator}" in net.uri'
     if vast_type == "domain":
-        return f'"{indicator}" in net.domain || "{indicator}" in net.hostname'
+        return f'"{indicator}" == net.domain || "{indicator}" == net.hostname'
     return None
 
 
