@@ -10,7 +10,13 @@ Every entry has a category for which we use the following visual abbreviations:
 - ⚡️ breaking change
 - 🐞 bugfix
 
-<!-- ## Unreleased -->
+## Unreleased
+
+- ⚠️ The retro-matching now applies a strict equality comparison when mapping
+  IoCs to VAST queries. Prior to this change `pyvast-threatbus` used substring
+  search, which came at heavy runtime costs when issuing hundreds of queries
+  per second.
+  [#104](https://github.com/tenzir/threatbus/pull/104)
 
 ## [2021.02.24]
 
