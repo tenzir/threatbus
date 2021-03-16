@@ -1,21 +1,14 @@
 from datetime import datetime, timezone
 import unittest
 import json
-
-from threatbus.data import (
-    Intel,
-    IntelData,
-    IntelType,
-    Operation,
-    Sighting,
-)
+from stix2 import Indicator, Sighting, parse
+from threatbus.data import Operation, ThreatBusSTIX2Constants
 from .message_mapping import (
-    get_vast_intel_type,
-    get_ioc,
-    to_vast_ioc,
-    to_vast_query,
-    query_result_to_threatbus_sighting,
-    matcher_result_to_threatbus_sighting,
+    get_vast_type_and_value,
+    indicator_to_vast_matcher_ioc,
+    indicator_to_vast_query,
+    matcher_result_to_sighting,
+    query_result_to_sighting,
     vast_escape_str,
 )
 
@@ -23,183 +16,18 @@ from .message_mapping import (
 class TestMessageMapping(unittest.TestCase):
     def setUp(self):
         self.ts = datetime.now(timezone.utc).astimezone()
-        self.id = "42"
+        self.indicator_id = "indicator--46b3f973-5c03-41fc-9efe-49598a267a35"
         self.operation = Operation.REMOVE
-        self.indicator = ("6.6.6.6",)
-        self.intel_type = IntelType.IPSRC
-        self.valid_intel_data = IntelData(self.indicator, self.intel_type, foo=23)
-        self.valid_intel = Intel(
-            self.ts, self.id, self.valid_intel_data, self.operation
+        self.ioc_value = "6.6.6.6"
+        self.pattern = f"[ipv4-addr:value = '{self.ioc_value}']"
+        self.indicator = Indicator(
+            pattern_type="stix",
+            pattern=self.pattern,
+            created=self.ts,
+            id=self.indicator_id,
         )
-        self.valid_query_result = f'{{"timestamp": "{self.ts}", "flow_id": 1840147514011873, "pcap_cnt": 626, "src_ip": "{self.indicator[0]}", "src_port": 1193, "dest_ip": "65.54.95.64", "dest_port": 80, "proto": "TCP", "event_type": "http", "community_id": "1:AzSEWwmsqEKUX5qrReAHI3Rpizg=", "http": {{"hostname": "download.windowsupdate.com", "url": "/v9/windowsupdate/a/selfupdate/WSUS3/x86/Other/wsus3setup.cab?0911180916", "http_port": null, "http_user_agent": "Windows-Update-Agent", "http_content_type": "application/octet-stream", "http_method": "HEAD", "http_refer": null, "protocol": "HTTP/1.1", "status": 200, "redirect": null, "length": 0}}, "tx_id": 0}}'
-        self.valid_vast_sighting = f'{{"ts": "{self.ts}", "data_id": 8, "indicator_id": 5, "matcher": "threatbus-syeocdkfcy", "ioc": "{self.indicator[0]}", "reference": "threatbus__{self.id}"}}'
-        self.invalid_intel_1 = {
-            "ts": self.ts,
-            "id": self.id,
-            "operation": self.operation,
-        }
-        self.invalid_intel_2 = {
-            "ts": self.ts,
-            "id": self.id,
-            "operation": self.operation,
-            "data": {},
-        }
-        self.invalid_intel_3 = {
-            "ts": self.ts,
-            "id": self.id,
-            "operation": self.operation,
-            "data": {"intel_type": "FOO"},
-        }
-
-    def test_invalid_threatbus_intel_get_ioc(self):
-        self.assertIsNone(get_ioc(None))
-        self.assertIsNone(get_ioc(42))
-        self.assertIsNone(get_ioc(object))
-        self.assertIsNone(get_ioc(self.invalid_intel_1))
-        self.assertIsNone(get_ioc(self.invalid_intel_2))
-        self.assertIsNone(get_ioc(self.invalid_intel_3))
-
-    def test_invalid_threatbus_intel_get_vast_intel_type(self):
-        self.assertIsNone(get_vast_intel_type(None))
-        self.assertIsNone(get_vast_intel_type(42))
-        self.assertIsNone(get_vast_intel_type(object))
-        self.assertIsNone(get_vast_intel_type(self.invalid_intel_1))
-        self.assertIsNone(get_vast_intel_type(self.invalid_intel_2))
-        self.assertIsNone(get_vast_intel_type(self.invalid_intel_3))
-
-    def test_invalid_threatbus_intel_to_vast_ioc(self):
-        self.assertIsNone(to_vast_ioc(None))
-        self.assertIsNone(to_vast_ioc(42))
-        self.assertIsNone(to_vast_ioc(object))
-        self.assertIsNone(to_vast_ioc(self.invalid_intel_1))
-        self.assertIsNone(to_vast_ioc(self.invalid_intel_2))
-        self.assertIsNone(to_vast_ioc(self.invalid_intel_3))
-
-    def test_invalid_threatbus_intel_to_vast_query(self):
-        self.assertIsNone(to_vast_query(None))
-        self.assertIsNone(to_vast_query(42))
-        self.assertIsNone(to_vast_query(object))
-        self.assertIsNone(to_vast_query(self.invalid_intel_1))
-        self.assertIsNone(to_vast_query(self.invalid_intel_2))
-        self.assertIsNone(to_vast_query(self.invalid_intel_3))
-
-    def test_invalid_query_result_to_threatbus_sighting(self):
-        # valid query result, invalid intel
-        self.assertIsNone(
-            query_result_to_threatbus_sighting(self.valid_query_result, None)
-        )
-        self.assertIsNone(
-            query_result_to_threatbus_sighting(self.valid_query_result, 42)
-        )
-        self.assertIsNone(
-            query_result_to_threatbus_sighting(self.valid_query_result, object)
-        )
-        self.assertIsNone(
-            query_result_to_threatbus_sighting(
-                self.valid_query_result, self.invalid_intel_1
-            )
-        )
-        self.assertIsNone(
-            query_result_to_threatbus_sighting(
-                self.valid_query_result, self.invalid_intel_2
-            )
-        )
-        self.assertIsNone(
-            query_result_to_threatbus_sighting(
-                self.valid_query_result, self.invalid_intel_3
-            )
-        )
-
-        # invalid query result, valid intel
-        self.assertIsNone(query_result_to_threatbus_sighting(None, self.valid_intel))
-        self.assertIsNone(query_result_to_threatbus_sighting(42, self.valid_intel))
-        self.assertIsNone(query_result_to_threatbus_sighting(object, self.valid_intel))
-        self.assertIsNone(
-            query_result_to_threatbus_sighting("some non-json string", self.valid_intel)
-        )
-        self.assertIsNone(
-            query_result_to_threatbus_sighting(self.invalid_intel_1, self.valid_intel)
-        )
-        self.assertIsNone(
-            query_result_to_threatbus_sighting(self.valid_intel, self.invalid_intel_2)
-        )
-
-    def test_invalid_matcher_result_to_threatbus_sighting(self):
-        self.assertIsNone(matcher_result_to_threatbus_sighting(None))
-        self.assertIsNone(matcher_result_to_threatbus_sighting(42))
-        self.assertIsNone(matcher_result_to_threatbus_sighting(object))
-        self.assertIsNone(matcher_result_to_threatbus_sighting("some non-json string"))
-        sighting_without_ioc = (
-            '{"ts": "2020-09-24T08:43:43.654072335", "reference": "threatbus__86"}'
-        )
-        self.assertIsNone(matcher_result_to_threatbus_sighting(sighting_without_ioc))
-        sighting_with_malformed_reference = (
-            '{"ts": "2020-09-24T08:43:43.654072335", "ioc": "foo", "reference": "86"}'
-        )
-        self.assertIsNone(
-            matcher_result_to_threatbus_sighting(sighting_with_malformed_reference)
-        )
-        sighting_with_malformed_timestamp = '{"ts": "2020 T08 :43.654072335", "ioc": "foo", "reference": "threatbus__86"}'
-        self.assertIsNone(
-            matcher_result_to_threatbus_sighting(sighting_with_malformed_timestamp)
-        )
-
-    def test_valid_intel_get_ioc(self):
-        self.assertEqual(get_ioc(self.valid_intel), self.indicator[0])
-
-    def test_valid_intel_get_vast_intel_type(self):
-        self.assertEqual(get_vast_intel_type(self.valid_intel), "ip")
-
-    def test_valid_intel_to_vast_ioc(self):
-        expected_vast_msg = {
-            "ioc": self.indicator[0],
-            "type": "ip",
-            "reference": "threatbus__" + str(self.id),
-        }
-        vast_msg = to_vast_ioc(self.valid_intel)
-        self.assertEqual(json.loads(vast_msg), expected_vast_msg)
-
-    def test_valid_intel_to_vast_query(self):
-        # IP type
-        self.assertEqual(to_vast_query(self.valid_intel), "6.6.6.6")
-
-        # URL type
-        url = "https://example.com/foo/bar"
-        intel_data = IntelData(url, IntelType.URL)
-        intel = Intel(self.ts, self.id, intel_data, self.operation)
-        self.assertEqual(to_vast_query(intel), f'"{url}" in net.uri')
-
-        # Domain type
-        domain = "example.com"
-        intel_data = IntelData(domain, IntelType.DOMAIN)
-        intel = Intel(self.ts, self.id, intel_data, self.operation)
-        self.assertEqual(
-            to_vast_query(intel),
-            f'"{domain}" in net.domain || "{domain}" in net.hostname',
-        )
-
-    def test_valid_query_result_to_threatbus_sighting(self):
-        parsed_sighting = query_result_to_threatbus_sighting(
-            self.valid_query_result, self.valid_intel
-        )
-        self.assertIsNotNone(parsed_sighting)
-        self.assertEqual(type(parsed_sighting), Sighting)
-        self.assertEqual(parsed_sighting.ts, self.ts)
-        self.assertEqual(parsed_sighting.ioc, self.indicator)
-
-        expected_context = json.loads(self.valid_query_result)
-        expected_context["source"] = "VAST"
-        self.assertEqual(parsed_sighting.context, expected_context)
-        self.assertEqual(parsed_sighting.intel, self.id)
-
-    def test_valid_matcher_result_to_threatbus_sighting(self):
-        parsed_sighting = matcher_result_to_threatbus_sighting(self.valid_vast_sighting)
-        self.assertIsNotNone(parsed_sighting)
-        self.assertEqual(type(parsed_sighting), Sighting)
-        self.assertEqual(parsed_sighting.ts, self.ts)
-        self.assertEqual(parsed_sighting.ioc, self.indicator)
-        self.assertEqual(parsed_sighting.context, {"source": "VAST"})
-        self.assertEqual(parsed_sighting.intel, self.id)
+        self.valid_query_result = f'{{"timestamp": "{self.ts}", "flow_id": 1840147514011873, "pcap_cnt": 626, "src_ip": "{self.ioc_value}", "src_port": 1193, "dest_ip": "65.54.95.64", "dest_port": 80, "proto": "TCP", "event_type": "http", "community_id": "1:AzSEWwmsqEKUX5qrReAHI3Rpizg=", "http": {{"hostname": "download.windowsupdate.com", "url": "/v9/windowsupdate/a/selfupdate/WSUS3/x86/Other/wsus3setup.cab?0911180916", "http_port": null, "http_user_agent": "Windows-Update-Agent", "http_content_type": "application/octet-stream", "http_method": "HEAD", "http_refer": null, "protocol": "HTTP/1.1", "status": 200, "redirect": null, "length": 0}}, "tx_id": 0}}'
+        self.valid_matcher_result = f'{{"ts": "{self.ts}", "data_id": 8, "indicator_id": 5, "matcher": "threatbus-syeocdkfcy", "ioc": "{self.ioc_value}", "reference": "threatbus__{self.indicator_id}"}}'
 
     def test_vast_escape_str(self):
         self.assertEqual(vast_escape_str('e"vil.com'), 'e\\"vil.com')
@@ -208,3 +36,131 @@ class TestMessageMapping(unittest.TestCase):
         self.assertEqual(vast_escape_str('e\\"vil.com'), 'e\\\\\\"vil.com')
         self.assertEqual(vast_escape_str('e\\\\""vil.com'), 'e\\\\\\\\\\"\\"vil.com')
         self.assertEqual(vast_escape_str("e'vil.com"), "e'vil.com")
+
+    def test_invalid_get_vast_type_and_value(self):
+        self.assertIsNone(get_vast_type_and_value(None))
+        self.assertIsNone(get_vast_type_and_value(True))
+        self.assertIsNone(get_vast_type_and_value(23))
+        self.assertIsNone(get_vast_type_and_value(""))
+        self.assertIsNone(get_vast_type_and_value("[]"))
+        self.assertIsNone(get_vast_type_and_value("[ipv4-addr:value = '6"))
+
+    def test_get_vast_type_and_value(self):
+        self.assertEqual(
+            ("ip", "6.6.6.6"), get_vast_type_and_value("[ipv4-addr:value = '6.6.6.6']")
+        )
+        self.assertEqual(
+            ("ipv6", "::1"), get_vast_type_and_value("[ipv6-addr:value = '::1']")
+        )
+        self.assertEqual(
+            ("domain", "example.com"),
+            get_vast_type_and_value("[domain-name:value = 'example.com']"),
+        )
+        url = "example.com/foo?query=bar"
+        self.assertEqual(
+            ("url", url), get_vast_type_and_value(f"[url:value = '{url}']")
+        )
+
+    def test_invalid_indicator_to_vast_matcher_ioc(self):
+        self.assertIsNone(indicator_to_vast_matcher_ioc(None))
+        self.assertIsNone(indicator_to_vast_matcher_ioc(42))
+        self.assertIsNone(indicator_to_vast_matcher_ioc(True))
+        self.assertIsNone(indicator_to_vast_matcher_ioc("hello"))
+        self.assertIsNone(
+            indicator_to_vast_matcher_ioc(Sighting(sighting_of_ref=self.indicator_id))
+        )
+
+    def test_indicator_to_vast_matcher_ioc(self):
+        expected_vast_ioc = json.dumps(
+            {
+                "ioc": self.ioc_value,
+                "type": "ip",
+                "reference": f"threatbus__{self.indicator_id}",
+            }
+        )
+        self.assertEqual(
+            expected_vast_ioc, indicator_to_vast_matcher_ioc(self.indicator)
+        )
+
+    def test_invalid_indicator_to_vast_query(self):
+        self.assertIsNone(indicator_to_vast_query(None))
+        self.assertIsNone(indicator_to_vast_query(42))
+        self.assertIsNone(indicator_to_vast_query(True))
+        self.assertIsNone(indicator_to_vast_query("hello"))
+        self.assertIsNone(
+            indicator_to_vast_query(Sighting(sighting_of_ref=self.indicator_id))
+        )
+
+    def test_indicator_to_vast_query(self):
+        ## test IP
+        expected_vast_query = f"{self.ioc_value}"
+        self.assertEqual(expected_vast_query, indicator_to_vast_query(self.indicator))
+
+        ## test URL
+        url = "example.com/foo/bar?query=123"
+        expected_vast_query = f'"{url}" in net.uri'
+        other_ioc = Indicator(pattern_type="stix", pattern=f"[url:value = '{url}']")
+        self.assertEqual(expected_vast_query, indicator_to_vast_query(other_ioc))
+
+        ## test domain
+        domain = "example.com"
+        expected_vast_query = f'"{domain}" == net.domain || "{domain}" == net.hostname'
+        other_ioc = Indicator(
+            pattern_type="stix", pattern=f"[domain-name:value = '{domain}']"
+        )
+        self.assertEqual(expected_vast_query, indicator_to_vast_query(other_ioc))
+
+    def test_invalid_query_result_to_sighting(self):
+        # valid query result, invalid Indicator
+        self.assertIsNone(query_result_to_sighting(self.valid_query_result, None))
+        self.assertIsNone(query_result_to_sighting(self.valid_query_result, 42))
+        self.assertIsNone(query_result_to_sighting(self.valid_query_result, object))
+        self.assertIsNone(query_result_to_sighting(self.valid_query_result, True))
+        self.assertIsNone(query_result_to_sighting(self.valid_query_result, "XX"))
+
+        # invalid query result, valid Indicator
+        self.assertIsNone(query_result_to_sighting(None, self.indicator))
+        self.assertIsNone(query_result_to_sighting(42, self.indicator))
+        self.assertIsNone(query_result_to_sighting(object, self.indicator))
+        self.assertIsNone(
+            query_result_to_sighting("some non-json string", self.indicator)
+        )
+
+    def test_query_result_to_sighting(self):
+        parsed_sighting = query_result_to_sighting(
+            self.valid_query_result, self.indicator
+        )
+        self.assertIsNotNone(parsed_sighting)
+        self.assertEqual(type(parsed_sighting), Sighting)
+        self.assertEqual(parsed_sighting.created, self.ts)
+        self.assertEqual(parsed_sighting.sighting_of_ref, self.indicator_id)
+        self.assertTrue(
+            ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value
+            in parsed_sighting.object_properties()
+        )
+        expected_context = json.loads(self.valid_query_result)
+        expected_context["source"] = "VAST"
+        self.assertEqual(parsed_sighting.x_threatbus_sighting_context, expected_context)
+
+    def test_invalid_matcher_result_to_sighting(self):
+        self.assertIsNone(matcher_result_to_sighting(None))
+        self.assertIsNone(matcher_result_to_sighting(42))
+        self.assertIsNone(matcher_result_to_sighting(object))
+        self.assertIsNone(matcher_result_to_sighting("some non-json string"))
+        sighting_with_malformed_reference = '{"ts": "2020-09-24T08:43:43.654072335", "ioc": "foo", "reference": "threatbus__86"}'
+        self.assertIsNone(matcher_result_to_sighting(sighting_with_malformed_reference))
+        sighting_with_malformed_timestamp = '{"ts": "2020 T08 :43.654072335", "ioc": "foo", "reference": "threatbus__indicator--46b3f973-5c03-41fc-9efe-49598a267a35"}'
+        self.assertIsNone(matcher_result_to_sighting(sighting_with_malformed_timestamp))
+
+    def test_matcher_result_to_sighting(self):
+        parsed_sighting = matcher_result_to_sighting(self.valid_matcher_result)
+        self.assertIsNotNone(parsed_sighting)
+        self.assertEqual(type(parsed_sighting), Sighting)
+        self.assertEqual(parsed_sighting.created, self.ts)
+        self.assertEqual(parsed_sighting.sighting_of_ref, self.indicator_id)
+        self.assertTrue(
+            ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value
+            in parsed_sighting.object_properties()
+        )
+        expected_context = {"source": "VAST"}
+        self.assertEqual(parsed_sighting.x_threatbus_sighting_context, expected_context)
