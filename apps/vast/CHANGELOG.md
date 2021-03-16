@@ -12,6 +12,18 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+- 🎁 `pyvast-threatbus` now supports the
+  [STIX-2 (version 2.1)](https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html)
+  standard for
+  [Indicators](https://docs.oasis-open.org/cti/stix/v2.1/cs02/stix-v2.1-cs02.html#_muftrcpnf89v)
+  and [Sightings](https://docs.oasis-open.org/cti/stix/v2.1/cs02/stix-v2.1-cs02.html#_a795guqsap3r).
+  The app converts STIX-2 Indicators on best-effort basis to both VAST queries
+  and VAST matcher IoCs to support both retro- and live-matching. Likewise,
+  `pyvast-threatbus` converts VAST query results as well as VAST matcher
+  sightings to valid STIX-2 Sightings before publishing them on Threat Bus
+  topics.
+  [#105](https://github.com/tenzir/threatbus/pull/105)
+
 - ⚠️ The retro-matching now applies a strict equality comparison when mapping
   IoCs to VAST queries. Prior to this change `pyvast-threatbus` used substring
   search, which came at heavy runtime costs when issuing hundreds of queries
