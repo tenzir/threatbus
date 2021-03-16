@@ -10,7 +10,6 @@ from threatbus.data import (
     ThreatBusSTIX2Constants,
 )
 from threatbus_zeek.message_mapping import (
-    is_point_equality_ioc,
     map_broker_event_to_sighting,
     map_indicator_to_broker_event,
     map_management_message,
@@ -169,42 +168,6 @@ class TestMessageMapping(unittest.TestCase):
             in sighting.object_properties()
         )
         self.assertEqual(sighting.x_threatbus_sighting_context, context)
-
-    def test_is_point_equility_ioc(self):
-        # negative test
-        self.assertFalse(is_point_equality_ioc("Some string"))
-        self.assertFalse(is_point_equality_ioc("6.6.6.6 = ipv4-addr:value"))
-        # missing brackets
-        self.assertFalse(is_point_equality_ioc("ipv4-addr:value = '6.6.6.6'"))
-        # double ==
-        self.assertFalse(is_point_equality_ioc("[ipv4-addr:value == '6.6.6.6']"))
-        # mising closing bracket
-        self.assertFalse(is_point_equality_ioc("[ipv4-addr:value = '6.6.6.6'"))
-        # mising opening bracket
-        self.assertFalse(is_point_equality_ioc("ipv4-addr:value = '6.6.6.6']"))
-        # mising quotes
-        self.assertFalse(is_point_equality_ioc("[ipv4-addr:value = 6.6.6.6]"))
-        # valid compound IoC
-        self.assertFalse(
-            is_point_equality_ioc(
-                "[ipv4-addr:value = '6.6.6.6' AND domain-name:value = 'evil.com']"
-            )
-        )
-        self.assertFalse(
-            is_point_equality_ioc(
-                "[ipv4-addr:value = '6.6.6.6'] AND [domain-name:value = 'evil.com']"
-            )
-        )
-
-        # postitve test
-        self.assertTrue(is_point_equality_ioc("[ipv4-addr:value = '6.6.6.6']"))
-        self.assertTrue(is_point_equality_ioc("[ipv6-addr:value = '::1']"))
-        self.assertTrue(is_point_equality_ioc("[domain-name:value = 'evil.com']"))
-        self.assertTrue(
-            is_point_equality_ioc(
-                "[x509-certificate:hashes.'SHA-1' = '6e6187d58483457f86eae49315a0a72d7543459a']"
-            )
-        )
 
     def test_valid_subscription(self):
         td = timedelta(days=5)

@@ -1,13 +1,13 @@
 import broker
 import re
 from stix2 import Indicator, Sighting
-from stix2patterns.v21.pattern import Pattern
 from threatbus.data import (
     Operation,
     Subscription,
     ThreatBusSTIX2Constants,
     Unsubscription,
 )
+from threatbus.stix2_helpers import is_point_equality_ioc, split_object_path_and_value
 from typing import Union
 from urllib.parse import urlparse
 
@@ -89,33 +89,6 @@ def map_broker_event_to_sighting(broker_data, module_namespace, logger):
     )
 
 
-def is_point_equality_ioc(pattern_str: str) -> bool:
-    """
-    Predicate to check if a STIX-2 pattern is a point-IoC, i.e., if the pattern
-    only consists of a single EqualityComparisonExpression
-    @param pattern_str The STIX-2 pattern string to inspect
-    """
-    try:
-        pattern = Pattern(pattern_str)
-        # InspectionListener https://github.com/oasis-open/cti-pattern-validator/blob/e926d0a14adf88de08acb908a51db1f453c13647/stix2patterns/v21/inspector.py#L5
-        # E.g.,   pattern = "[domain-name:value = 'evil.com']"
-        # =>           il = pattern_data(comparisons={'domain-name': [(['value'], '=', "'evil.com'")]}, observation_ops=set(), qualifiers=set())
-        # =>  cybox_types = ['domain-name']
-        il = pattern.inspect()
-        cybox_types = list(il.comparisons.keys())
-        return (
-            len(il.observation_ops) == 0
-            and len(il.qualifiers) == 0
-            and len(il.comparisons) == 1
-            and len(cybox_types) == 1  # must be point-indicator (one field only)
-            and len(il.comparisons[cybox_types[0]][0])
-            == 3  # ('value', '=', 'evil.com')
-            and il.comparisons[cybox_types[0]][0][1] == "="  # equality comparison
-        )
-    except Exception:
-        return False
-
-
 def map_indicator_to_broker_event(
     indicator: Indicator, module_namespace: str, logger
 ) -> Union[broker.zeek.Event, None]:
@@ -135,13 +108,7 @@ def map_indicator_to_broker_event(
             f"Zeek only supports point-IoCs. Cannot map compound pattern to a Zeek Intel item: {indicator.pattern}"
         )
         return None
-
-    # pattern is in the form [file:name = 'foo']
-    (object_path, ioc_value) = indicator.pattern[1:-1].split("=", 1)
-    object_path = object_path.strip()
-    ioc_value = ioc_value.strip()
-    if ioc_value.startswith("'") and ioc_value.endswith("'"):
-        ioc_value = ioc_value[1:-1]
+    object_path, ioc_value = split_object_path_and_value(indicator.pattern)
 
     # get matching Zeek intel type
     zeek_type = zeek_intel_type_map.get(object_path, None)

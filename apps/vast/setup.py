@@ -33,7 +33,6 @@ setup(
         "pyzmq >= 19",
         "pyvast >= 2020.10.29",
         "stix2 >= 2.1",
-        "stix2-patterns >= 0.3",
         "threatbus >= 2021.3.25",
     ],
     keywords=[
