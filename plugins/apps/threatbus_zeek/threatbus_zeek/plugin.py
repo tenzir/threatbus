@@ -8,8 +8,8 @@ import threading
 import threatbus
 from threatbus.data import Subscription, Unsubscription
 from threatbus_zeek.message_mapping import (
-    map_to_broker,
-    map_to_internal,
+    map_indicator_to_broker_event,
+    map_broker_event_to_sighting,
     map_management_message,
 )
 from typing import Callable, Dict, List, Union
@@ -55,7 +55,7 @@ class SubscriptionManager(threatbus.StoppableWorker):
             if not ready_readers:
                 continue
             (topic, broker_data) = sub.get()
-            msg = map_management_message(broker_data, self.module_namespace)
+            msg = map_management_message(broker_data, self.module_namespace, logger)
             if msg:
                 self.manage_subscription(msg)
 
@@ -67,10 +67,16 @@ class SubscriptionManager(threatbus.StoppableWorker):
         return "".join(random.choice(letters) for i in range(length))
 
     def manage_subscription(self, task: Union[Subscription, Unsubscription]):
+        """
+        Manages subscriptions and unsubscriptions of Zeek instances.
+        @param task A Subscription or Unsubscription request of a Zeek instance
+        """
         global lock, subscriptions
         if type(task) is Subscription:
             # point-to-point topic and queue for that particular subscription
-            logger.info(f"Received subscription for topic: {task.topic}")
+            logger.info(
+                f"Received subscription for topic '{task.topic}' with snapshot '{task.snapshot}'"
+            )
             p2p_topic = task.topic + self.rand_string(self.rand_suffix_length)
             p2p_q = JoinableQueue()
             ack = broker.zeek.Event(
@@ -82,14 +88,16 @@ class SubscriptionManager(threatbus.StoppableWorker):
             subscriptions[p2p_topic] = p2p_q
             lock.release()
         elif type(task) is Unsubscription:
-            logger.info(f"Received unsubscription from topic: {task.topic}")
+            logger.info(f"Received unsubscription from topic '{task.topic}'")
             threatbus_topic = task.topic[: len(task.topic) - self.rand_suffix_length]
             p2p_q = subscriptions.get(task.topic, None)
-            if p2p_q:
-                self.unsubscribe_callback(threatbus_topic, p2p_q)
-                lock.acquire()
-                del subscriptions[task.topic]
-                lock.release()
+            if not p2p_q:
+                logger.warning(f"No one was subscribed for topic '{task.topic}'")
+                return
+            self.unsubscribe_callback(threatbus_topic, p2p_q)
+            lock.acquire()
+            del subscriptions[task.topic]
+            lock.release()
         else:
             logger.debug(f"Skipping unknown management message of type: {type(task)}")
 
@@ -130,7 +138,9 @@ class BrokerPublisher(threatbus.StoppableWorker):
                     q.task_done()
                     continue
                 try:
-                    event = map_to_broker(msg, self.module_namespace)
+                    event = map_indicator_to_broker_event(
+                        msg, self.module_namespace, logger
+                    )
                     if event:
                         self.ep.publish(topic, event)
                         logger.debug(f"Published {msg} on topic {topic}")
@@ -142,8 +152,8 @@ class BrokerPublisher(threatbus.StoppableWorker):
 
 class BrokerReceiver(threatbus.StoppableWorker):
     """
-    Binds a broker subscriber to the given endpoint. Forwards all received intel
-    and sightings to the inq.
+    Binds a broker subscriber to the given endpoint. Forwards all received
+    sightings to the inq.
     """
 
     def __init__(self, module_namespace: str, ep: broker.Endpoint, inq: JoinableQueue):
@@ -158,16 +168,26 @@ class BrokerReceiver(threatbus.StoppableWorker):
         self.inq = inq
 
     def run(self):
-        sub = self.ep.make_subscriber(["threatbus/intel", "threatbus/sighting"])
+        """
+        Spawns a Broker endpoint and listens for sightings. Converts sightings
+        from the Zeek format to STIX-2 Sightings and forwards them to Threat Bus
+        """
+        sub = self.ep.make_subscriber(["stix2/sighting"])
         global logger
         while self._running():
             (ready_readers, [], []) = select.select([sub.fd()], [], [], 1)
             if not ready_readers:
                 continue
             (topic, broker_data) = sub.get()
-            msg = map_to_internal(broker_data, self.module_namespace)
-            if msg:
-                self.inq.put(msg)
+            try:
+                msg = map_broker_event_to_sighting(
+                    broker_data, self.module_namespace, logger
+                )
+                if msg:
+                    logger.debug(f"Received sighting {msg}")
+                    self.inq.put(msg)
+            except Exception as e:
+                logger.error(f"Error mapping Broker event to STIX-2 Sighting: {e}")
 
 
 def validate_config(config):

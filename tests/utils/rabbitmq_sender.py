@@ -1,4 +1,3 @@
-from datetime import datetime
 import pika
 from stix2 import Indicator
 

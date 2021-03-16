@@ -12,6 +12,21 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+- 🐞 We fixed a bug in the routing logic for SnapshotRequests. Apps can now
+  request snapshots as expected for all `stix2`-prefixed topics.
+  [#103](https://github.com/tenzir/threatbus/pull/103)
+
+- 🎁 The Zeek plugin now supports the
+  [STIX-2 (version 2.1)](https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html)
+  standard for
+  [Indicators](https://docs.oasis-open.org/cti/stix/v2.1/cs02/stix-v2.1-cs02.html#_muftrcpnf89v)
+  and [Sightings](https://docs.oasis-open.org/cti/stix/v2.1/cs02/stix-v2.1-cs02.html#_a795guqsap3r).
+  The plugin converts STIX-2 Indicators on best-effort basis to
+  [Zeek Intel items](https://docs.zeek.org/en/current/scripts/base/frameworks/intel/main.zeek.html#type-Intel::Type)
+  before forwarding them to Zeek. Likewise, the plugin converts Zeek sightings
+  to valid STIX-2 Sightings before publishing them on Threat Bus topics.
+  [#103](https://github.com/tenzir/threatbus/pull/103)
+
 - 🎁 The MISP plugin now supports the
   [STIX-2 (version 2.1)](https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html)
   standard for
@@ -19,7 +34,7 @@ Every entry has a category for which we use the following visual abbreviations:
   and [Sightings](https://docs.oasis-open.org/cti/stix/v2.1/cs02/stix-v2.1-cs02.html#_a795guqsap3r).
   The plugin converts MISP attributes to valid STIX-2 Indicators on best-effort
   basis before publishing them on Threat Bus topics. Likewise, the plugin
-  converts STIX-2 sightings to MISP sightings before sending them the MISP.
+  converts STIX-2 Sightings to MISP sightings before sending them the MISP.
   [#102](https://github.com/tenzir/threatbus/pull/102)
 
 - 🐞 We fixed a bug in the JSON (de-)serialization logic for `SnapshotEnvelope`s

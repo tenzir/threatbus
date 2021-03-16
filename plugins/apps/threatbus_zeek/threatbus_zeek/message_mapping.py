@@ -1,107 +1,72 @@
 import broker
-from contextlib import suppress
+import re
+from stix2 import Indicator, Sighting
+from stix2patterns.v21.pattern import Pattern
 from threatbus.data import (
-    Intel,
-    IntelData,
-    IntelType,
     Operation,
-    Sighting,
     Subscription,
+    ThreatBusSTIX2Constants,
     Unsubscription,
 )
-import re
+from typing import Union
+from urllib.parse import urlparse
 
-# See https://docs.zeek.org/en/stable/scripts/base/frameworks/intel/main.zeek.html#type-Intel::Type
-to_zeek_intel = {
-    IntelType.IPSRC: "ADDR",
-    IntelType.IPDST: "ADDR",
-    IntelType.IPSRC_PORT: "ADDR",
-    IntelType.IPDST_PORT: "ADDR",
-    IntelType.EMAILSRC: "EMAIL",
-    IntelType.EMAILDST: "EMAIL",
-    IntelType.TARGETEMAIL: "EMAIL",
-    IntelType.EMAILATTACHMENT: "FILE_NAME",
-    IntelType.FILENAME: "FILE_NAME",
-    IntelType.HOSTNAME: "DOMAIN",
-    IntelType.DOMAIN: "DOMAIN",
-    IntelType.DOMAIN_IP: "DOMAIN",
-    IntelType.URL: "URL",
-    IntelType.USERAGENT: "SOFTWARE",
-    IntelType.MD5: "FILE_HASH",
-    IntelType.MALWARESAMPLE: ("FILE_NAME", "FILE_HASH"),
-    IntelType.FILENAME_MD5: ("FILE_NAME", "FILE_HASH"),
-    IntelType.SHA1: "FILE_HASH",
-    IntelType.FILENAME_SHA1: ("FILE_NAME", "FILE_HASH"),
-    IntelType.SHA256: "FILE_HASH",
-    IntelType.FILENAME_SHA256: ("FILE_NAME", "FILE_HASH"),
-    IntelType.X509FINGERPRINTSHA1: "CERT_HASH",
-    IntelType.PDB: "FILE_NAME",
-    IntelType.AUTHENTIHASH: "FILE_HASH",
-    IntelType.SSDEEP: "FILE_HASH",
-    IntelType.IMPHASH: "FILE_HASH",
-    IntelType.PEHASH: "FILE_HASH",
-    IntelType.IMPFUZZY: "FILE_HASH",
-    IntelType.SHA224: "FILE_HASH",
-    IntelType.SHA384: "FILE_HASH",
-    IntelType.SHA512: "FILE_HASH",
-    IntelType.SHA512_224: "FILE_HASH",
-    IntelType.SHA512_256: "FILE_HASH",
-    IntelType.TLSH: "FILE_HASH",
-    IntelType.CDHASH: "FILE_HASH",
-    IntelType.FILENAME_AUTHENTIHASH: ("FILE_NAME", "FILE_HASH"),
-    IntelType.FILENAME_SSDEEP: ("FILE_NAME", "FILE_HASH"),
-    IntelType.FILENAME_IMPHASH: ("FILE_NAME", "FILE_HASH"),
-    IntelType.FILENAME_PEHASH: ("FILE_NAME", "FILE_HASH"),
-    IntelType.FILENAME_IMPFUZZY: ("FILE_NAME", "FILE_HASH"),
-    IntelType.FILENAME_SHA224: ("FILE_NAME", "FILE_HASH"),
-    IntelType.FILENAME_SHA384: ("FILE_NAME", "FILE_HASH"),
-    IntelType.FILENAME_SHA512: ("FILE_NAME", "FILE_HASH"),
-    IntelType.FILENAME_SHA512_224: ("FILE_NAME", "FILE_HASH"),
-    IntelType.FILENAME_SHA512_256: ("FILE_NAME", "FILE_HASH"),
-    IntelType.FILENAME_TLSH: ("FILE_NAME", "FILE_HASH"),
-}
-
-from_zeek_intel = {
-    "ADDR": IntelType.IPSRC,
-    "EMAIL": IntelType.EMAILSRC,
-    "FILE_NAME": IntelType.FILENAME,
-    "DOMAIN": IntelType.DOMAIN,
-    "URL": IntelType.URL,
-    "SOFTWARE": IntelType.USERAGENT,
-    "FILE_HASH": IntelType.MD5,
+# See the documentation for the Zeek INTEL framework [1] and STIX-2 cyber
+# observable objects [2]
+# [1] https://docs.zeek.org/en/stable/scripts/base/frameworks/intel/main.zeek.html#type-Intel::Type
+# [2] https://docs.oasis-open.org/cti/stix/v2.1/cs01/stix-v2.1-cs01.html#_mlbmudhl16lr
+zeek_intel_type_map = {
+    "domain-name:value": "DOMAIN",
+    "email-addr:value": "EMAIL",
+    "file:name": "FILE_NAME",
+    "file:hashes.MD5": "FILE_HASH",
+    "file:hashes.'SHA-1'": "FILE_HASH",
+    "file:hashes.'SHA-256'": "FILE_HASH",
+    "file:hashes.'SHA-512'": "FILE_HASH",
+    "file:hashes.'SHA3-256'": "FILE_HASH",
+    "file:hashes.'SHA3-512'": "FILE_HASH",
+    "file:hashes.SSDEEP": "FILE_HASH",
+    "file:hashes.TLSH": "FILE_HASH",
+    "ipv4-addr:value": "ADDR",
+    "ipv6-addr:value": "ADDR",
+    "software:name": "SOFTWARE",
+    "url:value": "URL",
+    "user:user_id": "USER_NAME",
+    "user:account_login": "USER_NAME",
+    "x509-certificate:hashes.'SHA-1'": "CERT_HASH",  # Zeek only supports SHA-1
 }
 
 
-def map_management_message(broker_data, module_namespace):
-    """Maps a management message to an actionable instruction for threatbus.
+def map_management_message(
+    broker_data, module_namespace: str, logger
+) -> Union[Subscription, Unsubscription, None]:
+    """
+    Maps a management message to an actionable instruction for Threat Bus.
     @param broker_data The raw data that was received via broker
     @param module_namespace A Zeek namespace to accept events from
+    @return A Subscription/Unsubscription object or None in case there is no
+    valid mapping.
     """
     event = broker.zeek.Event(broker_data)
     name, args = event.name(), event.args()
     module_namespace = module_namespace + "::" if module_namespace else ""
     name = name[name.startswith(module_namespace) and len(module_namespace) :]
     if name == "subscribe" and len(args) == 2:
-        return Subscription(args[0], args[1])
+        (topic, snapshot_delta) = args
+        if topic:
+            return Subscription(topic, snapshot_delta)
     elif name == "unsubscribe" and len(args) == 1:
-        return Unsubscription(args[0])
+        topic = args[0]
+        if topic:
+            return Unsubscription(topic)
+    logger.debug(f"Discarding Broker management message with unknown type: {name}")
+    return None
 
 
-def map_broker_intel_to_internal(intel_dict):
-    """Maps a intel dict with zeek Intel::Type values to the threatbus.data.IntelData Type
-    @param intel_dict The data to map into Threat Bus format
+def map_broker_event_to_sighting(broker_data, module_namespace, logger):
     """
-    zeek_type = intel_dict.get("intel_type", None)
-    intel_type = from_zeek_intel.get(zeek_type, None)
-    indicator = intel_dict.get("indicator", None)
-    if not intel_type or not indicator:
-        return None
-
-    return IntelData(indicator, intel_type)
-
-
-def map_to_internal(broker_data, module_namespace):
-    """Maps a broker message, based on the event name, to the internal format.
+    Maps a Broker message, based on the event name, to a STIX-2 indicator or
+    STIX-2 Sighting.
     @param broker_data The raw data that was received via broker
     @param module_namespace A Zeek namespace to accept events from
     """
@@ -109,69 +74,100 @@ def map_to_internal(broker_data, module_namespace):
     name, args = event.name(), event.args()
     module_namespace = module_namespace + "::" if module_namespace else ""
     name = name[name.startswith(module_namespace) and len(module_namespace) :]
-    if name == "sighting" and len(args) == 3:
-        # convert args to sighting
-        return Sighting(args[0], str(args[1]), args[2], None)
-    elif name == "intel" and len(args) >= 3:
-        # convert args to intel
-        op = Operation.ADD
-        with suppress(Exception):
-            op = Operation(args[3])
-        intel_data = map_broker_intel_to_internal(args[2])
-        if not intel_data:
-            return None
-        return Intel(args[0], str(args[1]), intel_data, op)
+    if name != "sighting" or len(args) != 3:
+        if logger:
+            logger.debug(f"Discarding Broker event with unknown type: {name}")
+        return None
+    # convert args to STIX-2 sighting
+    (timestamp, ioc_id, context) = args
+    return Sighting(
+        created=timestamp,
+        sighting_of_ref=str(ioc_id),
+        custom_properties={
+            ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value: context
+        },
+    )
 
 
-def map_intel_data_to_broker(intel_data):
-    """Maps threatbus.data.IntelData to a broker compatible type and zeek compatible Intel::Type values.
-    @param intel_data The Threat Bus intel data to map
+def is_point_equality_ioc(pattern_str: str) -> bool:
     """
-    zeek_type = to_zeek_intel.get(intel_data["intel_type"], None)
-    if not zeek_type:
-        return None
+    Predicate to check if a STIX-2 pattern is a point-IoC, i.e., if the pattern
+    only consists of a single EqualityComparisonExpression
+    @param pattern_str The STIX-2 pattern string to inspect
+    """
+    try:
+        pattern = Pattern(pattern_str)
+        # InspectionListener https://github.com/oasis-open/cti-pattern-validator/blob/e926d0a14adf88de08acb908a51db1f453c13647/stix2patterns/v21/inspector.py#L5
+        # E.g.,   pattern = "[domain-name:value = 'evil.com']"
+        # =>           il = pattern_data(comparisons={'domain-name': [(['value'], '=', "'evil.com'")]}, observation_ops=set(), qualifiers=set())
+        # =>  cybox_types = ['domain-name']
+        il = pattern.inspect()
+        cybox_types = list(il.comparisons.keys())
+        return (
+            len(il.observation_ops) == 0
+            and len(il.qualifiers) == 0
+            and len(il.comparisons) == 1
+            and len(cybox_types) == 1  # must be point-indicator (one field only)
+            and len(il.comparisons[cybox_types[0]][0])
+            == 3  # ('value', '=', 'evil.com')
+            and il.comparisons[cybox_types[0]][0][1] == "="  # equality comparison
+        )
+    except Exception:
+        return False
 
-    indicator = intel_data["indicator"]
-    if isinstance(zeek_type, str):
-        indicator = indicator[0]
-        if zeek_type == "URL":
-            indicator = re.sub(r"^https?://", "", indicator)
-        elif zeek_type == "ADDR" and re.match(".+/.+", indicator):
-            zeek_type = "SUBNET"  # elevate to subnet if possible
-    elif isinstance(zeek_type, tuple):
-        if len(zeek_type) != 2 and len(indicator) < 2:
-            return None
-        # prefer to use file hashes
-        if indicator[1]:
-            indicator = indicator[1]
-            zeek_type = zeek_type[1]
-        else:
-            indicator = indicator[0]
-            zeek_type = zeek_type[0]
-    else:
-        return None
-    return {"indicator": indicator, "intel_type": zeek_type}
 
-
-def map_to_broker(msg, module_namespace):
-    """Maps the internal message format to a broker message.
-    @param msg The message that shall be converted
-    @param module_namespace A Zeek namespace to use for event sending
+def map_indicator_to_broker_event(
+    indicator: Indicator, module_namespace: str, logger
+) -> Union[broker.zeek.Event, None]:
+    """
+    Maps STIX-2 Indicators to Broker events using the Zeek Intel format
+    @see https://docs.zeek.org/en/current/scripts/base/frameworks/intel/main.zeek.html#type-Intel::Type
+    @param indicator The STIX-2 Indicator to convert
+    @param module_namespace A Zeek namespace to use for sending the event
     @return The mapped broker event or None
     """
-    msg_type = type(msg).__name__.lower()
-    if msg_type == "sighting":
-        # convert sighting to zeek event
-        return broker.zeek.Event(
-            f"{module_namespace}::sighting",
-            (msg.ts, str(msg.intel), msg.context),
+    if type(indicator) is not Indicator:
+        logger.debug(f"Discarding message, expected STIX-2 Indicator: {indicator}")
+        return None
+
+    if not is_point_equality_ioc(indicator.pattern):
+        logger.debug(
+            f"Zeek only supports point-IoCs. Cannot map compound pattern to a Zeek Intel item: {indicator.pattern}"
         )
-    elif msg_type == "intel":
-        # convert intel to zeek event
-        intel_data = map_intel_data_to_broker(msg.data)
-        if not intel_data:
-            return None
-        return broker.zeek.Event(
-            f"{module_namespace}::intel",
-            (msg.ts, str(msg.id), intel_data, msg.operation.value),
+        return None
+
+    # pattern is in the form [file:name = 'foo']
+    (object_path, ioc_value) = indicator.pattern[1:-1].split("=", 1)
+    object_path = object_path.strip()
+    ioc_value = ioc_value.strip()
+    if ioc_value.startswith("'") and ioc_value.endswith("'"):
+        ioc_value = ioc_value[1:-1]
+
+    # get matching Zeek intel type
+    zeek_type = zeek_intel_type_map.get(object_path, None)
+    if not zeek_type:
+        logger.debug(
+            f"No matching Zeek type found for STIX-2 indicator type '{object_path}'"
         )
+        return None
+
+    if zeek_type == "URL":
+        # remove leading protocol, if any
+        parsed = urlparse(ioc_value)
+        scheme = f"{parsed.scheme}://"
+        ioc_value = parsed.geturl().replace(scheme, "", 1)
+    elif zeek_type == "ADDR" and re.match(".+/.+", ioc_value):
+        # elevate to subnet if possible
+        zeek_type = "SUBNET"
+
+    operation = "ADD"  ## Zeek operation to add a new Intel item
+    if (
+        ThreatBusSTIX2Constants.X_THREATBUS_UPDATE.value
+        in indicator.object_properties()
+        and indicator.x_threatbus_update == Operation.REMOVE.value
+    ):
+        operation = "REMOVE"
+    return broker.zeek.Event(
+        f"{module_namespace}::intel",
+        (indicator.created, str(indicator.id), zeek_type, ioc_value, operation),
+    )
