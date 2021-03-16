@@ -37,7 +37,7 @@ zeek_intel_type_map = {
 
 
 def map_management_message(
-    broker_data, module_namespace: str
+    broker_data, module_namespace: str, logger
 ) -> Union[Subscription, Unsubscription, None]:
     """
     Maps a management message to an actionable instruction for Threat Bus.
@@ -58,6 +58,7 @@ def map_management_message(
         topic = args[0]
         if topic:
             return Unsubscription(topic)
+    logger.debug(f"Discarding Broker management message with unknown type: {name}")
     return None
 
 
@@ -125,8 +126,7 @@ def map_indicator_to_broker_event(
     @return The mapped broker event or None
     """
     if type(indicator) is not Indicator:
-        if logger:
-            logger.debug(f"Discarding message, expected STIX-2 Indicator: {indicator}")
+        logger.debug(f"Discarding message, expected STIX-2 Indicator: {indicator}")
         return None
 
     if not is_point_equality_ioc(indicator.pattern):

@@ -1,6 +1,7 @@
 import broker
 from datetime import datetime, timedelta, timezone
 import json
+from logging import getLogger
 from stix2 import Indicator, Sighting, parse
 from threatbus.data import (
     Operation,
@@ -31,68 +32,89 @@ class TestMessageMapping(unittest.TestCase):
             pattern=self.pattern,
         )
         self.module_namespace = "TestNamespace"
+        self.logger = getLogger("test")
 
     def test_invalid_indicator_inputs(self):
-        self.assertIsNone(map_indicator_to_broker_event(None, None, None))
-        self.assertIsNone(map_indicator_to_broker_event(None, "", None))
+        self.assertIsNone(map_indicator_to_broker_event(None, None, self.logger))
+        self.assertIsNone(map_indicator_to_broker_event(None, "", self.logger))
         self.assertIsNone(
-            map_indicator_to_broker_event(None, self.module_namespace, None)
+            map_indicator_to_broker_event(None, self.module_namespace, self.logger)
         )
         self.assertIsNone(
-            map_indicator_to_broker_event(42, self.module_namespace, None)
+            map_indicator_to_broker_event(42, self.module_namespace, self.logger)
         )
         self.assertIsNone(
-            map_indicator_to_broker_event(object, self.module_namespace, None)
+            map_indicator_to_broker_event(object, self.module_namespace, self.logger)
         )
         self.assertIsNone(
             map_indicator_to_broker_event(
                 Sighting(sighting_of_ref=self.indicator_id),
                 self.module_namespace,
-                None,
+                self.logger,
             )
         )
 
     def test_invalid_zeek_inputs(self):
         broker_data = broker.zeek.Event("Hello")  # unknown event
-        self.assertIsNone(map_broker_event_to_sighting(broker_data, None, None))
+        self.assertIsNone(map_broker_event_to_sighting(broker_data, None, self.logger))
         self.assertIsNone(
-            map_broker_event_to_sighting(broker_data, self.module_namespace, None)
+            map_broker_event_to_sighting(
+                broker_data, self.module_namespace, self.logger
+            )
         )
-        self.assertIsNone(map_management_message(broker_data, None))
-        self.assertIsNone(map_management_message(broker_data, self.module_namespace))
+        self.assertIsNone(map_management_message(broker_data, None, self.logger))
+        self.assertIsNone(
+            map_management_message(broker_data, self.module_namespace, self.logger)
+        )
 
         # not enough arguments provided
         broker_data = broker.zeek.Event("sighting", 1, 2)
-        self.assertIsNone(map_broker_event_to_sighting(broker_data, None, None))
+        self.assertIsNone(map_broker_event_to_sighting(broker_data, None, self.logger))
         self.assertIsNone(
-            map_broker_event_to_sighting(broker_data, self.module_namespace, None)
+            map_broker_event_to_sighting(
+                broker_data, self.module_namespace, self.logger
+            )
         )
-        self.assertIsNone(map_management_message(broker_data, None))
-        self.assertIsNone(map_management_message(broker_data, self.module_namespace))
+        self.assertIsNone(map_management_message(broker_data, None, self.logger))
+        self.assertIsNone(
+            map_management_message(broker_data, self.module_namespace, self.logger)
+        )
 
         broker_data = broker.zeek.Event("intel", 42, {})
-        self.assertIsNone(map_broker_event_to_sighting(broker_data, None, None))
+        self.assertIsNone(map_broker_event_to_sighting(broker_data, None, self.logger))
         self.assertIsNone(
-            map_broker_event_to_sighting(broker_data, self.module_namespace, None)
+            map_broker_event_to_sighting(
+                broker_data, self.module_namespace, self.logger
+            )
         )
-        self.assertIsNone(map_management_message(broker_data, None))
-        self.assertIsNone(map_management_message(broker_data, self.module_namespace))
+        self.assertIsNone(map_management_message(broker_data, None, self.logger))
+        self.assertIsNone(
+            map_management_message(broker_data, self.module_namespace, self.logger)
+        )
 
         broker_data = broker.zeek.Event("subscribe", "topic")
-        self.assertIsNone(map_broker_event_to_sighting(broker_data, None, None))
+        self.assertIsNone(map_broker_event_to_sighting(broker_data, None, self.logger))
         self.assertIsNone(
-            map_broker_event_to_sighting(broker_data, self.module_namespace, None)
+            map_broker_event_to_sighting(
+                broker_data, self.module_namespace, self.logger
+            )
         )
-        self.assertIsNone(map_management_message(broker_data, None))
-        self.assertIsNone(map_management_message(broker_data, self.module_namespace))
+        self.assertIsNone(map_management_message(broker_data, None, self.logger))
+        self.assertIsNone(
+            map_management_message(broker_data, self.module_namespace, self.logger)
+        )
 
         broker_data = broker.zeek.Event("unsubscribe")
-        self.assertIsNone(map_broker_event_to_sighting(broker_data, None, None))
+        self.assertIsNone(map_broker_event_to_sighting(broker_data, None, self.logger))
         self.assertIsNone(
-            map_broker_event_to_sighting(broker_data, self.module_namespace, None)
+            map_broker_event_to_sighting(
+                broker_data, self.module_namespace, self.logger
+            )
         )
-        self.assertIsNone(map_management_message(broker_data, None))
-        self.assertIsNone(map_management_message(broker_data, self.module_namespace))
+        self.assertIsNone(map_management_message(broker_data, None, self.logger))
+        self.assertIsNone(
+            map_management_message(broker_data, self.module_namespace, self.logger)
+        )
 
     def test_valid_indicator(self):
         # test indicator added
@@ -191,12 +213,12 @@ class TestMessageMapping(unittest.TestCase):
 
         # without namespace
         event = broker.zeek.Event("subscribe", topic, td)
-        subscription = map_management_message(event, self.module_namespace)
+        subscription = map_management_message(event, self.module_namespace, self.logger)
         self.assertEqual(subscription, expected)
 
         # with namespace:
         event = broker.zeek.Event(self.module_namespace + "::subscribe", topic, td)
-        subscription = map_management_message(event, self.module_namespace)
+        subscription = map_management_message(event, self.module_namespace, self.logger)
         self.assertEqual(subscription, expected)
 
     def test_valid_unsubscription(self):
@@ -205,10 +227,14 @@ class TestMessageMapping(unittest.TestCase):
 
         # without namespace
         event = broker.zeek.Event("unsubscribe", topic)
-        unsubscription = map_management_message(event, self.module_namespace)
+        unsubscription = map_management_message(
+            event, self.module_namespace, self.logger
+        )
         self.assertEqual(unsubscription, expected)
 
         # with namespace:
         event = broker.zeek.Event(self.module_namespace + "::unsubscribe", topic)
-        unsubscription = map_management_message(event, self.module_namespace)
+        unsubscription = map_management_message(
+            event, self.module_namespace, self.logger
+        )
         self.assertEqual(unsubscription, expected)

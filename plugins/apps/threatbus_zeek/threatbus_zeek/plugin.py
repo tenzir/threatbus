@@ -55,7 +55,7 @@ class SubscriptionManager(threatbus.StoppableWorker):
             if not ready_readers:
                 continue
             (topic, broker_data) = sub.get()
-            msg = map_management_message(broker_data, self.module_namespace)
+            msg = map_management_message(broker_data, self.module_namespace, logger)
             if msg:
                 self.manage_subscription(msg)
 
