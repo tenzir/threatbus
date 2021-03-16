@@ -137,7 +137,8 @@ def map_indicator_to_broker_event(
 
     # pattern is in the form [file:name = 'foo']
     (object_path, ioc_value) = indicator.pattern[1:-1].split("=")
-    object_path, ioc_value = object_path.strip(), ioc_value.strip()
+    object_path = object_path.strip()
+    ioc_value = ioc_value.strip()
     if ioc_value.startswith("'") and ioc_value.endswith("'"):
         ioc_value = ioc_value[1:-1]
 
