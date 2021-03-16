@@ -9,6 +9,7 @@ from threatbus.data import (
     Unsubscription,
 )
 from typing import Union
+from urllib.parse import urlparse
 
 # See the documentation for the Zeek INTEL framework [1] and STIX-2 cyber
 # observable objects [2]
@@ -136,7 +137,7 @@ def map_indicator_to_broker_event(
         return None
 
     # pattern is in the form [file:name = 'foo']
-    (object_path, ioc_value) = indicator.pattern[1:-1].split("=")
+    (object_path, ioc_value) = indicator.pattern[1:-1].split("=", 1)
     object_path = object_path.strip()
     ioc_value = ioc_value.strip()
     if ioc_value.startswith("'") and ioc_value.endswith("'"):
@@ -152,7 +153,9 @@ def map_indicator_to_broker_event(
 
     if zeek_type == "URL":
         # remove leading protocol, if any
-        ioc_value = re.sub(r"^https?://", "", ioc_value)
+        parsed = urlparse(ioc_value)
+        scheme = f"{parsed.scheme}://"
+        ioc_value = parsed.geturl().replace(scheme, "", 1)
     elif zeek_type == "ADDR" and re.match(".+/.+", ioc_value):
         # elevate to subnet if possible
         zeek_type = "SUBNET"
