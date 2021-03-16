@@ -8,12 +8,12 @@ import confuse
 import json
 import logging
 from .message_mapping import (
-    get_vast_intel_type,
-    get_ioc,
-    matcher_result_to_threatbus_sighting,
-    query_result_to_threatbus_sighting,
-    to_vast_ioc,
-    to_vast_query,
+    get_vast_type_and_value,
+    indicator_to_vast_matcher_ioc,
+    indicator_to_vast_query,
+    matcher_result_to_sighting,
+    query_result_to_sighting,
+    split_object_path_and_value,
 )
 from pyvast import VAST
 import random
@@ -22,8 +22,10 @@ import socket
 from string import ascii_lowercase as letters
 import sys
 from .metrics import Gauge, Summary
+from stix2 import parse, Indicator, Sighting
 from threatbus.logger import setup as setup_logging_threatbus
-from threatbus.data import Intel, IntelDecoder, Sighting, SightingEncoder, Operation
+from threatbus.data import Operation, ThreatBusSTIX2Constants
+
 import time
 import zmq
 
@@ -131,12 +133,12 @@ async def start(
 ):
     """
     Starts the app between the two given endpoints. Subscribes the configured
-    VAST instance for threat intelligence (IoCs) and reports new intelligence to
+    VAST instance for threat intelligence (IoCs) and reports new sightings to
     Threat Bus.
     @param cmd The vast binary command to use with PyVAST
     @param vast_endpoint The endpoint of a running VAST node ('host:port')
     @param zmq_endpoint The ZMQ management endpoint of Threat Bus ('host:port')
-    @param snapshot An integer value to request n days of past intel items
+    @param snapshot An integer value to request n days of historical IoC items
     @param live_match Boolean flag to enable live-matching
     @param retro_match Boolean flag to enable retro-matching
     @param retro_match_max_events Max amount of retro match results
@@ -154,7 +156,7 @@ async def start(
     assert await vast.test_connection() is True, "Cannot connect to VAST"
 
     logger.debug(f"Calling Threat Bus management endpoint {zmq_endpoint}")
-    reply = subscribe(zmq_endpoint, "threatbus/intel", snapshot)
+    reply = subscribe(zmq_endpoint, "stix2/indicator", snapshot)
     if not reply_is_success(reply):
         logger.error("Subscription failed")
         return
@@ -178,7 +180,7 @@ async def start(
         asyncio.create_task(heartbeat(zmq_endpoint, p2p_topic, interval=5))
     )
 
-    intel_queue = asyncio.Queue()
+    indicator_queue = asyncio.Queue()
     sightings_queue = asyncio.Queue()
     async_tasks.append(
         asyncio.create_task(
@@ -187,7 +189,7 @@ async def start(
     )
 
     async_tasks.append(
-        asyncio.create_task(receive(pub_endpoint, p2p_topic, intel_queue))
+        asyncio.create_task(receive(pub_endpoint, p2p_topic, indicator_queue))
     )
 
     async_tasks.append(
@@ -195,7 +197,7 @@ async def start(
             match_intel(
                 vast_binary,
                 vast_endpoint,
-                intel_queue,
+                indicator_queue,
                 sightings_queue,
                 live_match,
                 retro_match,
@@ -254,14 +256,14 @@ async def write_metrics(every: int, to: str):
         await asyncio.sleep(every)
 
 
-async def receive(pub_endpoint: str, topic: str, intel_queue: asyncio.Queue):
+async def receive(pub_endpoint: str, topic: str, indicator_queue: asyncio.Queue):
     """
     Starts a zmq subscriber on the given endpoint and listens for new messages
     that are published on the given topic (zmq prefix matching). Depending on
-    the topic suffix, Intel items (IoCs) are enqueued to the intel_queue.
+    the topic suffix, Indicators are enqueued to the indicator_queue.
     @param pub_endpoint A host:port string to connect to via zmq
     @param topic The topic prefix to subscribe to intelligence items
-    @param intel_queue The queue to put arriving IoCs into
+    @param indicator_queue The queue to put arriving IoCs into
     """
     global logger
     socket = zmq.Context().socket(zmq.SUB)
@@ -281,11 +283,11 @@ async def receive(pub_endpoint: str, topic: str, intel_queue: asyncio.Queue):
                 logger.error(f"Error decoding message: {e}")
                 continue
             # the topic is suffixed with the message type
-            if not topic.endswith("intel"):
+            if not topic.endswith("indicator"):
                 # pyvast-threatbus is not (yet) interested in Sightings or SnapshotRequests
                 logger.debug(f"Skipping unsupported message: {msg}")
                 continue
-            await intel_queue.put(msg)
+            await indicator_queue.put(msg)
         else:
             await asyncio.sleep(0.05)  # free event loop for other tasks
 
@@ -294,20 +296,20 @@ async def retro_match_vast(
     vast_binary,
     vast_endpoint,
     retro_match_max_events,
-    intel,
+    indicator,
     sightings_queue,
 ):
     """
-    Turns the given intel into a valid VAST query and forwards all all query
-    results (sightings) to the sightings_queue.
+    Turns the given STIX-2 Indicator into a valid VAST query and forwards all
+    query results (sightings) to the sightings_queue.
     @param vast_binary The vast binary command to use with PyVAST
     @param vast_endpoint The endpoint of a running vast node ('host:port')
     @param retro_match_max_events  Max amount of retro match results
-    @param intel The IoC to query VAST for
+    @param indicator The STIX-2 Indicator to query VAST for
     @param sightings_queue The queue to put new sightings into
     """
     start = time.time()
-    query = to_vast_query(intel)
+    query = indicator_to_vast_query(indicator)
     if not query:
         return
     global logger, max_open_tasks
@@ -321,70 +323,72 @@ async def retro_match_vast(
         while not proc.stdout.at_eof():
             line = (await proc.stdout.readline()).decode().rstrip()
             if line:
-                sighting = query_result_to_threatbus_sighting(line, intel)
+                sighting = query_result_to_sighting(line, indicator)
                 if not sighting:
                     logger.error(f"Could not parse VAST query result: {line}")
                     continue
                 reported += 1
                 await sightings_queue.put(sighting)
-        logger.debug(f"Retro-matched {reported} sighting(s) for intel: {intel}")
+        logger.debug(f"Retro-matched {reported} sighting(s) for indicator: {indicator}")
         s_retro_matches_per_ioc.observe(reported)
         s_retro_query_time_s_per_ioc.observe(time.time() - start)
 
 
-async def ingest_vast_ioc(vast_binary, vast_endpoint, intel):
+async def ingest_vast_ioc(vast_binary: str, vast_endpoint: str, indicator: Indicator):
     """
-    Ingests the given intel as IoC into a VAST matcher.
+    Converts the given STIX-2 Indicator to a VAST-compatible IoC and ingests it
+    via a VAST matcher.
     @param vast_binary The vast binary command to use with PyVAST
     @param vast_endpoint The endpoint of a running vast node ('host:port')
-    @param intel The IoC to query VAST for
+    @param indicator The STIX-2 Indicator to query VAST for
     """
     global logger
-    ioc = to_vast_ioc(intel)
-    if not ioc:
-        logger.error(f"Unable to convert Intel to VAST compatible IoC: {intel}")
-        return
-    vast = VAST(binary=vast_binary, endpoint=vast_endpoint, logger=logger)
-    proc = await vast.import_().json(type="intel.indicator").exec(stdin=ioc)
-    await proc.wait()
-    logger.debug(f"Ingested intel for live matching: {intel}")
-
-
-async def remove_vast_ioc(vast_binary, vast_endpoint, intel):
-    """
-    Removes the given intel as IoC from a VAST matcher.
-    @param vast_binary The vast binary command to use with PyVAST
-    @param vast_endpoint The endpoint of a running vast node ('host:port')
-    @param intel The IoC to query VAST for
-    """
-    global logger, matcher_name
-    intel_type = get_vast_intel_type(intel)
-    ioc = get_ioc(intel)
-    if not ioc or not intel_type:
+    vast_ioc = indicator_to_vast_matcher_ioc(indicator)
+    if not vast_ioc:
         logger.error(
-            f"Cannot remove intel with missing intel_type or indicator: {intel}"
+            f"Unable to convert STIX-2 Indicator to VAST compatible IoC. Is it a point IoC? {indicator}"
         )
         return
     vast = VAST(binary=vast_binary, endpoint=vast_endpoint, logger=logger)
-    await vast.matcher().ioc_remove(matcher_name, ioc, intel_type).exec()
-    logger.debug(f"Removed indicator {intel}")
+    proc = await vast.import_().json(type="intel.indicator").exec(stdin=vast_ioc)
+    await proc.wait()
+    logger.debug(f"Ingested indicator for VAST live matching: {indicator}")
+
+
+async def remove_vast_ioc(vast_binary: str, vast_endpoint: str, indicator: Indicator):
+    """
+    Converts the given STIX-2 Indicator to a VAST-compatible IoC and removes it
+    from the VAST matcher.
+    @param vast_binary The vast binary command to use with PyVAST
+    @param vast_endpoint The endpoint of a running vast node ('host:port')
+    @param indicator The STIX-2 Indicator to remove from VAST
+    """
+    global logger, matcher_name
+    type_and_value = get_vast_type_and_value(indicator.pattern)
+    if not type_and_value:
+        logger.debug(f"Cannot remove IoC from VAST. Is it a point IoC? {indicator}")
+        return None
+    (vast_type, ioc_value) = type_and_value
+    vast = VAST(binary=vast_binary, endpoint=vast_endpoint, logger=logger)
+    await vast.matcher().ioc_remove(matcher_name, ioc_value, vast_type).exec()
+    logger.debug(f"Removed indicator from VAST live matching: {indicator}")
 
 
 async def match_intel(
     vast_binary: str,
     vast_endpoint: str,
-    intel_queue: asyncio.Queue,
+    indicator_queue: asyncio.Queue,
     sightings_queue: asyncio.Queue,
     live_match: bool,
     retro_match: bool,
     retro_match_max_events: int,
 ):
     """
-    Reads from the intel_queue and matches all IoCs, either via VAST's
+    Reads from the indicator_queue and matches all IoCs, either via VAST's
     live-matching or retro-matching.
     @param vast_binary The vast binary command to use with PyVAST
     @param vast_endpoint The endpoint of a running vast node ('host:port')
-    @param intel_queue The queue to read new IoCs from
+    @param indicator_queue The queue to read new IoCs from
     @param sightings_queue The queue to put new sightings into
     @param live_match Boolean flag to use retro-matching
     @param retro_match Boolean flag to use live-matching
@@ -392,18 +396,29 @@ async def match_intel(
     """
     global logger, open_tasks
     while True:
-        msg = await intel_queue.get()
+        msg = await indicator_queue.get()
         try:
-            intel = json.loads(msg, cls=IntelDecoder)
+            indicator = parse(msg, allow_custom=True)
         except Exception as e:
-            logger.warning(f"Failed to decode intel item {msg}: {e}")
+            logger.warning(f"Failed to decode STIX-2 Indicator item {msg}: {e}")
             continue
-        if type(intel) is not Intel:
+        if type(indicator) is not Indicator:
             logger.warning(
-                f"Ignoring unknown message type, expected Intel: {type(intel)}"
+                f"Ignoring unknown message type, expected STIX-2 Indicator: {type(indicator)}"
             )
             continue
-        if intel.operation == Operation.ADD:
+        if (
+            ThreatBusSTIX2Constants.X_THREATBUS_UPDATE.value
+            in indicator.object_properties()
+            and indicator.x_threatbus_update == Operation.REMOVE.value
+        ):
+            g_iocs_removed.inc()
+            if live_match:
+                asyncio.create_task(
+                    remove_vast_ioc(vast_binary, vast_endpoint, indicator)
+                )
+        else:
+            # add new Indicator to matcher / query Indicator retrospectively
             g_iocs_added.inc()
             if retro_match:
                 asyncio.create_task(
@@ -411,19 +426,15 @@ async def match_intel(
                         vast_binary,
                         vast_endpoint,
                         retro_match_max_events,
-                        intel,
+                        indicator,
                         sightings_queue,
                     )
                 )
             if live_match:
-                asyncio.create_task(ingest_vast_ioc(vast_binary, vast_endpoint, intel))
-        elif intel.operation == Operation.REMOVE:
-            g_iocs_removed.inc()
-            if live_match:
-                asyncio.create_task(remove_vast_ioc(vast_binary, vast_endpoint, intel))
-        else:
-            logger.warning(f"Unsupported operation for indicator: {intel}")
-        intel_queue.task_done()
+                asyncio.create_task(
+                    ingest_vast_ioc(vast_binary, vast_endpoint, indicator)
+                )
+        indicator_queue.task_done()
 
 
 async def live_match_vast(
@@ -521,7 +532,7 @@ async def report_sightings(
     else:
         socket = zmq.Context().socket(zmq.PUB)
         socket.connect(f"tcp://{sub_endpoint}")
-        topic = "threatbus/sighting"
+        topic = "stix2/sighting"
         logger.info(f"Forwarding sightings to Threat Bus at {sub_endpoint}/{topic}")
     while True:
         sighting = await sightings_queue.get()
@@ -552,7 +563,7 @@ async def report_sightings(
             else:
                 await invoke_cmd_for_context(sink, sighting.context)
         else:
-            socket.send_string(f"{topic} {json.dumps(sighting, cls=SightingEncoder)}")
+            socket.send_string(f"{topic} {sighting.serialize()}")
         sightings_queue.task_done()
         logger.debug(f"Reported sighting: {sighting}")
 
@@ -598,11 +609,11 @@ def reply_is_success(reply: dict):
 
 def subscribe(endpoint: str, topic: str, snapshot: int, timeout: int = 5):
     """
-    Subscribes this app to the Threat Bus for the given topic. Requests an
-    optional snapshot of past intelligence data.
+    Subscribes this app to Threat Bus for the given topic. Requests an optional
+    snapshot of historical indicators.
     @param endpoint The ZMQ management endpoint of Threat Bus ('host:port')
     @param topic The topic to subscribe to
-    @param snapshot An integer value to request n days of past intel items
+    @param snapshot An integer value to request n days of historical IoC items
     @param timeout The period after which the connection attempt is aborted
     """
     global logger
