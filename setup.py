@@ -48,5 +48,5 @@ setup(
     python_requires=">=3.7",
     setup_requires=["setuptools", "wheel"],
     url="https://github.com/tenzir/threatbus",
-    version="2021.02.24",
+    version="2021.03.25",
 )
