@@ -62,10 +62,8 @@ VAST's
 works as
 [continuous query](https://docs.tenzir.com/vast/cli/vast/export/#documentation).
 `pyvast-threatbus` subscribes to those continuous query results and reports all
-new IoC matches from VAST to Threat Bus as `Sightings`.
-
-Live matching is the default mode of operation for `pyvast-threatbus`. Note that
-the VAST node must support this feature.
+new IoC matches from VAST to Threat Bus as `Sightings`. You can enable live
+matching in the config file by setting `live_match: true`.
 
 #### Retro Matching
 
@@ -83,9 +81,9 @@ VAST by setting the config option `retro_match_max_events` to a positive integer
 You can configure `pyvast-threatbus` to invoke another program for parsing
 Sighting `context` data via the config option `transform_context`.
 
-If set, the app translates the `context` field of a Sighting via the specified
-utility. For example, configure the app to pass the `context`
-object to [DCSO/fever](https://github.com/DCSO/fever) `alertify`:
+If set, the app translates the `x_threatbus_sighting_context` field of a STIX-2
+Sighting via the specified utility. For example, configure the app to pass the
+context object to [DCSO/fever](https://github.com/DCSO/fever) `alertify`:
 
 ```yaml
 ...
@@ -93,21 +91,9 @@ transform_context: fever alertify --alert-prefix 'MY PREFIX' --extra-key my-ioc 
 ...
 ```
 
-A `Sighting` object is structured as follows:
-
-```yaml
-{
-  "ts": "2020-09-04 11:21:13.663164",
-  "reference": "threatbus__86",
-  "ioc": "foobar.com",
-  "context": {
-    ...
-  }
-```
-
-The `context` field can contain arbitrary data. For example, retro matches from
-VAST contain the full query result in the context field (like a Suricata EVE
-entry or a Zeek conn.log entry).
+The `x_threatbus_sighting_context` field can contain arbitrary data. For
+example, retro matches from VAST contain the full query result in the context
+field (like a Suricata EVE entry or a Zeek conn.log entry).
 
 Note that the `cmd` string passed to `transform_context` is treated as
 template string. The placeholder `%ioc` is replaced with the contents of the
@@ -115,7 +101,7 @@ actually matched IoC.
 
 ### Custom Sinks for Sightings
 
-`pyvast-threatbus` offers to send Sighting `context` to a configurable `sink`
+`pyvast-threatbus` offers to send Sighting context to a configurable `sink`
 _instead_ of reporting them back to Threat Bus. This can be configured via the
 `sink` configuration parameter. The special placeholder `STDOUT` can be used to
 print the Sighting context to `STDOUT`.
@@ -124,6 +110,5 @@ A custom sink is useful to forward `Sightings` to another process, like
 `syslog`, or forward STDOUT via a UNIX pipe. Note that it may be desirable to
 disable logging in that case.
 
-Note that only the `context` field is printed, and not the object structure of
-the `Sighting`. The `Sighting` itself is a Threat Bus internal format and most
-likely not usable for most applications.
+Note that only the `x_threatbus_sighting_context` field of a STIX-2 Sighting is
+printed, and not the object structure of the Sighting itself.
