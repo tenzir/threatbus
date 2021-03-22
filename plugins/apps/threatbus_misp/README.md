@@ -178,17 +178,18 @@ whitelist filtering works.
 
 ## Development Setup
 
-The following guides describe how to set up local, dockerized instances of MISP
-and Kafka.
+The following guides describe how to set up a local, dockerized instance of
+Kafka and how to setup a VirtualBox running MISP for developing.
 
 ### Dockerized Kafka
 
-For a simple, working Kafka Docker setup use the [single node example](https://github.com/confluentinc/cp-docker-images/blob/5.3.1-post/examples/kafka-single-node/docker-compose.yml)
+For a simple, working Kafka Docker setup use the
+[single node example](https://github.com/confluentinc/cp-docker-images/blob/5.3.1-post/examples/kafka-single-node/docker-compose.yml)
 from `confluentinc/cp-docker-images`.
 
 Store the `docker-compose.yaml` and modify the Kafka environment variables such
-that the Docker host (e.g., `172.17.0.1`) of your Docker machine is advertised
-as Kafka listener:
+that the Docker host (e.g., `172.17.0.1` on Linux) of your Docker machine is
+advertised as Kafka listener:
 
 ```yaml
 zookeeper:
@@ -201,7 +202,8 @@ kafka:
   ...
 ```
 
-For details about Kafka listeners, check out [this article](https://rmoff.net/2018/08/02/kafka-listeners-explained/).
+Check out [this article](https://rmoff.net/2018/08/02/kafka-listeners-explained/)
+for details about Kafka listeners.
 
 Then start the compose setup via `docker-compose up -d`.
 
@@ -209,88 +211,89 @@ To test the setup, use the `tests/utils/kafka_receiver.py` and
 `tests/utils/kafka_sender.py` scripts.
 
 
-### Dockerized MISP
+### Local MISP using VirtualBox
 
-Use DCSO's [dockerized MISP](https://github.com/DCSO/MISP-dockerized) to set
-up a local testing environment:
+This guide walks you through setting up MISP using a pre-configured VirtualBox
+VM and then configuring MISP to export Attribute (IoC) updates to Threat Bus.
 
-*Setup a MISP Docker cluster*
+#### Installation via VirtualBox
+
+Use the officially maintained
+[Virtual Images](https://www.circl.lu/misp-images/_archive/) for MISP.
+Download the latest `.ova` image file and load it in a VirtualBox client. Ensure
+the following:
+
+- The VM has enough working memory (e.g., 3 GiB of RAM)
+- The VM exposes ports 8443 (web interface) and 50000 (ZMQ)
+  - Use VirtualBox port-forwarding when NATting
+  - Use VirtualBox bridge-mode & SSH into the VM using SSH port-forwarding
+
+Here are the above steps as pure CLI instructions for running MISP in headless
+mode (i.e., without a graphical VirtualBox interface).
 
 ```
-git clone git@github.com:DCSO/MISP-dockerized.git
-cd MISP-dockerized
-make install
-# follow the dialog...
+curl -fL -o misp-2.4.138.ova https://www.circl.lu/misp-images/latest/MISP_v2.4.138@28ccbc9.ova
+vboxmanage import misp-2.4.138.ova --vsys 0 --vmname misp --memory 3072 --cpus 1 --eula accept
+vboxmanage modifyvm misp --nic1 nat
+vboxmanage modifyvm misp --natpf1 "zmq,tcp,,50000,,50000"
+vboxmanage list -l misp
 ```
 
-*Edit the docker-compose.yaml*
+You can then start and stop VM using the following commands:
+
+```
+vboxmanage startvm misp --type headless
+vboxmanage controlvm misp poweroff
+```
+
+#### Configuration for usage with Threat Bus
+
+For Threat Bus to receive attribute (IoC) updates from MISP, you must either
+enable Kafka or ZMQ export in the MISP VM. If you chose to go with Kafka, you
+need to install `librdkafka` first inside the VM, then make it known to PHP.
+
+*Install Kafka inside the VM*
 
 ```sh
-cd current
-vim docker-compose.yaml
-```
-Find the section `misp-server` in the configuration and add the following:
+ssh misp@<MISP_VM_IP> # enter your configured password to pop an interactive shell inside the VM
+sudo apt-get update
+sudo apt-get install software-properties-common
+sudo apt-get install librdkafka-dev
 
-```yaml
-misp-server:
-    ...
-    ports:
-      - "50000:50000"
-    ...
-```
-
-
-*Restart MISP to accept the new port*
-
-```sh
-make deploy
+# see https://misp.github.io/MISP/INSTALL.ubuntu1804/#misp-has-a-feature-for-publishing-events-to-kafka-to-enable-it-simply-run-the-following-commands
+sudo pecl channel-update pecl.php.net
+sudo pecl install rdkafka
+echo "extension=rdkafka.so" | sudo tee /etc/php/7.2/mods-available/rdkafka.ini
+sudo phpenmod rdkafka
+sudo service apache2 restart
+exit
 ```
 
-*Enable the Kafka plugin in the MISP web-view*
+Once Kafka is installed, you can go ahead and enable it in the MISP web-view.
 
-- Visit https://localhost:80
+*Enable Kafka export in the MISP web-view*
+
+- Visit https://localhost:8443
 - login with your configured credentials
 - Go to `Administration` -> `Server Settings & Maintenance` -> `Plugin settings Tab`
 - Set the following entries 
   - `Plugin.Kafka_enable` -> `true`
-  - `Plugin.Kafka_brokers` -> `172.17.0.1:9092`    <- In this example, 172.17.0.1 is the Docker host, reachable from other Docker networks. The port is reachable when the Kafka Docker setup binds to it globally.
+  - `Plugin.Kafka_brokers` -> `172.17.0.1:9092`    <- In this example, 172.17.0.1 is the Docker host as configured in the Dockerized Kafka setup above, reachable from other Docker networks. The port is reachable when the Kafka Docker setup binds to it globally.
   - `Plugin.Kafka_attribute_notifications_enable` -> `true`
   - `Plugin.Kafka_attribute_notifications_topic` -> `misp_attribute` <- The topic goes into the threatbus `config.yaml`
 
-*Install Kafka inside the `misp-server` container*
-
-```sh
-docker exec -ti misp-server bash # pop interactive shell inside the container
-
-apt-get install software-properties-common
-apt-get update
-# enable stretch-backports to get a recent librdkafka version
-add-apt-repository "deb http://deb.debian.org/debian stretch-backports main contrib non-free"
-apt-get update
-apt-get install librdkafka-dev/stretch-backports
-# see https://misp.github.io/MISP/INSTALL.ubuntu1804/#misp-has-a-feature-for-publishing-events-to-kafka-to-enable-it-simply-run-the-following-commands
-pecl channel-update pecl.php.net
-pecl install rdkafka
-echo "extension=rdkafka.so" | tee /etc/php/7.0/mods-available/rdkafka.ini
-phpenmod rdkafka
-service apache2 restart
-exit # leave the Docker container shell
-```
+You can use ZeroMQ to export IoCs from MISP as light weight alternative to
+running Kafka. It does not require any extra installations, except enabling the
+feature in the MISP web-view.
 
 *Enable the ZMQ plugin in the MISP web-view*
 
-- Visit https://localhost:80
+- Visit https://localhost:8443
 - login with your configured credentials
 - Go to `Administration` -> `Server Settings & Maintenance` -> `Diagnostics Tab`
 - Find the ZeroMQ plugin section and enable it
 - Go to `Administration` -> `Server Settings & Maintenance` -> `Plugin settings Tab`
 - Set the entry `Plugin.ZeroMQ_attribute_notifications_enable` to `true`
-
-*Restart all MISP services*
-
-```sh
-make restart-all
-```
 
 
 ## License
