@@ -1,64 +1,19 @@
 from dateutil import parser as dateutil_parser
 from ipaddress import ip_address
 import json
-from threatbus.data import Intel, IntelType, Sighting
+from stix2 import Indicator, Sighting
+from threatbus.data import ThreatBusSTIX2Constants
+from threatbus.stix2_helpers import is_point_equality_ioc, split_object_path_and_value
+from typing import Tuple, Union
 
-to_vast_intel = {
-    IntelType.IPSRC: "ip",
-    IntelType.IPDST: "ip",
-    IntelType.HOSTNAME: "domain",
-    IntelType.DOMAIN: "domain",
-    IntelType.DOMAIN_IP: "domain",
-    IntelType.URL: "url",
-    IntelType.URI: "url",
+vast_ioc_type_map = {
+    "ipv4-addr:value": "ip",
+    "ipv6-addr:value": "ipv6",
+    "domain-name:value": "domain",
+    "url:value": "url",
 }
 
 threatbus_reference = "threatbus__"
-
-
-def get_vast_intel_type(intel: Intel):
-    """
-    Returns the VAST compatible intel type for the given Threat Bus Intel.
-    @param intel The Threat Bus Intel to extract the intel_type from
-    """
-    if not type(intel) == Intel:
-        return None
-    return to_vast_intel.get(intel.data["intel_type"], None)
-
-
-def get_ioc(intel: Intel):
-    """
-    Extracts the IoC from the given Threat Bus Intel and returns it as plain
-    string.
-    @param intel The Threat Bus Intel to extract the IoC from
-    """
-    if not type(intel) == Intel:
-        return None
-    return intel.data["indicator"][0]  # indicators are tuples in Threat Bus
-
-
-def to_vast_ioc(intel: Intel):
-    """
-    Maps a Threat Bus Intel item to a VAST compatible IoC format (JSON)
-    @param intel The item to map
-    """
-    if not type(intel) == Intel:
-        return None
-    vast_type = get_vast_intel_type(intel)
-    if not vast_type:
-        return None
-
-    indicator = get_ioc(intel)
-    if vast_type == "ip" and ip_address(indicator).version == 6:
-        vast_type = "ipv6"
-
-    return json.dumps(
-        {
-            "ioc": indicator,
-            "type": vast_type,
-            "reference": f"{threatbus_reference}{intel.id}",
-        }
-    )
 
 
 def vast_escape_str(val: str):
@@ -71,37 +26,75 @@ def vast_escape_str(val: str):
     return val.replace('"', '\\"')
 
 
-def to_vast_query(intel: Intel):
+def get_vast_type_and_value(pattern_str: str) -> Union[Tuple[str, str], None]:
+    if not is_point_equality_ioc(pattern_str):
+        return None
+    object_path, ioc_value = split_object_path_and_value(pattern_str)
+    ioc_value = vast_escape_str(ioc_value)
+    vast_type = vast_ioc_type_map.get(object_path, None)
+    if not vast_type:
+        return None
+    return vast_type, ioc_value
+
+
+def indicator_to_vast_matcher_ioc(indicator: Indicator) -> Union[str, None]:
+    """
+    Maps a STIX-2 Indicator to a VAST compatible IoC format (JSON), so that a
+    VAST matcher can ingest it.
+    @param indicator The item to map
+    @return an IoC in JSON format that a VAST matcher can read or None
+    """
+    if type(indicator) is not Indicator:
+        return None
+
+    type_and_value = get_vast_type_and_value(indicator.pattern)
+    if not type_and_value:
+        return None
+    (vast_type, ioc_value) = type_and_value
+
+    return json.dumps(
+        {
+            "ioc": ioc_value,
+            "type": vast_type,
+            "reference": f"{threatbus_reference}{indicator.id}",
+        }
+    )
+
+
+def indicator_to_vast_query(indicator: Indicator) -> Union[str, None]:
     """
     Creates a VAST query from a Threat Bus Intel item.
     @param intel The item to map
+    @return a valid VAST query string or None
     """
-    if not type(intel) == Intel:
+    if type(indicator) is not Indicator:
         return None
-    vast_type = get_vast_intel_type(intel)
-    if not vast_type:
-        return None
-    indicator = get_ioc(intel)
-    if not indicator:
-        return None
-    indicator = vast_escape_str(str(indicator))
 
-    if vast_type == "ip":
-        return indicator
+    type_and_value = get_vast_type_and_value(indicator.pattern)
+    if not type_and_value:
+        return None
+    (vast_type, ioc_value) = type_and_value
+
+    if vast_type == "ip" or vast_type == "ipv6":
+        return ioc_value
     if vast_type == "url":
-        return f'"{indicator}" in net.uri'
+        return f'"{ioc_value}" in net.uri'
     if vast_type == "domain":
-        return f'"{indicator}" == net.domain || "{indicator}" == net.hostname'
+        return f'"{ioc_value}" == net.domain || "{ioc_value}" == net.hostname'
     return None
 
 
-def query_result_to_threatbus_sighting(query_result: str, intel: Intel):
+def query_result_to_sighting(
+    query_result: str, indicator: Indicator
+) -> Union[Sighting, None]:
     """
-    Creates a Threat Bus Sighting from a VAST query result.
-    @param query_result The query result to convert
-    @param intel The intel item that the sighting refers to
+    Creates a STIX-2 Sighting from a VAST query result and the STIX-2 indicator
+    that the query result refers to.
+    @param query_result The VAST query result to convert
+    @param indicator The STIX-2 Indicator that the query result refers to
+    @return a valid STIX-2 Sighting that references the given indicator or None
     """
-    if type(query_result) is not str or type(intel) is not Intel:
+    if type(query_result) is not str or type(indicator) is not Indicator:
         return None
     try:
         context = json.loads(query_result)
@@ -111,40 +104,44 @@ def query_result_to_threatbus_sighting(query_result: str, intel: Intel):
             return None
 
         return Sighting(
-            dateutil_parser.parse(ts),
-            intel.id,
-            context,
-            intel.data["indicator"],
+            created=dateutil_parser.parse(ts),
+            sighting_of_ref=indicator.id,
+            custom_properties={
+                ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value: context
+            },
         )
     except Exception:
         return None
 
 
-def matcher_result_to_threatbus_sighting(msg: str):
+def matcher_result_to_sighting(matcher_result: str) -> Union[Sighting, None]:
     """
-    Maps a sighting from the VAST Matcher format to a Threat Bus Sighting.
-    @param msg The raw sighting from VAST
+    Maps a sighting from the VAST Matcher format to a STIX-2 Sighting.
+    @param matcher_result The raw sighting from VAST
+    @return a valid STIX-2 Sighting that references the IoC from the VAST
+        matcher or None
     """
-    if type(msg) is not str:
+    if type(matcher_result) is not str:
         return None
     try:
-        dct = json.loads(msg)
+        dct = json.loads(matcher_result)
         ts = dct.get("ts", None)
         if type(ts) is str:
             ts = dateutil_parser.parse(ts)
     except Exception:
         return None
     ref = dct.get("reference", "")
-    ioc = (dct.get("ioc", ""),)  # ioc's are tuples
     context = dct.get("context", {})
-    if (
-        not ts
-        or not ref
-        or not len(ref) > len(threatbus_reference)
-        or not ioc
-        or not ioc[0]
-    ):
+    # ref = threatbus__indicator--46b3f973-5c03-41fc-9efe-49598a267a35
+    ref_len = len(threatbus_reference) + len("indicator--") + 36
+    if not ts or not ref or not len(ref) == ref_len:
         return None
     ref = ref[len(threatbus_reference) :]
     context["source"] = "VAST"
-    return Sighting(ts, ref, context, ioc)
+    return Sighting(
+        created=ts,
+        sighting_of_ref=ref,
+        custom_properties={
+            ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value: context
+        },
+    )

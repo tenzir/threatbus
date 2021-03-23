@@ -31,6 +31,7 @@ setup(
         "confuse>=1.0",
         "pluggy>=0.13",
         "python-dateutil>=2.8.1",
+        "stix2-patterns >= 0.3",
         "stix2>=2.1",
     ],
     keywords=[
@@ -48,5 +49,5 @@ setup(
     python_requires=">=3.7",
     setup_requires=["setuptools", "wheel"],
     url="https://github.com/tenzir/threatbus",
-    version="2021.02.24",
+    version="2021.03.25",
 )

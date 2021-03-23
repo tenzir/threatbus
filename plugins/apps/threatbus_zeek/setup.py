@@ -27,8 +27,7 @@ setup(
     entry_points={"threatbus.app": ["zeek = threatbus_zeek.plugin"]},
     install_requires=[
         "stix2 >= 2.1",
-        "stix2-patterns >= 0.3",
-        "threatbus >= 2021.2.24",
+        "threatbus >= 2021.3.25",
     ],
     keywords=[
         "Zeek",

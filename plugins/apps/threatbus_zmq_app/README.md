@@ -170,20 +170,24 @@ again later.
 
 ### Pub/Sub via ZeroMQ
 
-Once an app has subscribed to Threat Bus via using the `manage` endpoint of the
-zmq-app plugin, it has a unique, random `p2p_topic` (see above). Threat Bus
-(the zmq-app) uses this topic to publish messages to the plugin. Messages can be
-of the types specified in `threatbus.data`, i.e. `Intel`, `Sighting`,
-`SnapshotRequest`, and `SnapshotEnvelope`.
+Once an app has subscribed to a certain Threat Bus topic using the `manage`
+endpoint of the zmq-app plugin, it gets a unique, random `p2p_topic` (see
+above). The `p2p_topic` differs from the subscribed Threat Bus topic. The
+zmq-app plugin uses only the `p2p_topic` to publish messages to subscribers.
+Messages are either STIX-2 Indicators and Sightings or are of the types
+specified in
+[`threatbus.data`](https://github.com/tenzir/threatbus/blob/master/threatbus/data.py),
+i.e., `SnapshotRequest`, and `SnapshotEnvelope`.
 
 ZeroMQ uses [prefix matching](https://zeromq.org/socket-api/#topics) for pub/sub
 connections. The zmq-app plugin leverages this feature to indicate the type of
-each sent message to the subscriber. Hence, app can simply match the topic
+each sent message to the subscriber. Hence, an app can simply match the topic
 suffix to determine the message type.
 
-For example, all `Intel` items will always be sent on the topic
-`p2p_topic + "intel"`, all `SnapshotRequest` items on the topic
-`p2p_topic + "snapshotrequest"` and so forth.
+For example, all STIX-2 Indicators will always be sent on the topic
+`p2p_topic + "indicator"`, all messages of the type
+`threatbus.data.SnapshotRequest` on the topic `p2p_topic + "snapshotrequest"`
+and so forth.
 
 ### Snapshots
 

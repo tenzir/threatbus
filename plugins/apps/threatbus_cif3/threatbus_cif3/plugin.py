@@ -15,17 +15,17 @@ workers: List[threatbus.StoppableWorker] = list()
 
 class CIFPublisher(threatbus.StoppableWorker):
     """
-    Reports / publishes intel items back to the given CIF endpoint.
+    Reports / publishes Indicators to the given CIF endpoint.
     """
 
-    def __init__(self, intel_outq: JoinableQueue, cif: Client, config: Subview):
+    def __init__(self, indicator_q: JoinableQueue, cif: Client, config: Subview):
         """
-        @param intel_outq Publish all intel from this queue to CIF
+        @param indicator_q Publish all indicators from this queue to CIF
         @param cif The CIF client to use
         @config the plugin config
         """
         super(CIFPublisher, self).__init__()
-        self.intel_outq = intel_outq
+        self.indicator_q = indicator_q
         self.cif = cif
         self.config = config
 
@@ -43,24 +43,25 @@ class CIFPublisher(threatbus.StoppableWorker):
 
         while self._running():
             try:
-                intel = self.intel_outq.get(block=True, timeout=1)
+                indicator = self.indicator_q.get(block=True, timeout=1)
             except Empty:
                 continue
-            if not intel:
-                logger.warning("Received unparsable intel item")
-                self.intel_outq.task_done()
+            if not indicator:
+                self.indicator_q.task_done()
                 continue
-            cif_mapped_intel = map_to_cif(intel, logger, confidence, tags, tlp, group)
+            cif_mapped_intel = map_to_cif(
+                indicator, confidence, tags, tlp, group, logger
+            )
             if not cif_mapped_intel:
-                self.intel_outq.task_done()
+                self.indicator_q.task_done()
                 continue
             try:
-                logger.debug(f"Adding intel to CIF: {cif_mapped_intel}")
+                logger.debug(f"Adding indicator to CIF {cif_mapped_intel}")
                 self.cif.indicators_create(cif_mapped_intel)
             except Exception as err:
-                logger.error(f"CIF submission error: {err}")
+                logger.error(f"Error adding indicator to CIF {err}")
             finally:
-                self.intel_outq.task_done()
+                self.indicator_q.task_done()
 
 
 def validate_config(config: Subview):
@@ -106,11 +107,11 @@ def run(
         )
         return
 
-    intel_outq = JoinableQueue()
-    topic = "threatbus/intel"
-    subscribe_callback(topic, intel_outq)
+    indicator_q = JoinableQueue()
+    topic = "stix2/indicator"
+    subscribe_callback(topic, indicator_q)
 
-    workers.append(CIFPublisher(intel_outq, cif, config))
+    workers.append(CIFPublisher(indicator_q, cif, config))
     for w in workers:
         w.start()
 
