@@ -23,10 +23,10 @@ setup(
     description="A RabbitMQ backbone for threatbus.",
     entry_points={"threatbus.backbone": ["rabbitmq = threatbus_rabbitmq.plugin"]},
     install_requires=[
-        "pika>=1.1.0",
+        "pika >= 1.1.0",
         "retry",
-        "stix2>=2.1",
-        "threatbus>=2021.2.24",
+        "stix2 >= 2.1",
+        "threatbus >= 2021.2.24",
     ],
     keywords=[
         "message broker",
@@ -46,5 +46,5 @@ setup(
     packages=["threatbus_rabbitmq"],
     python_requires=">=3.7",
     url="https://github.com/tenzir/threatbus",
-    version="2021.02.24",
+    version="2021.03.25",
 )
