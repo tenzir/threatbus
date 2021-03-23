@@ -10,7 +10,17 @@ Every entry has a category for which we use the following visual abbreviations:
 - 🧬 Experimental feature
 - 🐞 Bugfix
 
-## Unreleased
+<!-- ## Unreleased -->
+
+## [2021.03.25]
+
+- 🎁 The CIFv3 plugin now supports the
+  [STIX-2 (version 2.1)](https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html)
+  standard for
+  [Indicators](https://docs.oasis-open.org/cti/stix/v2.1/cs02/stix-v2.1-cs02.html#_muftrcpnf89v).
+  The plugin converts STIX-2 Indicators on best-effort basis to CIFv3
+  indicators before forwarding them to the configured CIF endpoint.
+  [#106](https://github.com/tenzir/threatbus/pull/106)
 
 - 🐞 We fixed a bug in the routing logic for SnapshotRequests. Apps can now
   request snapshots as expected for all `stix2`-prefixed topics.
@@ -150,3 +160,4 @@ Every entry has a category for which we use the following visual abbreviations:
 [2020.11.30]: https://github.com/tenzir/threatbus/releases/tag/2020.11.30
 [2020.12.16]: https://github.com/tenzir/threatbus/releases/tag/2020.12.16
 [2021.02.24]: https://github.com/tenzir/threatbus/releases/tag/2021.02.24
+[2021.03.25]: https://github.com/tenzir/threatbus/releases/tag/2021.03.25
