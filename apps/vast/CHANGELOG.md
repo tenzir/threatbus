@@ -10,7 +10,9 @@ Every entry has a category for which we use the following visual abbreviations:
 - ⚡️ breaking change
 - 🐞 bugfix
 
-## Unreleased
+<!-- ## Unreleased -->
+
+## [2021.03.25]
 
 - 🎁 `pyvast-threatbus` now supports the
   [STIX-2 (version 2.1)](https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html)
@@ -85,3 +87,4 @@ Every entry has a category for which we use the following visual abbreviations:
 [2020.11.26]: https://github.com/tenzir/threatbus/releases/tag/2020.11.26
 [2020.12.16]: https://github.com/tenzir/threatbus/releases/tag/2020.12.16
 [2021.02.24]: https://github.com/tenzir/threatbus/releases/tag/2021.02.24
+[2021.03.25]: https://github.com/tenzir/threatbus/releases/tag/2021.03.25
