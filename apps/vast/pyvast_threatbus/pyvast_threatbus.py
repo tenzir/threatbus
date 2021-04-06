@@ -462,7 +462,7 @@ async def live_match_vast(
                 # TODO reconnect
             continue
         vast_sighting = data.decode("utf-8").rstrip()
-        sighting = matcher_result_to_threatbus_sighting(vast_sighting)
+        sighting = matcher_result_to_sighting(vast_sighting)
         if not sighting:
             logger.error(f"Cannot parse sighting-output from VAST: {vast_sighting}")
             continue
