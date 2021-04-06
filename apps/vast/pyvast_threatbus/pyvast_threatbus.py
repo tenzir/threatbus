@@ -370,7 +370,8 @@ async def remove_vast_ioc(vast_binary: str, vast_endpoint: str, indicator: Indic
         return None
     (vast_type, ioc_value) = type_and_value
     vast = VAST(binary=vast_binary, endpoint=vast_endpoint, logger=logger)
-    await vast.matcher().ioc_remove(matcher_name, ioc_value, vast_type).exec()
+    # TODO pass matcher_name once VAST supports more fine-grained deletion
+    await vast.matcher().intel().remove(ioc_value, vast_type).exec()
     logger.debug(f"Removed indicator from VAST live matching: {indicator}")
 
 
