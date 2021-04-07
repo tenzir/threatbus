@@ -10,7 +10,19 @@ Every entry has a category for which we use the following visual abbreviations:
 - ⚡️ breaking change
 - 🐞 bugfix
 
-<!-- ## Unreleased -->
+## Unreleased
+
+- ⚠️ The previous VAST-Pro feature for threat intel matching has been
+  [rewritten](https://docs.tenzir.com/vast/features/threat-intel-matching)
+  as VAST plugin. This PR updates `pyvast-threatbus` to cope with the VAST CLI
+  changes introduced by that rewrite.
+  [#109](https://github.com/tenzir/threatbus/pull/109)
+
+- 🐞 We fixed a bug where VAST matcher results where passed to the wrong mapping
+  function after being retrieved from VAST.
+  [#109](https://github.com/tenzir/threatbus/pull/109)
+
+
 
 ## [2021.03.25]
 
