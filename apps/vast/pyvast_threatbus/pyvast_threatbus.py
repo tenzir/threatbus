@@ -350,7 +350,7 @@ async def ingest_vast_ioc(vast_binary: str, vast_endpoint: str, indicator: Indic
         )
         return
     vast = VAST(binary=vast_binary, endpoint=vast_endpoint, logger=logger)
-    proc = await vast.import_().json(type="intel.indicator").exec(stdin=vast_ioc)
+    proc = await vast.import_(type="intel.indicator").json().exec(stdin=vast_ioc)
     await proc.wait()
     logger.debug(f"Ingested indicator for VAST live matching: {indicator}")
 
