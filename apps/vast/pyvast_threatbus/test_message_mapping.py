@@ -27,7 +27,7 @@ class TestMessageMapping(unittest.TestCase):
             id=self.indicator_id,
         )
         self.valid_query_result = f'{{"timestamp": "{self.ts}", "flow_id": 1840147514011873, "pcap_cnt": 626, "src_ip": "{self.ioc_value}", "src_port": 1193, "dest_ip": "65.54.95.64", "dest_port": 80, "proto": "TCP", "event_type": "http", "community_id": "1:AzSEWwmsqEKUX5qrReAHI3Rpizg=", "http": {{"hostname": "download.windowsupdate.com", "url": "/v9/windowsupdate/a/selfupdate/WSUS3/x86/Other/wsus3setup.cab?0911180916", "http_port": null, "http_user_agent": "Windows-Update-Agent", "http_content_type": "application/octet-stream", "http_method": "HEAD", "http_refer": null, "protocol": "HTTP/1.1", "status": 200, "redirect": null, "length": 0}}, "tx_id": 0}}'
-        self.valid_matcher_result = f'{{"ts": "{self.ts}", "data_id": 8, "indicator_id": 5, "matcher": "threatbus-syeocdkfcy", "ioc": "{self.ioc_value}", "reference": "threatbus__{self.indicator_id}"}}'
+        self.valid_matcher_result = f'{{"ts": "{self.ts}", "data_id": 8, "indicator_id": 5, "matcher": "threatbus-syeocdkfcy", "value": "{self.ioc_value}", "reference": "threatbus__{self.indicator_id}"}}'
 
     def test_vast_escape_str(self):
         self.assertEqual(vast_escape_str('e"vil.com'), 'e\\"vil.com')
@@ -73,7 +73,7 @@ class TestMessageMapping(unittest.TestCase):
     def test_indicator_to_vast_matcher_ioc(self):
         expected_vast_ioc = json.dumps(
             {
-                "ioc": self.ioc_value,
+                "value": self.ioc_value,
                 "type": "ip",
                 "reference": f"threatbus__{self.indicator_id}",
             }
@@ -147,9 +147,9 @@ class TestMessageMapping(unittest.TestCase):
         self.assertIsNone(matcher_result_to_sighting(42))
         self.assertIsNone(matcher_result_to_sighting(object))
         self.assertIsNone(matcher_result_to_sighting("some non-json string"))
-        sighting_with_malformed_reference = '{"ts": "2020-09-24T08:43:43.654072335", "ioc": "foo", "reference": "threatbus__86"}'
+        sighting_with_malformed_reference = '{"ts": "2020-09-24T08:43:43.654072335", "value": "foo", "reference": "threatbus__86"}'
         self.assertIsNone(matcher_result_to_sighting(sighting_with_malformed_reference))
-        sighting_with_malformed_timestamp = '{"ts": "2020 T08 :43.654072335", "ioc": "foo", "reference": "threatbus__indicator--46b3f973-5c03-41fc-9efe-49598a267a35"}'
+        sighting_with_malformed_timestamp = '{"ts": "2020 T08 :43.654072335", "value": "foo", "reference": "threatbus__indicator--46b3f973-5c03-41fc-9efe-49598a267a35"}'
         self.assertIsNone(matcher_result_to_sighting(sighting_with_malformed_timestamp))
 
     def test_matcher_result_to_sighting(self):

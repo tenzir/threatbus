@@ -350,7 +350,7 @@ async def ingest_vast_ioc(vast_binary: str, vast_endpoint: str, indicator: Indic
         )
         return
     vast = VAST(binary=vast_binary, endpoint=vast_endpoint, logger=logger)
-    proc = await vast.import_().json(type="intel.indicator").exec(stdin=vast_ioc)
+    proc = await vast.import_(type="intel.indicator").json().exec(stdin=vast_ioc)
     await proc.wait()
     logger.debug(f"Ingested indicator for VAST live matching: {indicator}")
 
@@ -370,7 +370,8 @@ async def remove_vast_ioc(vast_binary: str, vast_endpoint: str, indicator: Indic
         return None
     (vast_type, ioc_value) = type_and_value
     vast = VAST(binary=vast_binary, endpoint=vast_endpoint, logger=logger)
-    await vast.matcher().ioc_remove(matcher_name, ioc_value, vast_type).exec()
+    # TODO pass matcher_name once VAST supports more fine-grained deletion
+    await vast.matcher().intel().remove(ioc_value, vast_type).exec()
     logger.debug(f"Removed indicator from VAST live matching: {indicator}")
 
 
@@ -461,7 +462,7 @@ async def live_match_vast(
                 # TODO reconnect
             continue
         vast_sighting = data.decode("utf-8").rstrip()
-        sighting = matcher_result_to_threatbus_sighting(vast_sighting)
+        sighting = matcher_result_to_sighting(vast_sighting)
         if not sighting:
             logger.error(f"Cannot parse sighting-output from VAST: {vast_sighting}")
             continue

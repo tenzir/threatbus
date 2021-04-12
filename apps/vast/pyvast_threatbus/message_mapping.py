@@ -54,7 +54,7 @@ def indicator_to_vast_matcher_ioc(indicator: Indicator) -> Union[str, None]:
 
     return json.dumps(
         {
-            "ioc": ioc_value,
+            "value": ioc_value,
             "type": vast_type,
             "reference": f"{threatbus_reference}{indicator.id}",
         }
