@@ -12,6 +12,13 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+
+- 🎁 `pyvast-threatbus` now supports a new config option to set timeouts for
+  VAST retro-queries: `retro_match_timeout`. Pending queries are killed upon
+  timeout. VAST results that were exported before the timeout hit are still
+  reported as valid Sightings.
+  [#110](https://github.com/tenzir/threatbus/pull/110)
+
 - ⚠️ VAST's proprietary
   [Threat Intel Matching](https://docs.tenzir.com/vast/features/threat-intel-matching)
   feature was rewritten as a VAST plugin. `pyvast-threatbus` now works with the
