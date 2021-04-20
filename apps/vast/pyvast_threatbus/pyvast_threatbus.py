@@ -13,7 +13,6 @@ from .message_mapping import (
     indicator_to_vast_query,
     matcher_result_to_sighting,
     query_result_to_sighting,
-    split_object_path_and_value,
 )
 from pyvast import VAST
 import random

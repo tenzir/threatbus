@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 import unittest
 import json
-from stix2 import Indicator, Sighting, parse
+from stix2 import Indicator, Sighting
 from threatbus.data import Operation, ThreatBusSTIX2Constants
 from .message_mapping import (
     get_vast_type_and_value,
