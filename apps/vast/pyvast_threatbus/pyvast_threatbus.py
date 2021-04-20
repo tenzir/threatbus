@@ -88,6 +88,7 @@ def validate_config(config: confuse.Subview):
         live_match or retro_match
     ), "please enable at least one kind of matching (live_match and/or retro_match)"
     config["retro_match_max_events"].get(int)
+    config["retro_match_timeout"].get(float)
     config["max_background_tasks"].get(int)
 
     # fallback values for the optional arguments
@@ -125,6 +126,7 @@ async def start(
     live_match: bool,
     retro_match: bool,
     retro_match_max_events: int,
+    retro_match_timeout: float,
     max_open_files: int,
     metrics_interval: int,
     metrics_filename: str,
@@ -142,6 +144,7 @@ async def start(
     @param live_match Boolean flag to enable live-matching
     @param retro_match Boolean flag to enable retro-matching
     @param retro_match_max_events Max amount of retro match results
+    @param retro_match_timeout Interval after which to terminate the retro-query
     @param max_open_files The maximum number of concurrent background tasks for VAST queries.
     @param merics_interval The interval in seconds to bucketize metrics
     @param metrics_filename The filename (system path) to store metrics at
@@ -202,6 +205,7 @@ async def start(
                 live_match,
                 retro_match,
                 retro_match_max_events,
+                retro_match_timeout,
             )
         )
     )
@@ -293,11 +297,12 @@ async def receive(pub_endpoint: str, topic: str, indicator_queue: asyncio.Queue)
 
 
 async def retro_match_vast(
-    vast_binary,
-    vast_endpoint,
-    retro_match_max_events,
-    indicator,
-    sightings_queue,
+    vast_binary: str,
+    vast_endpoint: str,
+    retro_match_max_events: int,
+    retro_match_timeout: float,
+    indicator: Indicator,
+    sightings_queue: asyncio.Queue,
 ):
     """
     Turns the given STIX-2 Indicator into a valid VAST query and forwards all
@@ -305,6 +310,7 @@ async def retro_match_vast(
     @param vast_binary The vast binary command to use with PyVAST
     @param vast_endpoint The endpoint of a running vast node ('host:port')
     @param retro_match_max_events  Max amount of retro match results
+    @param retro_match_timeout Interval after which to terminate the retro-query
     @param indicator The STIX-2 Indicator to query VAST for
     @param sightings_queue The queue to put new sightings into
     """
@@ -319,9 +325,23 @@ async def retro_match_vast(
         if retro_match_max_events > 0:
             kwargs["max_events"] = retro_match_max_events
         proc = await vast.export(**kwargs).json(query).exec()
+        retro_result = None
+        try:
+            retro_result = await asyncio.wait_for(
+                proc.communicate(),
+                timeout=retro_match_timeout if retro_match_timeout > 0 else None,
+            )
+        except asyncio.TimeoutError:
+            proc.terminate()
+            logger.error(
+                f"Timeout after {retro_match_timeout}s in retro-query for indicator {indicator}"
+            )
+        if not retro_result or len(retro_result) != 2:
+            return
         reported = 0
-        while not proc.stdout.at_eof():
-            line = (await proc.stdout.readline()).decode().rstrip()
+        stdout = retro_result[0]
+        for line in stdout.decode().split("\n"):
+            line = line.rstrip()
             if line:
                 sighting = query_result_to_sighting(line, indicator)
                 if not sighting:
@@ -383,6 +403,7 @@ async def match_intel(
     live_match: bool,
     retro_match: bool,
     retro_match_max_events: int,
+    retro_match_timeout: float,
 ):
     """
     Reads from the indicator_queue and matches all IoCs, either via VAST's
@@ -394,6 +415,7 @@ async def match_intel(
     @param live_match Boolean flag to use retro-matching
     @param retro_match Boolean flag to use live-matching
     @param retro_match_max_events  Max amount of retro match results
+    @param retro_match_timeout Interval after which to terminate the retro-query
     """
     global logger, open_tasks
     while True:
@@ -427,6 +449,7 @@ async def match_intel(
                         vast_binary,
                         vast_endpoint,
                         retro_match_max_events,
+                        retro_match_timeout,
                         indicator,
                         sightings_queue,
                     )
@@ -698,6 +721,7 @@ def main():
                     config["live_match"].get(),
                     config["retro_match"].get(),
                     config["retro_match_max_events"].get(),
+                    config["retro_match_timeout"].get(),
                     config["max_background_tasks"].get(),
                     config["metrics"]["interval"].get(),
                     config["metrics"]["filename"].get(),
