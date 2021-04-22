@@ -28,8 +28,12 @@ Chat with us on [Matrix][chat-url].
 
 - **Connect Open-Source Security Tools**: Threat Bus is a pub-sub broker for
   threat intelligence data. With *Threat Bus* you can seamlessly integrate
-  [MISP][misp] intelligence with the [Zeek][zeek] intel framework or report
-  sightings from IDS deployments to some data base.
+  threat intel platforms like [OpenCTI][opencti] or [MISP][misp] with detection
+  tools and databases like [Zeek][zeek] or [VAST][vast].
+
+- **Native STIX-2**: Threat Bus transports indicators and sightings encoded as
+  per the [STIX-2](https://oasis-open.github.io/cti-documentation/stix/intro)
+  open format specification.
 
 - **Plugin-based Architecture**: The project is plugin-based and can be extended
   easily. Read about the different [plugin types][plugin-types] and
@@ -39,7 +43,8 @@ Chat with us on [Matrix][chat-url].
 - **Official Plugins**: We maintain many plugins right in the official Threat
   Bus repository. Check out our integrations for [MISP][misp], [Zeek][zeek],
   [CIFv3][cif], and generally apps that connect via [ZeroMQ][zmq], like
-  [pyvast-threatbus][pyvast-threatbus].
+  [pyvast-threatbus][pyvast-threatbus] and our
+  [OpenCTI connector][opencti-connector].
 
 - **Snapshotting**: The snapshot feature allows subscribers to directly request
   threat intelligence data for a certain time range from other applications.
@@ -52,8 +57,8 @@ The `config.yaml.example` file provides a working configuration for Threat Bus
 with all existing application plugins enabled together with the RabbitMQ
 backbone.
 
-The following example shows how to connect [MISP][misp], [Zeek][zeek] via
-Threat Bus. There are more integrations available, so make sure to check out all
+The following example shows how to connect [Zeek][zeek] via Threat Bus. There
+are more integrations available, so make sure to check out all
 [Threat Bus projects on PyPI](https://pypi.org/search/?q=threatbus).
 
 *Start Threat Bus*
@@ -103,6 +108,7 @@ pip install threatbus-inmem           # inmemory backbone plugin
 pip install threatbus-rabbitmq        # RabbitMQ backbone plugin
 pip install threatbus-misp[zmq]       # MISP application plugin
 pip install threatbus-zeek            # Zeek application plugin
+pip install threatbus-zmq-app         # ZeroMQ application plugin
 pip install threatbus-<plugin_name>
 ```
 
@@ -141,9 +147,10 @@ Please adhere to the [plugin naming conventions](https://pluggy.readthedocs.io/e
 and always prefix your plugin name with `threatbus-`.
 
 Plugins can either be *apps* or *backbones*. Application plugins (apps) add new
-functionality to `threatbus` and allow communication to a
-threat-intelligence-enabled app (e.g., Zeek or Suricata). Backbone plugins add a
-new storage and distribution backend to `threatbus` (e.g., in-memory or Kafka).
+functionality to Threat Bus and allow communication to a specific app and/or
+via a specific protocol (e.g., ZeroMQ or Zeek/broker). Backbone plugins add a
+new storage and distribution backend to Threat Bus (e.g., in-memory or
+RabbitMQ).
 
 Example:
 
@@ -208,6 +215,8 @@ to any of the existing plugins for an example.
 Threat Bus comes with a [3-clause BSD license][license-url].
 
 
+[opencti]: https://www.opencti.io/
+[opencti-connector]: https://github.com/OpenCTI-Platform/connectors/tree/master/threatbus
 [misp]: https://github.com/misp/misp
 [vast]: https://github.com/tenzir/vast
 [docs]: https://docs.tenzir.com/threatbus
