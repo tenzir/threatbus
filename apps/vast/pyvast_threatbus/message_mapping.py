@@ -132,6 +132,7 @@ def matcher_result_to_sighting(matcher_result: str) -> Union[Sighting, None]:
         return None
     ref = dct.get("reference", "")
     context = dct.get("context", {})
+    ioc_value = dct.get("value", "")
     # ref = threatbus__indicator--46b3f973-5c03-41fc-9efe-49598a267a35
     ref_len = len(threatbus_reference) + len("indicator--") + 36
     if not ts or not ref or not len(ref) == ref_len:
@@ -142,6 +143,7 @@ def matcher_result_to_sighting(matcher_result: str) -> Union[Sighting, None]:
         created=ts,
         sighting_of_ref=ref,
         custom_properties={
-            ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value: context
+            ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value: context,
+            ThreatBusSTIX2Constants.X_THREATBUS_INDICATOR_VALUE.value: ioc_value,
         },
     )

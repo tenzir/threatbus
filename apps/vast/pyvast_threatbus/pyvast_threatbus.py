@@ -543,7 +543,7 @@ async def report_sightings(
     @param transform_cmd The command to use to pipe sightings to. Treated
         as template string: occurrences of '%ioc' in the cmd string get replaced
         with the matched IoC.
-    @param report_data If True, only report context data of the sighting instead.data instead of the
+    @param report_data If True, only report context data of the sighting instead
         of the whole thing.
     """
     global logger
