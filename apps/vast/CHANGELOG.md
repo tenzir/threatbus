@@ -12,6 +12,11 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+- 🐞 We fixed an unhandled exception in the post-processing of sighting context
+  data for both retro- and live-matched sightings. The bug was introduced with
+  the STIX-2 rewrite and effectively rendered both the `transform_context` and
+  `sink` options unusable.
+  [#112](https://github.com/tenzir/threatbus/pull/112)
 
 - 🎁 `pyvast-threatbus` now supports a new config option to set timeouts for
   VAST retro-queries: `retro_match_timeout`. Pending queries are killed upon
