@@ -1,5 +1,4 @@
 from dateutil import parser as dateutil_parser
-from ipaddress import ip_address
 import json
 from stix2 import Indicator, Sighting
 from threatbus.data import ThreatBusSTIX2Constants
