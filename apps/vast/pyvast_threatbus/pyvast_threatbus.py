@@ -566,51 +566,88 @@ async def report_sightings(
             )
             continue
         if transform_cmd:
+            sighting = await transform_context(sighting, transform_cmd)
+        if sink:
             context = (
                 sighting.x_threatbus_sighting_context
                 if ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value
                 in sighting.object_properties()
                 else None
             )
-            indicator = (
-                sighting.x_threatbus_indicator
-                if ThreatBusSTIX2Constants.X_THREATBUS_INDICATOR.value
-                in sighting.object_properties()
-                else None
-            )
-            _, ioc_value = split_object_path_and_value(indicator.pattern)
-            transformed_context_raw = await invoke_cmd_for_context(
-                transform_cmd, context, ioc_value
-            )
-            try:
-                transformed_context = json.loads(transformed_context_raw)
-                # recreate the sighting with the new transformed context
-                ser = json.loads(sighting.serialize())
-                ser[
-                    ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value
-                ] = transformed_context
-                sighting = parse(json.dumps(ser), allow_custom=True)
-            except Exception as e:
-                logger.error(
-                    f"Cannot parse transformed sighting context (expecting JSON): {transformed_context_raw}",
-                    e,
+            if not context:
+                logger.warn(
+                    f"Cannot report sighting context to custom sink because no context data is found in the sighting {sighting}"
                 )
                 continue
-        if (
-            sink
-            and ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value
-            in sighting.object_properties()
-        ):
             if sink.lower() == "stdout":
-                print(json.dumps(sighting.x_threatbus_sighting_context))
+                print(json.dumps(context))
             else:
-                await invoke_cmd_for_context(
-                    sink, sighting.x_threatbus_sighting_context
-                )
+                await invoke_cmd_for_context(sink, context)
         else:
             socket.send_string(f"{topic} {sighting.serialize()}")
         sightings_queue.task_done()
         logger.debug(f"Reported sighting: {sighting}")
+
+
+async def transform_context(sighting: Sighting, transform_cmd: str) -> Sighting:
+    """
+    Transforms the context of a sighting using the command configured in
+    `transform_context`
+    @param sighting the sighting as it was reported by VAST
+    @param transform_cmd The command to use to pipe sightings to. Treated
+        as template string: occurrences of '%ioc' in the cmd string get replaced
+        with the matched IoC.
+    @return a copy of the original sighting with the x_threatbus_context field
+        set and transformed accordingly
+    """
+    context = (
+        sighting.x_threatbus_sighting_context
+        if ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value
+        in sighting.object_properties()
+        else None
+    )
+    if not context:
+        logger.error(
+            f"Cannot invoke `transform_context` command because no context data is found in the sighting {sighting}"
+        )
+        return
+    indicator = (
+        sighting.x_threatbus_indicator
+        if ThreatBusSTIX2Constants.X_THREATBUS_INDICATOR.value
+        in sighting.object_properties()
+        else None
+    )
+    if indicator:
+        _, ioc_value = split_object_path_and_value(indicator.pattern)
+    else:
+        # try to find the indicator value instead
+        ioc_value = (
+            sighting.x_threatbus_indicator_value
+            if ThreatBusSTIX2Constants.X_THREATBUS_INDICATOR_VALUE.value
+            in sighting.object_properties()
+            else None
+        )
+    if not ioc_value:
+        logger.error(
+            f"Cannot invoke `transform_context` command because no indicator value is found in the sighting {sighting}"
+        )
+        return
+    transformed_context_raw = await invoke_cmd_for_context(
+        transform_cmd, context, ioc_value
+    )
+    try:
+        transformed_context = json.loads(transformed_context_raw)
+        # recreate the sighting with the new transformed context
+        ser = json.loads(sighting.serialize())
+        ser[
+            ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value
+        ] = transformed_context
+        return parse(json.dumps(ser), allow_custom=True)
+    except Exception as e:
+        logger.error(
+            f"Cannot parse transformed sighting context (expecting JSON): {transformed_context_raw}",
+            e,
+        )
 
 
 def send_manage_message(endpoint: str, action: dict, timeout: int = 5):
