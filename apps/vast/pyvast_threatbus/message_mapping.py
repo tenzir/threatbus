@@ -106,7 +106,8 @@ def query_result_to_sighting(
             created=dateutil_parser.parse(ts),
             sighting_of_ref=indicator.id,
             custom_properties={
-                ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value: context
+                ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value: context,
+                ThreatBusSTIX2Constants.X_THREATBUS_INDICATOR.value: indicator,
             },
         )
     except Exception:

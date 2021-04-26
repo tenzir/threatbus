@@ -24,6 +24,7 @@ from .metrics import Gauge, Summary
 from stix2 import parse, Indicator, Sighting
 from threatbus.logger import setup as setup_logging_threatbus
 from threatbus.data import Operation, ThreatBusSTIX2Constants
+from threatbus.stix2_helpers import split_object_path_and_value
 
 import time
 import zmq
@@ -542,8 +543,8 @@ async def report_sightings(
     @param transform_cmd The command to use to pipe sightings to. Treated
         as template string: occurrences of '%ioc' in the cmd string get replaced
         with the matched IoC.
-    @param report_data If True, only report sighting.context.data instead of the
-        whole sighting.
+    @param report_data If True, only report context data of the sighting instead.data instead of the
+        of the whole thing.
     """
     global logger
     if transform_cmd:
@@ -564,27 +565,48 @@ async def report_sightings(
                 f"Ignoring unknown message type, expected Sighting: {type(sighting)}"
             )
             continue
-        if transform_cmd and sighting.context:
-            ioc = sighting.ioc
-            if sighting.ioc and type(sighting.ioc) is tuple:
-                ioc = sighting.ioc[0]  # use first value of tuple
-            context_str = await invoke_cmd_for_context(
-                transform_cmd, sighting.context, ioc
+        if transform_cmd:
+            context = (
+                sighting.x_threatbus_sighting_context
+                if ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value
+                in sighting.object_properties()
+                else None
+            )
+            indicator = (
+                sighting.x_threatbus_indicator
+                if ThreatBusSTIX2Constants.X_THREATBUS_INDICATOR.value
+                in sighting.object_properties()
+                else None
+            )
+            _, ioc_value = split_object_path_and_value(indicator.pattern)
+            transformed_context_raw = await invoke_cmd_for_context(
+                transform_cmd, context, ioc_value
             )
             try:
-                context = json.loads(context_str)
-                sighting.context = context
+                transformed_context = json.loads(transformed_context_raw)
+                # recreate the sighting with the new transformed context
+                ser = json.loads(sighting.serialize())
+                ser[
+                    ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value
+                ] = transformed_context
+                sighting = parse(json.dumps(ser), allow_custom=True)
             except Exception as e:
                 logger.error(
-                    f"Cannot parse transformed sighting context (expecting JSON): {context_str}",
+                    f"Cannot parse transformed sighting context (expecting JSON): {transformed_context_raw}",
                     e,
                 )
                 continue
-        if sink:
+        if (
+            sink
+            and ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value
+            in sighting.object_properties()
+        ):
             if sink.lower() == "stdout":
-                print(json.dumps(sighting.context))
+                print(json.dumps(sighting.x_threatbus_sighting_context))
             else:
-                await invoke_cmd_for_context(sink, sighting.context)
+                await invoke_cmd_for_context(
+                    sink, sighting.x_threatbus_sighting_context
+                )
         else:
             socket.send_string(f"{topic} {sighting.serialize()}")
         sightings_queue.task_done()
