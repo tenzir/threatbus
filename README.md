@@ -21,7 +21,9 @@ A threat intelligence dissemination layer for open-source security tools.
 [_License_](#license) &mdash;
 [_Documentation_][docs]
 
-Chat with us on [Matrix][chat-url].
+Chat with us on [Gitter][chat-url], or join us on Matrix at
+`#tenzir_threatbus:gitter.im`
+
 </h4>
 
 ## Key Features
@@ -34,7 +36,7 @@ Chat with us on [Matrix][chat-url].
 - **Plugin-based Architecture**: The project is plugin-based and can be extended
   easily. Read about the different [plugin types][plugin-types] and
   [how to write your own][plugin-development].
-  We welcome contributions to adopt new open source tools! 
+  We welcome contributions to adopt new open source tools!
 
 - **Official Plugins**: We maintain many plugins right in the official Threat
   Bus repository. Check out our integrations for [MISP][misp], [Zeek][zeek],
@@ -226,8 +228,8 @@ Threat Bus comes with a [3-clause BSD license][license-url].
 [latest-release-url]: https://github.com/tenzir/threatbus/releases
 [ci-url]: https://github.com/tenzir/threatbus/actions?query=branch%3Amaster
 [ci-badge]: https://github.com/tenzir/threatbus/workflows/Python%20Egg/badge.svg?branch=master
-[chat-badge]: https://img.shields.io/badge/matrix-chat-brightgreen.svg
-[chat-url]: https://tenzir.element.io
+[chat-badge]: https://img.shields.io/badge/gitter-chat-brightgreen.svg
+[chat-url]: https://gitter.im/tenzir/threatbus
 [license-badge]: https://img.shields.io/badge/license-BSD-blue.svg
 [license-url]: https://github.com/tenzir/threatbus/blob/master/COPYING
 [alpha-badge]: https://img.shields.io/badge/stage-alpha-blueviolet

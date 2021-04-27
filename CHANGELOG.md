@@ -12,6 +12,11 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+- ⚠️ The Threat Bus community chat moved from Element to Gitter. Join us at
+  [gitter.im/tenzir/threatbus](https://gitter.im/tenzir/threatbus) or via
+  Matrix at `#tenzir_threatbus:gitter.im`.
+  [#113](https://github.com/tenzir/threatbus/pull/113)
+
 - 🐞 We fixed a bug in the routing logic for SnapshotRequests. Apps can now
   request snapshots as expected for all `stix2`-prefixed topics.
   [#103](https://github.com/tenzir/threatbus/pull/103)
