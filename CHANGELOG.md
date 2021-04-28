@@ -14,6 +14,10 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## [2021.04.29]
 
+- 🐞 We fixed a bug in the ZeroMQ app plugin that threw an exception upon
+  receiving `SnapshotRequests`.
+  [#116](https://github.com/tenzir/threatbus/pull/116)
+
 - ⚠️ The Threat Bus community chat moved from Element to Gitter. Join us at
   [gitter.im/tenzir/threatbus](https://gitter.im/tenzir/threatbus) or via
   Matrix at `#tenzir_threatbus:gitter.im`.

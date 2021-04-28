@@ -171,7 +171,7 @@ class ZmqPublisher(threatbus.StoppableWorker):
                     q.task_done()
                     continue
                 topic += type(msg).__name__.lower()
-                if type(msg) is Indicator or Sighting:
+                if type(msg) is Indicator or type(msg) is Sighting:
                     encoded = msg.serialize()
                 elif type(msg) is SnapshotRequest:
                     encoded = json.dumps(msg, cls=SnapshotRequestEncoder)
