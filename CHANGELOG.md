@@ -4,11 +4,11 @@ This changelog documents all notable user-facing changes of Threat Bus.
 
 Every entry has a category for which we use the following visual abbreviations:
 
-- 🎁 Feature
-- ⚠️ Change
-- ⚡️ Breaking Change
-- 🧬 Experimental feature
-- 🐞 Bugfix
+- 🎁 Features
+- ⚠️ Changes
+- ⚡️ Breaking Changes
+- 🧬 Experimental Features
+- 🐞 Bug Fixes
 
 <!-- ## Unreleased -->
 

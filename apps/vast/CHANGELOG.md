@@ -4,11 +4,11 @@ This changelog documents all notable user-facing changes of `pyvast-threatbus`.
 
 Every entry has a category for which we use the following visual abbreviations:
 
-- 🎁 feature
-- 🧬 experimental feature
-- ⚠️ change
-- ⚡️ breaking change
-- 🐞 bugfix
+- 🎁 Features
+- 🧬 Experimental Features
+- ⚠️ Changes
+- ⚡️ Breaking Changes
+- 🐞 Bug Fixes
 
 ## Unreleased
 
