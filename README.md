@@ -10,7 +10,7 @@ A threat intelligence dissemination layer for open-source security tools.
 [![Build Status][ci-badge]][ci-url]
 [![Total alerts][lgtm-alerts-badge]][lgtm-alerts-url]
 [![Language grade: Python][lgtm-quality-badge]][lgtm-quality-url]
-[![Development Status][alpha-badge]][latest-release-url]
+[![Development Status][beta-badge]][latest-release-url]
 [![Latest Release][latest-release-badge]][latest-release-url]
 [![Chat][chat-badge]][chat-url]
 [![License][license-badge]][license-url]
@@ -241,7 +241,7 @@ Threat Bus comes with a [3-clause BSD license][license-url].
 [chat-url]: https://gitter.im/tenzir/threatbus
 [license-badge]: https://img.shields.io/badge/license-BSD-blue.svg
 [license-url]: https://github.com/tenzir/threatbus/blob/master/COPYING
-[alpha-badge]: https://img.shields.io/badge/stage-alpha-blueviolet
+[beta-badge]: https://img.shields.io/badge/stage-beta-blue
 [lgtm-alerts-badge]: https://img.shields.io/lgtm/alerts/g/tenzir/threatbus.svg?logo=lgtm&logoWidth=18
 [lgtm-alerts-url]: https://lgtm.com/projects/g/tenzir/threatbus/alerts/
 [lgtm-quality-badge]: https://img.shields.io/lgtm/grade/python/g/tenzir/threatbus.svg?logo=lgtm&logoWidth=18
