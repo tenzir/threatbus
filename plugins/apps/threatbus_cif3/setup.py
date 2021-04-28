@@ -27,7 +27,7 @@ setup(
     entry_points={"threatbus.app": ["cif3 = threatbus_cif3.plugin"]},
     install_requires=[
         "stix2 >= 2.1",
-        "threatbus >= 2021.3.25",
+        "threatbus >= 2021.4.29",
         "cifsdk > 3.0.0rc4, < 4.0",
     ],
     keywords=[
@@ -49,5 +49,5 @@ setup(
     packages=["threatbus_cif3"],
     python_requires=">=3.6",
     url="https://github.com/tenzir/threatbus",
-    version="2021.03.25",
+    version="2021.04.29",
 )

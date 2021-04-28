@@ -24,7 +24,7 @@ setup(
     entry_points={"threatbus.backbone": ["inmem = threatbus_inmem.plugin"]},
     install_requires=[
         "stix2 >= 2.1",
-        "threatbus >= 2021.2.24",
+        "threatbus >= 2021.4.29",
     ],
     keywords=[
         "message broker",
@@ -41,5 +41,5 @@ setup(
     packages=["threatbus_inmem"],
     python_requires=">=3.7",
     url="https://github.com/tenzir/threatbus",
-    version="2021.03.25",
+    version="2021.04.29",
 )
