@@ -11,7 +11,7 @@ setup(
     author_email="engineering@tenzir.com",
     classifiers=[
         # https://pypi.org/classifiers/
-        "Development Status :: 3 - Alpha",
+        "Development Status :: 4 - Beta",
         "License :: OSI Approved :: BSD License",
         "Operating System :: MacOS :: MacOS X",
         "Operating System :: POSIX :: Linux",
@@ -33,7 +33,7 @@ setup(
         "pyzmq >= 19",
         "pyvast >= 2020.10.29",
         "stix2 >= 2.1",
-        "threatbus >= 2021.3.25",
+        "threatbus >= 2021.4.29",
     ],
     keywords=[
         "open source",
@@ -52,5 +52,5 @@ setup(
     python_requires=">=3.7",
     setup_requires=["setuptools", "wheel"],
     url="https://github.com/tenzir/threatbus",
-    version="2021.03.25",
+    version="2021.04.29",
 )

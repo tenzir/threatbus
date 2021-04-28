@@ -10,7 +10,9 @@ Every entry has a category for which we use the following visual abbreviations:
 - ⚡️ Breaking Changes
 - 🐞 Bug Fixes
 
-## Unreleased
+<!-- ## Unreleased -->
+
+## [2021.04.29]
 
 - 🐞 We fixed an unhandled exception in the post-processing of sighting context
   data for both retro- and live-matched sightings. The bug was introduced with
@@ -112,3 +114,4 @@ Every entry has a category for which we use the following visual abbreviations:
 [2020.12.16]: https://github.com/tenzir/threatbus/releases/tag/2020.12.16
 [2021.02.24]: https://github.com/tenzir/threatbus/releases/tag/2021.02.24
 [2021.03.25]: https://github.com/tenzir/threatbus/releases/tag/2021.03.25
+[2021.04.29]: https://github.com/tenzir/threatbus/releases/tag/2021.04.29

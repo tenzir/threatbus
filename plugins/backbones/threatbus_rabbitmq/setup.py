@@ -11,7 +11,7 @@ setup(
     author_email="engineering@tenzir.com",
     classifiers=[
         # https://pypi.org/classifiers/
-        "Development Status :: 3 - Alpha",
+        "Development Status :: 4 - Beta",
         "Environment :: Plugins",
         "License :: OSI Approved :: BSD License",
         "Operating System :: MacOS :: MacOS X",
@@ -26,7 +26,7 @@ setup(
         "pika >= 1.1.0",
         "retry",
         "stix2 >= 2.1",
-        "threatbus >= 2021.2.24",
+        "threatbus >= 2021.4.29",
     ],
     keywords=[
         "message broker",
@@ -46,5 +46,5 @@ setup(
     packages=["threatbus_rabbitmq"],
     python_requires=">=3.7",
     url="https://github.com/tenzir/threatbus",
-    version="2021.03.25",
+    version="2021.04.29",
 )

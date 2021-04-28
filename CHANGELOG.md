@@ -12,6 +12,13 @@ Every entry has a category for which we use the following visual abbreviations:
 
 <!-- ## Unreleased -->
 
+## [2021.04.29]
+
+- ⚠️ The Threat Bus community chat moved from Element to Gitter. Join us at
+  [gitter.im/tenzir/threatbus](https://gitter.im/tenzir/threatbus) or via
+  Matrix at `#tenzir_threatbus:gitter.im`.
+  [#113](https://github.com/tenzir/threatbus/pull/113)
+
 ## [2021.03.25]
 
 - 🎁 The CIFv3 plugin now supports the
@@ -21,11 +28,6 @@ Every entry has a category for which we use the following visual abbreviations:
   The plugin converts STIX-2 Indicators on best-effort basis to CIFv3
   indicators before forwarding them to the configured CIF endpoint.
   [#106](https://github.com/tenzir/threatbus/pull/106)
-
-- ⚠️ The Threat Bus community chat moved from Element to Gitter. Join us at
-  [gitter.im/tenzir/threatbus](https://gitter.im/tenzir/threatbus) or via
-  Matrix at `#tenzir_threatbus:gitter.im`.
-  [#113](https://github.com/tenzir/threatbus/pull/113)
 
 - 🐞 We fixed a bug in the routing logic for SnapshotRequests. Apps can now
   request snapshots as expected for all `stix2`-prefixed topics.
@@ -166,3 +168,4 @@ Every entry has a category for which we use the following visual abbreviations:
 [2020.12.16]: https://github.com/tenzir/threatbus/releases/tag/2020.12.16
 [2021.02.24]: https://github.com/tenzir/threatbus/releases/tag/2021.02.24
 [2021.03.25]: https://github.com/tenzir/threatbus/releases/tag/2021.03.25
+[2021.04.29]: https://github.com/tenzir/threatbus/releases/tag/2021.04.29

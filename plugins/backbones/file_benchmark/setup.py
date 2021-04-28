@@ -34,5 +34,5 @@ setup(
     packages=["file_benchmark"],
     python_requires=">=3.7",
     url="https://github.com/tenzir/threatbus",
-    version="2021.03.25",
+    version="2021.04.29",
 )
