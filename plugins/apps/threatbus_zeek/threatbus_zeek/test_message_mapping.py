@@ -147,7 +147,7 @@ class TestMessageMapping(unittest.TestCase):
         event = broker.zeek.Event("sighting", self.ts, self.indicator_id, context)
         sighting = map_broker_event_to_sighting(event, self.module_namespace, None)
         self.assertEqual(type(sighting), Sighting)
-        self.assertEqual(sighting.created, self.ts)
+        self.assertEqual(sighting.last_seen, self.ts)
         self.assertEqual(sighting.sighting_of_ref, self.indicator_id)
         self.assertTrue(
             ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value
@@ -161,7 +161,7 @@ class TestMessageMapping(unittest.TestCase):
         )
         sighting = map_broker_event_to_sighting(event, self.module_namespace, None)
         self.assertEqual(type(sighting), Sighting)
-        self.assertEqual(sighting.created, self.ts)
+        self.assertEqual(sighting.last_seen, self.ts)
         self.assertEqual(sighting.sighting_of_ref, self.indicator_id)
         self.assertTrue(
             ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value

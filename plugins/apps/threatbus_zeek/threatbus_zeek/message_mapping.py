@@ -81,8 +81,8 @@ def map_broker_event_to_sighting(broker_data, module_namespace, logger):
     # convert args to STIX-2 sighting
     (timestamp, ioc_id, context) = args
     return Sighting(
-        created=timestamp,
         sighting_of_ref=str(ioc_id),
+        last_seen=timestamp,
         custom_properties={
             ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value: context
         },

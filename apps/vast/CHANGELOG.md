@@ -10,7 +10,14 @@ Every entry has a category for which we use the following visual abbreviations:
 - ⚡️ Breaking Changes
 - 🐞 Bug Fixes
 
-<!-- ## Unreleased -->
+## Unreleased
+
+- ⚠️ `pyvast-threatbus` now uses the timestamp of retro- & live-matches to set
+  the `last_seen` property of STIX-2 Sightings, instead of setting the `created`
+  timestamp. The `created` timestamp now always refers to the actual creation
+  time of the sightings.
+  [#117](https://github.com/tenzir/threatbus/pull/117)
+
 
 ## [2021.04.29]
 
