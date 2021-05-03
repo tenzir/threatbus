@@ -10,7 +10,14 @@ Every entry has a category for which we use the following visual abbreviations:
 - 🧬 Experimental Features
 - 🐞 Bug Fixes
 
-<!-- ## Unreleased -->
+## Unreleased
+
+- ⚠️ The `threatbus-zeek` plugin now uses the timestamp of Zeek intel matches to
+  set the `last_seen` property of resulting STIX-2 Sightings, instead of setting
+  the `created` timestamp. The `created` timestamp now always refers to the
+  actual creation time of the sightings.
+  [#117](https://github.com/tenzir/threatbus/pull/117)
+
 
 ## [2021.04.29]
 
