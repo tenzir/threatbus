@@ -101,9 +101,9 @@ def query_result_to_sighting(
         ts = context.get("ts", context.get("timestamp", None))
         if not ts:
             return None
-
+        ts = dateutil_parser.parse(ts)
         return Sighting(
-            created=dateutil_parser.parse(ts),
+            last_seen=ts,
             sighting_of_ref=indicator.id,
             custom_properties={
                 ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value: context,
@@ -140,7 +140,7 @@ def matcher_result_to_sighting(matcher_result: str) -> Union[Sighting, None]:
     ref = ref[len(threatbus_reference) :]
     context["source"] = "VAST"
     return Sighting(
-        created=ts,
+        last_seen=ts,
         sighting_of_ref=ref,
         custom_properties={
             ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value: context,

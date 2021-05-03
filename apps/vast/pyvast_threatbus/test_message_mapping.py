@@ -132,7 +132,7 @@ class TestMessageMapping(unittest.TestCase):
         )
         self.assertIsNotNone(parsed_sighting)
         self.assertEqual(type(parsed_sighting), Sighting)
-        self.assertEqual(parsed_sighting.created, self.ts)
+        self.assertEqual(parsed_sighting.last_seen, self.ts)
         self.assertEqual(parsed_sighting.sighting_of_ref, self.indicator_id)
         self.assertTrue(
             ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value
@@ -156,7 +156,7 @@ class TestMessageMapping(unittest.TestCase):
         parsed_sighting = matcher_result_to_sighting(self.valid_matcher_result)
         self.assertIsNotNone(parsed_sighting)
         self.assertEqual(type(parsed_sighting), Sighting)
-        self.assertEqual(parsed_sighting.created, self.ts)
+        self.assertEqual(parsed_sighting.last_seen, self.ts)
         self.assertEqual(parsed_sighting.sighting_of_ref, self.indicator_id)
         self.assertTrue(
             ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value
