@@ -1,0 +1,9 @@
+logging:
+  console: true
+  console_verbosity: DEBUG
+  file: true
+  file_verbosity: DEBUG
+  filename: zmq-app-template.log
+
+threatbus: localhost:13370
+snapshot: 30
