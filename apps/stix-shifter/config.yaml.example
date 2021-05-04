@@ -7,3 +7,21 @@ logging:
 
 threatbus: localhost:13370
 snapshot: 30
+modules:
+  # for details on a module's options, please see https://github.com/opencybersecurityalliance/stix-shifter/blob/master/OVERVIEW.md#how-to-use
+  splunk:
+    max-results: 100
+    connection:
+      host: localhost,
+      port: 8089,
+      selfSignedCert: false,
+    transmission:
+      auth:
+        username: admin
+        password: admin123
+    translation: {<Any required options specific to the particular data source>}
+    data_source:
+      type: identity
+      identity_class: events
+      name: Splunk
+      id: identity--629a6400-8817-4bcb-aee7-8c74fc57482c
