@@ -12,6 +12,12 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+- 🎁 We now provide a simple asyncio
+  [template](https://github.com/tenzir/threatbus/tree/master/apps/zmq-app-template)
+  for writing applications that connect to Threat Bus via ZeroMQ.
+  [#118](https://github.com/tenzir/threatbus/pull/118)
+
+
 - ⚠️ The `threatbus-zeek` plugin now uses the timestamp of Zeek intel matches to
   set the `last_seen` property of resulting STIX-2 Sightings, instead of setting
   the `created` timestamp. The `created` timestamp now always refers to the
