@@ -25,6 +25,7 @@ unit-tests:
 	$(MAKE) -C plugins/apps/threatbus_zeek unit-tests
 	$(MAKE) -C plugins/apps/threatbus_cif3 unit-tests
 	$(MAKE) -C apps/vast unit-tests
+	$(MAKE) -C apps/stix-shifter unit-tests
 
 .PHONY: integration-tests
 integration-tests:
@@ -50,6 +51,7 @@ clean:
 	-$(MAKE) -C plugins/backbones/threatbus_inmem clean
 	-$(MAKE) -C plugins/backbones/threatbus_rabbitmq clean
 	-$(MAKE) -C apps/vast clean
+	-$(MAKE) -C apps/stix-shifter clean
 
 .PHONY: build
 build:
@@ -61,6 +63,7 @@ build:
 	$(MAKE) -C plugins/backbones/threatbus_inmem build
 	$(MAKE) -C plugins/backbones/threatbus_rabbitmq build
 	$(MAKE) -C apps/vast build
+	$(MAKE) -C apps/stix-shifter build
 
 .PHONY: dist
 dist:
@@ -72,6 +75,7 @@ dist:
 	$(MAKE) -C plugins/backbones/threatbus_inmem dist
 	$(MAKE) -C plugins/backbones/threatbus_rabbitmq dist
 	$(MAKE) -C apps/vast dist
+	$(MAKE) -C apps/stix-shifter dist
 
 .PHONY: install
 install:
@@ -83,6 +87,7 @@ install:
 	$(MAKE) -C plugins/backbones/threatbus_inmem install
 	$(MAKE) -C plugins/backbones/threatbus_rabbitmq install
 	$(MAKE) -C apps/vast install
+	$(MAKE) -C apps/stix-shifter install
 
 .PHONY: dev-mode
 dev-mode:
@@ -92,5 +97,6 @@ dev-mode:
 	$(MAKE) -C plugins/backbones/threatbus_rabbitmq dev-mode
 	$(MAKE) -C plugins/apps/threatbus_misp dev-mode
 	$(MAKE) -C plugins/apps/threatbus_zeek dev-mode
-	$(MAKE) -C apps/vast dev-mode
 	$(MAKE) -C plugins/apps/threatbus_cif3 dev-mode
+	$(MAKE) -C apps/vast dev-mode
+	$(MAKE) -C apps/stix-shifter dev-mode
