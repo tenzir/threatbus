@@ -1,0 +1,39 @@
+[tool.poetry]
+name = "file-benchmark"
+version = "2021.04.29"
+authors = ["Tenzir <engineering@tenzir.com>"]
+classifiers=[
+    # https://pypi.org/classifiers/
+    "Development Status :: 3 - Alpha",
+    "Environment :: Plugins",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+    "Topic :: Software Development :: Object Brokering",
+]
+description = "A benchmark backbone for threatbus, that reads a file and provisions its contents."
+documentation = "https://docs.tenzir.com/threatbus/"
+keywords = [
+    "threatbus",
+    "plugin"
+]
+license = "BSD-3-Clause"
+readme = "README.md"
+repository = "https://github.com/tenzir/threatbus/"
+
+[tool.poetry.plugins."threatbus.backbone"]
+file_benchmark = "file_benchmark.plugin"
+
+[tool.poetry.dependencies]
+python = "^3.7"
+threatbus = "2021.04.29"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.urls]
+issues = "https://github.com/tenzir/threatbus/issues"
