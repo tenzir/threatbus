@@ -88,16 +88,21 @@ class SubscriptionManager(threatbus.StoppableWorker):
                         subscriptions_lock.acquire()
                         subscriptions[p2p_topic] = (task.topic, p2p_q)
                         subscriptions_lock.release()
-                        snapshot_id = self.subscribe_callback(
-                            task.topic, p2p_q, task.snapshot
+                        subscribed_topics = (
+                            task.topic if type(task.topic) is list else [task.topic]
                         )
-                        if snapshot_id:
-                            # remember that this snapshot was requested by this particular
-                            # subscriber (identified by unique topic), so it is not asked to
-                            # execute it's own request
-                            snapshots_lock.acquire()
-                            snapshots[snapshot_id] = p2p_topic
-                            snapshots_lock.release()
+
+                        for subscribed_topic in subscribed_topics:
+                            snapshot_id = self.subscribe_callback(
+                                subscribed_topic, p2p_q, task.snapshot
+                            )
+                            if snapshot_id:
+                                # remember that this snapshot was requested by this particular
+                                # subscriber (identified by unique p2p_topic), so it is not asked to
+                                # execute it's own snapshot request
+                                snapshots_lock.acquire()
+                                snapshots[snapshot_id] = p2p_topic
+                                snapshots_lock.release()
                         # send success message for reconnecting
                         socket.send_json(
                             {
@@ -112,12 +117,20 @@ class SubscriptionManager(threatbus.StoppableWorker):
                         socket.send_json({"status": "error"})
                 elif type(task) is Unsubscription:
                     logger.info(f"Received unsubscription from topic {task.topic}")
-                    threatbus_topic, p2p_q = subscriptions.get(task.topic, (None, None))
+                    threatbus_topics, p2p_q = subscriptions.get(
+                        task.topic, (None, None)
+                    )
+                    threatbus_topics = (
+                        threatbus_topics
+                        if type(threatbus_topics) is list
+                        else [threatbus_topics]
+                    )
                     if not p2p_q:
                         logger.warn("No one was subscribed for that topic. Skipping.")
                         socket.send_json({"status": "error"})
                         continue
-                    self.unsubscribe_callback(threatbus_topic, p2p_q)
+                    for tb_topic in threatbus_topics:
+                        self.unsubscribe_callback(tb_topic, p2p_q)
                     subscriptions_lock.acquire()
                     del subscriptions[task.topic]
                     subscriptions_lock.release()

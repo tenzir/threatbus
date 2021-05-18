@@ -5,6 +5,9 @@ from threatbus.data import Subscription, Unsubscription
 
 @dataclass
 class Heartbeat:
+    # the p2p_topic used for point-to-point communication between the host and
+    # the subscriber, not a human-readable topic. I.e., the random string that
+    # was sent as respons from the Threat Bus host during subscription.
     topic: str
 
 
