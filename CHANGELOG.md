@@ -12,6 +12,13 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+- 🎁 Threat Bus now supports subscriptions for multiple topics. The
+  `zmq-app-plugin` implements those multi-topic subscriptions in a
+  backwards-compatible way. Subscribers benefit from this change, as they only
+  get assigned a single point-to-point topic for their subscription, instead of
+  one point-to-point topic for every subscribed Threat Bus topic.
+  [#120](https://github.com/tenzir/threatbus/pull/120)
+
 - ⚠️ The `-c` / `--config` parameter is now explicitly required to start
   Threat Bus. Starting without it will print a helpful error message.
   [#119](https://github.com/tenzir/threatbus/pull/119)
