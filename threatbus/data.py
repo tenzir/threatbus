@@ -4,7 +4,7 @@ from enum import auto, Enum, unique
 import json
 from stix2 import Indicator, Sighting, parse
 from stix2.parsing import dict_to_stix2
-from typing import Union
+from typing import List, Union
 
 ## Threat Bus custom STIX-2 attributes
 @unique
@@ -23,12 +23,16 @@ class ThreatBusSTIX2Constants(Enum):
 
 @dataclass
 class Subscription:
-    topic: str
+    # either a single topic or a list of topics, e.g., `stix2/indicator`
+    topic: Union[str, List[str]]
     snapshot: timedelta
 
 
 @dataclass
 class Unsubscription:
+    # the p2p_topic used for point-to-point communication between the host and
+    # the subscriber, not a human-readable topic. I.e., the random string that
+    # was sent as respons from the Threat Bus host during subscription.
     topic: str
 
 
