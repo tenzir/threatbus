@@ -5,7 +5,7 @@ import json
 from stix2 import Indicator, Sighting
 from stix2.utils import format_datetime
 
-from data import (
+from threatbus.data import (
     MessageType,
     Operation,
     SnapshotEnvelope,

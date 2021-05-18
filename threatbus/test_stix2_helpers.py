@@ -1,4 +1,4 @@
-from stix2_helpers import is_point_equality_ioc, split_object_path_and_value
+from threatbus.stix2_helpers import is_point_equality_ioc, split_object_path_and_value
 import unittest
 
 
