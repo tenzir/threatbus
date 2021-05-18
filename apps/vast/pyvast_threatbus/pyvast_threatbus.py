@@ -743,7 +743,10 @@ async def heartbeat(endpoint: str, p2p_topic: str, interval: int = 5):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", "-c", help="Path to a configuration file")
+    required_group = parser.add_argument_group("required named arguments")
+    required_group.add_argument(
+        "--config", "-c", help="path to a configuration file", required=True
+    )
     args = parser.parse_args()
 
     # we need to use an underscore in the configuration name "pyvast_threatbus"

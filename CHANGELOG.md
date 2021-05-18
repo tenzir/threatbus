@@ -12,6 +12,10 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+- ⚠️ The `-c` / `--config` parameter is now explicitly required to start
+  Threat Bus. Starting without it will print a helpful error message.
+  [#119](https://github.com/tenzir/threatbus/pull/119)
+
 - ⚠️ The `threatbus-zeek` plugin now uses the timestamp of Zeek intel matches to
   set the `last_seen` property of resulting STIX-2 Sightings, instead of setting
   the `created` timestamp. The `created` timestamp now always refers to the

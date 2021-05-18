@@ -198,7 +198,10 @@ def start(config: confuse.Subview):
 def main():
     config = confuse.Configuration("threatbus")
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", "-c", help="path to a configuration file")
+    required_group = parser.add_argument_group("required named arguments")
+    required_group.add_argument(
+        "--config", "-c", help="path to a configuration file", required=True
+    )
     args = parser.parse_args()
     config.set_args(args)
     if args.config:
