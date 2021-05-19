@@ -3,7 +3,7 @@ logging:
   console_verbosity: DEBUG
   file: true
   file_verbosity: DEBUG
-  filename: zmq-app-template.log
+  filename: stix-shifter.log
 
 threatbus: localhost:13370
 snapshot: 30
@@ -16,7 +16,7 @@ modules:
     # https://github.com/opencybersecurityalliance/stix-shifter/blob/master/OVERVIEW.md#connection
     connection:
       host: localhost
-      port: 8089
+      port: 8089 # Management port
       selfSignedCert: false
     # https://github.com/opencybersecurityalliance/stix-shifter/blob/master/OVERVIEW.md#configuration
     transmission:
@@ -24,7 +24,7 @@ modules:
         username: admin
         password: admin123
     # https://github.com/opencybersecurityalliance/stix-shifter/blob/master/OVERVIEW.md#translate
-    tranlation: {<Any required options specific to the particular data source>}
+    translation: # {<Any required options specific to the particular data source>}
     # The data_source is a STIX-2 DataSource (e.g., an `identity`) and is used
     # to create a STIX bundle with the queried results. You configure it here
     # and only once for this module.

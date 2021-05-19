@@ -1,16 +1,16 @@
 STIX-Shifter Threat Bus
 =======================
 
-This app bridges the gap between Threat Bus and commercial security tools by
+This app bridges the gap between Threat Bus and various security tools by
 leveraging
 [STIX-Shifter](https://github.com/opencybersecurityalliance/stix-shifter).
 
 STIX-Shifter is a tool and library to transform STIX patterns into native
-queries for a variety of (mostly) commercial tools, like
+queries for a variety of (mostly commercial) security tools, like
 [IBM QRadar](https://www.ibm.com/security/security-intelligence/qradar) or
-[Splunk](https://www.splunk.com/). Since Threat Bus itself primarily focuses on
-open-source tools, this app now provides a simple way to use intelligence from
-Threat Bus with the commercial tools of your choice.
+[Splunk](https://www.splunk.com/). This app connects STIX-Shifter with Threat
+Bus and provides a simple way to communicate with the commercial tools of your
+choice via Threat Bus.
 
 ## How It Works
 
@@ -19,10 +19,10 @@ connect via ZeroMQ, users must first install and configure the
 [`threatbus-zmq-app`](https://pypi.org/project/threatbus-zmq-app/) plugin on
 their Threat Bus host.
 
-This app functions as middleman between Threat Bus and commercial security
-products. It subscribes to indicator updates from the bus and uses STIX-Shifter
-to actively translate STIX-2 intelligence to native queries for commercial
-tools. The app then executes these queries via STIX-Shifter. [Result processing
+This app functions as middleman between Threat Bus and security tools supported
+by STIX-Shifter. It subscribes to indicator updates from the bus and uses
+STIX-Shifter to actively translate STIX-2 intelligence to native queries.
+The app then executes these queries via STIX-Shifter. [Result processing
 is yet to be implemented.]
 
 ## Quick Start
@@ -64,7 +64,7 @@ modules:
     # https://github.com/opencybersecurityalliance/stix-shifter/blob/master/OVERVIEW.md#connection
     connection:
       host: localhost
-      port: 8089
+      port: 8089 # Management port
       selfSignedCert: false
     # https://github.com/opencybersecurityalliance/stix-shifter/blob/master/OVERVIEW.md#configuration
     transmission:
@@ -72,7 +72,7 @@ modules:
         username: admin
         password: admin123
     # https://github.com/opencybersecurityalliance/stix-shifter/blob/master/OVERVIEW.md#translate
-    tranlation: {<Any required options specific to the particular data source>}
+    translation: # {<Any required options specific to the particular data source>}
     # The data_source is a STIX-2 DataSource (e.g., an `identity`) and is used
     # to create a STIX bundle with the queried results. You configure it here
     # and only once for this module.
