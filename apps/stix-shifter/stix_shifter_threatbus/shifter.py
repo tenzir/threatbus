@@ -5,26 +5,29 @@ import asyncio
 import atexit
 import coloredlogs
 import confuse
-import logging
 import json
-import sys
+import logging
+import signal
 from stix2 import parse, Indicator, Bundle
 from stix_shifter.stix_translation import stix_translation
 from stix_shifter.stix_transmission import stix_transmission
+import sys
 from threatbus.logger import setup as setup_logging_threatbus
 from typing import Union
 import warnings
 import zmq
 
-# Ignore warnings about SSL configuration in the user configs
+# Ignore warnings about SSL configuration in the user configs.
 warnings.filterwarnings("ignore")
 
 logger_name = "stix-shifter-threatbus"
 logger = logging.getLogger(logger_name)
-# list of all running async tasks of the bridge
+# List of all running async tasks of the bridge.
 async_tasks = []
-# the p2p topic sent back by Threat Bus upon successful subscription
+# The p2p topic sent back by Threat Bus upon successful subscription.
 p2p_topic = None
+# Boolean flag indicating that the user has issued a SIGNAL (e.g., SIGTERM).
+user_exit = False
 
 ### --------------------------- Application helpers ---------------------------
 
@@ -75,15 +78,28 @@ def validate_config(config: confuse.Subview):
         config["modules"][mod]["translation"].add({})  # default to empty config
 
 
-def cancel_async_tasks():
+async def cancel_async_tasks():
     """
     Cancels all async tasks.
     """
     global async_tasks
     for task in async_tasks:
-        task.cancel()
-        del task
+        if task is not asyncio.current_task():
+            task.cancel()
+            del task
     async_tasks = []
+    return await asyncio.gather(*async_tasks)
+
+
+async def stop_signal():
+    """
+    Implements Python's asyncio eventloop signal handler
+    https://docs.python.org/3/library/asyncio-eventloop.html
+    Cancels all running tasks and exits the app.
+    """
+    global user_exit
+    user_exit = True
+    await cancel_async_tasks()
 
 
 ### --------------- ZeroMQ communication / management functions ---------------
@@ -169,14 +185,13 @@ async def heartbeat(endpoint: str, p2p_topic: str, interval: int = 5):
     @param p2p_topic The topic string to include in the heartbeat
     @param timeout The period after which the connection attempt is aborted
     """
-    global logger, async_tasks
+    global logger
     action = {"action": "heartbeat", "topic": p2p_topic}
     while True:
         reply = send_manage_message(endpoint, action, interval)
         if not reply_is_success(reply):
             logger.error("Subscription with Threat Bus host became invalid")
-            cancel_async_tasks()
-            return
+            return await cancel_async_tasks()
         await asyncio.sleep(interval)
 
 
@@ -236,7 +251,9 @@ async def start(zmq_endpoint: str, snapshot: int, modules_config: dict):
         asyncio.create_task(process_indicators(indicator_queue, modules_config))
     )
 
-    atexit.register(cancel_async_tasks)
+    loop = asyncio.get_event_loop()
+    for s in [signal.SIGHUP, signal.SIGTERM, signal.SIGINT]:
+        loop.add_signal_handler(s, lambda: asyncio.create_task(stop_signal()))
     return await asyncio.gather(*async_tasks)
 
 
@@ -408,8 +425,13 @@ def main():
                     config["modules"].get(dict),
                 )
             )
+        except (KeyboardInterrupt, SystemExit):
+            return
         except asyncio.CancelledError:
-            logger.info("Restarting STIX-Shifter Threat Bus app ...")
+            if user_exit:
+                # Tasks were cancelled because the user stopped the app.
+                return
+            logger.info("Restarting stix-shifter-threatbus ...")
 
 
 if __name__ == "__main__":
