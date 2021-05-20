@@ -32,7 +32,7 @@ setup(
         "confuse",
         "pyzmq >= 19",
         "stix2 >= 2.1",
-        "threatbus >= 2021.4.29",
+        "threatbus >= 2021.5.27",
     ],
     keywords=[
         "open source",
@@ -50,5 +50,5 @@ setup(
     python_requires=">=3.7",
     setup_requires=["setuptools", "wheel"],
     url="https://github.com/tenzir/threatbus",
-    version="2021.04.29",
+    version="2021.05.27",
 )
