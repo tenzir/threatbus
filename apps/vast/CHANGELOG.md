@@ -12,6 +12,11 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+- ⚠️ All Threat Bus apps that connect via ZeroMQ like `pyvast-threatbus`. now
+  shutdown gracefully and do not longer print a stack trace when receiving any
+  stop signal.
+  [#118](https://github.com/tenzir/threatbus/pull/118)
+
 - ⚠️ The `-c` / `--config` parameter is now explicitly required to start
   `pyvast-threatbus`. Starting without it will print a helpful error message.
   [#119](https://github.com/tenzir/threatbus/pull/119)

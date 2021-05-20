@@ -16,6 +16,7 @@ from .message_mapping import (
 )
 from pyvast import VAST
 import random
+import signal
 from shlex import split as lexical_split
 import socket
 from string import ascii_lowercase as letters
@@ -32,13 +33,15 @@ import zmq
 logger_name = "pyvast-threatbus"
 logger = logging.getLogger(logger_name)
 matcher_name = None
-# list of all running async tasks of the bridge
+# List of all running async tasks of the bridge.
 async_tasks = []
-# the p2p topic that was given to the vast-bridge upon successful subscription
+# The p2p topic that was given to the vast-bridge upon successful subscription.
 p2p_topic = None
 max_open_tasks = None
+# Boolean flag indicating that the user has issued a SIGNAL (e.g., SIGTERM).
+user_exit = False
 
-# metric definitions
+# Metric definitions.
 metrics = []
 g_iocs_added = Gauge("added_iocs")
 g_iocs_removed = Gauge("removed_iocs")
@@ -107,15 +110,28 @@ def validate_config(config: confuse.Subview):
     config["metrics"]["filename"].get(str)
 
 
-def cancel_async_tasks():
+async def cancel_async_tasks():
     """
     Cancels all async tasks.
     """
     global async_tasks
     for task in async_tasks:
-        task.cancel()
-        del task
+        if task is not asyncio.current_task():
+            task.cancel()
+            del task
     async_tasks = []
+    return await asyncio.gather(*async_tasks)
+
+
+async def stop_signal():
+    """
+    Implements Python's asyncio eventloop signal handler
+    https://docs.python.org/3/library/asyncio-eventloop.html
+    Cancels all running tasks and exits the app.
+    """
+    global user_exit
+    user_exit = True
+    await cancel_async_tasks()
 
 
 async def start(
@@ -227,7 +243,9 @@ async def start(
             asyncio.create_task(write_metrics(metrics_interval, metrics_filename))
         )
 
-    atexit.register(cancel_async_tasks)
+    loop = asyncio.get_event_loop()
+    for s in [signal.SIGHUP, signal.SIGTERM, signal.SIGINT]:
+        loop.add_signal_handler(s, lambda: asyncio.create_task(stop_signal()))
     return await asyncio.gather(*async_tasks)
 
 
@@ -730,14 +748,13 @@ async def heartbeat(endpoint: str, p2p_topic: str, interval: int = 5):
     @param p2p_topic The topic string to include in the heartbeat
     @param timeout The period after which the connection attempt is aborted
     """
-    global logger, async_tasks
+    global logger
     action = {"action": "heartbeat", "topic": p2p_topic}
     while True:
         reply = send_manage_message(endpoint, action, interval)
         if not reply_is_success(reply):
             logger.error("Subscription with Threat Bus host became invalid")
-            cancel_async_tasks()
-            return
+            return await cancel_async_tasks()
         await asyncio.sleep(interval)
 
 
@@ -790,7 +807,12 @@ def main():
                     config["sink"].get(),
                 )
             )
+        except (KeyboardInterrupt, SystemExit):
+            return
         except asyncio.CancelledError:
+            if user_exit:
+                # Tasks were cancelled because the user stopped the app.
+                return
             logger.info("Restarting pyvast-threatbus ...")
 
 
