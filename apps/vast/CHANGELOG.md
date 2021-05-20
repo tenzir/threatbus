@@ -10,7 +10,9 @@ Every entry has a category for which we use the following visual abbreviations:
 - ⚡️ Breaking Changes
 - 🐞 Bug Fixes
 
-## Unreleased
+<!-- ## Unreleased -->
+
+## [2021.05.27]
 
 - ⚠️ All Threat Bus apps that connect via ZeroMQ like `pyvast-threatbus`. now
   shutdown gracefully and do not longer print a stack trace when receiving any
@@ -131,3 +133,4 @@ Every entry has a category for which we use the following visual abbreviations:
 [2021.02.24]: https://github.com/tenzir/threatbus/releases/tag/2021.02.24
 [2021.03.25]: https://github.com/tenzir/threatbus/releases/tag/2021.03.25
 [2021.04.29]: https://github.com/tenzir/threatbus/releases/tag/2021.04.29
+[2021.05.27]: https://github.com/tenzir/threatbus/releases/tag/2021.05.27
