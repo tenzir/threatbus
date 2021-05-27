@@ -12,7 +12,6 @@ A threat intelligence dissemination layer for open-source security tools.
 [![Language grade: Python][lgtm-quality-badge]][lgtm-quality-url]
 [![Development Status][beta-badge]][latest-release-url]
 [![Latest Release][latest-release-badge]][latest-release-url]
-[![Chat][chat-badge]][chat-url]
 [![License][license-badge]][license-url]
 
 [_Getting Started_](#getting-started) &mdash;
@@ -20,11 +19,11 @@ A threat intelligence dissemination layer for open-source security tools.
 [_Writing Plugins_](#plugin-development) &mdash;
 [_License_](#license) &mdash;
 [_Documentation_][docs]
-
-Chat with us on [Gitter][chat-url], or join us on Matrix at
-`#tenzir_threatbus:gitter.im`
-
 </h4>
+<div align="center">
+
+[![Chat][chat-badge]][chat-url]
+</div>
 
 ## Key Features
 
@@ -237,8 +236,8 @@ Threat Bus comes with a [3-clause BSD license][license-url].
 [latest-release-url]: https://github.com/tenzir/threatbus/releases
 [ci-url]: https://github.com/tenzir/threatbus/actions?query=branch%3Amaster
 [ci-badge]: https://github.com/tenzir/threatbus/workflows/Python%20Egg/badge.svg?branch=master
-[chat-badge]: https://img.shields.io/badge/gitter-chat-brightgreen.svg
-[chat-url]: https://gitter.im/tenzir/threatbus
+[chat-badge]: https://img.shields.io/badge/Slack-Tenzir%20Community%20Chat-brightgreen?logo=slack&color=purple&style=flat
+[chat-url]: https://join.slack.com/t/tenzir-community/shared_invite/zt-qameypr6-HPotWDNrE6sw5~5cV2nLWg
 [license-badge]: https://img.shields.io/badge/license-BSD-blue.svg
 [license-url]: https://github.com/tenzir/threatbus/blob/master/COPYING
 [beta-badge]: https://img.shields.io/badge/stage-beta-blue

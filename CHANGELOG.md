@@ -10,7 +10,12 @@ Every entry has a category for which we use the following visual abbreviations:
 - 🧬 Experimental Features
 - 🐞 Bug Fixes
 
-<!-- ## Unreleased -->
+## Unreleased
+
+- ⚠️  The Threat Bus community chat moved from Gitter to Slack. 
+  [Join us](https://join.slack.com/t/tenzir-community/shared_invite/zt-qameypr6-HPotWDNrE6sw5~5cV2nLWg)
+  in the `#threatbus` channel for interactive discussions.
+  [#123](https://github.com/tenzir/threatbus/pull/123)
 
 ## [2021.05.27]
 
