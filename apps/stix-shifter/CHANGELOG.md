@@ -11,7 +11,9 @@ Every entry has a category for which we use the following visual abbreviations:
 - ⚡️ Breaking Changes
 - 🐞 Bug Fixes
 
-## Unreleased
+<!-- ## Unreleased -->
+
+## [2021.05.27]
 
 - 🎁 `stix-shifter-threatbus` has come to life. This stand-alone application
   connects to Threat Bus via ZeroMQ and bridges the gap between Threat Bus and
@@ -22,3 +24,5 @@ Every entry has a category for which we use the following visual abbreviations:
   first translate STIX-2 Indicators to native queries for commercial tools and
   then execute these queries to log the results.
   [#118](https://github.com/tenzir/threatbus/pull/118)
+
+[2021.05.27]: https://github.com/tenzir/threatbus/releases/tag/2021.05.27
