@@ -5,18 +5,15 @@ import asyncio
 import atexit
 import coloredlogs
 import confuse
-from datetime import datetime
-from dateutil import parser as dateutil_parser
 import json
 import logging
+from .message_mapping import map_bundle_to_sightings
 import signal
-from stix2 import parse, Bundle, Indicator, Sighting
+from stix2 import parse, Indicator, Sighting
 from stix_shifter.stix_translation import stix_translation
 from stix_shifter.stix_transmission import stix_transmission
 import sys
-from threatbus.data import ThreatBusSTIX2Constants
 from threatbus.logger import setup as setup_logging_threatbus
-from typing import Union
 import warnings
 import zmq
 
@@ -417,23 +414,8 @@ async def query_indicator(
             f"Received STIX bundle without `objects` field, cannot generate sightings: {stix_results}"
         )
         return
-    try:
-        # Generate one sighting per object in the bundle
-        for obj in objs:
-            if obj.get("type", None) != "observed-data":
-                continue
-            last = dateutil_parser.parse(obj.get("last_observed", str(datetime.now())))
-            sighting = Sighting(
-                last_seen=last,
-                sighting_of_ref=indicator.id,
-                custom_properties={
-                    ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value: obj,
-                    ThreatBusSTIX2Constants.X_THREATBUS_INDICATOR.value: indicator,
-                },
-            )
-            await sightings_queue.put(sighting)
-    except Exception as e:
-        logger.error(e)
+    for sighting in map_bundle_to_sightings(indicator, objs):
+        await sightings_queue.put(sighting)
 
 
 async def report_sightings(sub_endpoint: str, sightings_queue: asyncio.Queue):
