@@ -5,13 +5,16 @@ import asyncio
 import atexit
 import coloredlogs
 import confuse
+from datetime import datetime
+from dateutil import parser as dateutil_parser
 import json
 import logging
 import signal
-from stix2 import parse, Indicator, Bundle
+from stix2 import parse, Bundle, Indicator, Sighting
 from stix_shifter.stix_translation import stix_translation
 from stix_shifter.stix_transmission import stix_transmission
 import sys
+from threatbus.data import ThreatBusSTIX2Constants
 from threatbus.logger import setup as setup_logging_threatbus
 from typing import Union
 import warnings
@@ -229,7 +232,7 @@ async def start(zmq_endpoint: str, snapshot: int, modules_config: dict):
     p2p_topic = topic
     atexit.register(unsubscribe, zmq_endpoint, topic)
 
-    # set task exception handler
+    # Set task exception handler.
     loop = asyncio.get_event_loop()
 
     def exception_handler(loop, context):
@@ -237,18 +240,29 @@ async def start(zmq_endpoint: str, snapshot: int, modules_config: dict):
 
     loop.set_exception_handler(exception_handler)
 
-    # Start a heartbeat task so we notice when the Threat Bus host goes away
+    # Start a heartbeat task so we notice when the Threat Bus host goes away.
     async_tasks.append(
         asyncio.create_task(heartbeat(zmq_endpoint, p2p_topic, interval=5))
     )
 
-    # Start a receive task to retrieve real-time updates from Threat Bus
+    # Create queues (channels) for passing indicators and sightings
+    # asynchronously between the routines that make up this app.
     indicator_queue = asyncio.Queue()
+    sightings_queue = asyncio.Queue()
+
+    # Start a receive task to retrieve real-time updates from Threat Bus.
     async_tasks.append(
         asyncio.create_task(receive(pub_endpoint, p2p_topic, indicator_queue))
     )
     async_tasks.append(
-        asyncio.create_task(process_indicators(indicator_queue, modules_config))
+        asyncio.create_task(
+            process_indicators(indicator_queue, sightings_queue, modules_config)
+        )
+    )
+
+    # Start a publisher task to send back sightings to Threat Bus.
+    async_tasks.append(
+        asyncio.create_task(report_sightings(sub_endpoint, sightings_queue))
     )
 
     loop = asyncio.get_event_loop()
@@ -292,11 +306,14 @@ async def receive(pub_endpoint: str, topic: str, indicator_queue: asyncio.Queue)
             await asyncio.sleep(0.01)  # Free event loop for other tasks
 
 
-async def process_indicators(indicator_queue: asyncio.Queue, modules_config: dict):
+async def process_indicators(
+    indicator_queue: asyncio.Queue, sightings_queue: asyncio.Queue, modules_config: dict
+):
     """
     Translates STIX-2 pattern and queries all configured modules via
     STIX-Shifter.
-    @param indicator_queue The queue to put arriving IoCs into
+    @param indicator_queue The queue to read indicators from
+    @param sightings_queue The queue to put sightings into
     @param modules_config User-provided configuration for STIX-Shifter modules
     """
     while True:
@@ -313,11 +330,15 @@ async def process_indicators(indicator_queue: asyncio.Queue, modules_config: dic
             f"Converting indicator from Threat Bus to module-specific query: {indicator}"
         )
         for module, opts in modules_config.items():
-            asyncio.create_task(query_indicator(indicator, module, opts))
+            asyncio.create_task(
+                query_indicator(indicator, module, opts, sightings_queue)
+            )
         indicator_queue.task_done()
 
 
-async def query_indicator(indicator: Indicator, module: str, opts: dict):
+async def query_indicator(
+    indicator: Indicator, module: str, opts: dict, sightings_queue: asyncio.Queue
+):
     """
     Translates an indicator into a module-specific query and executes it. E.g.,
     if the module is `splunk`, the indicator's pattern is first translated into
@@ -326,6 +347,7 @@ async def query_indicator(indicator: Indicator, module: str, opts: dict):
     @param module The module's name, e.g., `splunk`
     @param opts The module configuration directly taken from the user-defined
         configuration file `config.yaml` with which this app was started
+    @param sightings_queue The queue to put sightings into
     """
     max_results = opts["max_results"]
     connection_opts = opts["connection"]
@@ -384,8 +406,57 @@ async def query_indicator(indicator: Indicator, module: str, opts: dict):
         json.dumps(query_results),
         translation_opts,
     )
-    # TODO: parse output and report back sightings
-    logger.debug(f"STIX Results: {stix_results}")
+    ## Parse output and report back sightings to Threat Bus
+    ## The stix_results is always a self-made bundle with at least an `objects`
+    ## field present. The bundle may be invalid STIX though, so we cannot simply
+    ## invoke `parse()`. See this link for details on the bundle stucture:
+    ## https://github.com/opencybersecurityalliance/stix-shifter/blob/3.4.5/stix_shifter_utils/stix_translation/src/json_to_stix/json_to_stix_translator.py#L12
+    objs = stix_results.get("objects", None)
+    if objs is None:
+        logger.error(
+            f"Received STIX bundle without `objects` field, cannot generate sightings: {stix_results}"
+        )
+        return
+    try:
+        # Generate one sighting per object in the bundle
+        for obj in objs:
+            if obj.get("type", None) != "observed-data":
+                continue
+            last = dateutil_parser.parse(obj.get("last_observed", str(datetime.now())))
+            sighting = Sighting(
+                last_seen=last,
+                sighting_of_ref=indicator.id,
+                custom_properties={
+                    ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value: obj,
+                    ThreatBusSTIX2Constants.X_THREATBUS_INDICATOR.value: indicator,
+                },
+            )
+            await sightings_queue.put(sighting)
+    except Exception as e:
+        logger.error(e)
+
+
+async def report_sightings(sub_endpoint: str, sightings_queue: asyncio.Queue):
+    """
+    Starts a ZeroMQ publisher on the given endpoint and publishes sightings from
+    the sightings_queue to Threat Bus.
+    @param sub_endpoint A host:port string to connect to via ZeroMQ
+    @param sightings_queue The queue to receive sightings from
+    """
+    socket = zmq.Context().socket(zmq.PUB)
+    socket.connect(f"tcp://{sub_endpoint}")
+    topic = "stix2/sighting"
+    logger.info(f"Forwarding sightings to Threat Bus at {sub_endpoint}/{topic}")
+    while True:
+        sighting = await sightings_queue.get()
+        if type(sighting) is not Sighting:
+            logger.warning(
+                f"Ignoring unknown message type, expected Sighting: {type(sighting)}"
+            )
+            continue
+        socket.send_string(f"{topic} {sighting.serialize()}")
+        sightings_queue.task_done()
+        logger.debug(f"Reported sighting: {sighting}")
 
 
 def main():
