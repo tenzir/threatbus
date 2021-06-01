@@ -1,5 +1,6 @@
 from dateutil import parser as dateutil_parser
 import json
+from re import match
 from stix2 import Indicator, Sighting
 from threatbus.data import ThreatBusSTIX2Constants
 from threatbus.stix2_helpers import is_point_equality_ioc, split_object_path_and_value
@@ -77,7 +78,17 @@ def indicator_to_vast_query(indicator: Indicator) -> Union[str, None]:
     if vast_type == "ip" or vast_type == "ipv6":
         return ioc_value
     if vast_type == "url":
-        return f'"{ioc_value}" in net.uri'
+        if match(r"[A-Za-z0-9]+://", ioc_value):
+            return f'"{ioc_value}" == net.uri'
+        else:
+            protocols = [
+                "",
+                "http://",
+                "tcp://",
+            ]
+            return " || ".join(
+                [f'"{protocol}{ioc_value}" == net.uri' for protocol in protocols]
+            )
     if vast_type == "domain":
         return f'"{ioc_value}" == net.domain || "{ioc_value}" == net.hostname'
     return None
