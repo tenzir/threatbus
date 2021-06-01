@@ -30,6 +30,7 @@ setup(
         "black >= 19.10b",
         "coloredlogs >= 14.0",
         "confuse",
+        "python-dateutil",
         "pyzmq >= 19",
         "pyvast >= 2020.10.29",
         "stix2 >= 2.1",
