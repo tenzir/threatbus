@@ -237,7 +237,7 @@ Threat Bus comes with a [3-clause BSD license][license-url].
 [ci-url]: https://github.com/tenzir/threatbus/actions?query=branch%3Amaster
 [ci-badge]: https://github.com/tenzir/threatbus/workflows/Python%20Egg/badge.svg?branch=master
 [chat-badge]: https://img.shields.io/badge/Slack-Tenzir%20Community%20Chat-brightgreen?logo=slack&color=purple&style=flat
-[chat-url]: https://join.slack.com/t/tenzir-community/shared_invite/zt-qameypr6-HPotWDNrE6sw5~5cV2nLWg
+[chat-url]: http://slack.tenzir.com
 [license-badge]: https://img.shields.io/badge/license-BSD-blue.svg
 [license-url]: https://github.com/tenzir/threatbus/blob/master/COPYING
 [beta-badge]: https://img.shields.io/badge/stage-beta-blue
