@@ -40,6 +40,19 @@ make dev-mode
 stix-shifter-threatbus -c config.yaml
 ```
 
+### Docker
+
+You can also run this app via Docker.
+
+- Build it:
+  ```
+  docker build . -t tenzir/stix-shifter-threatbus:latest
+  ```
+- Run it (and mount a custom config file into the container):
+  ```
+  docker run --net=host -v /path/to/your/conf.yaml:/opt/tenzir/threatbus/stix-shifter-threatbus/config.yaml
+  ```
+
 ## Configuration
 
 Apart from the logging section, which is self-explanatory, users need to

@@ -21,6 +21,8 @@ Every entry has a category for which we use the following visual abbreviations:
   ZeroMQ. The original observation objects are kept in each sighting's context
   data.
 
+- 🎁 `stix-shifter-threatbus` now comes with its own Dockerfile. Pre-built
+  images are available on Dockerhub.
 
 ## [2021.05.27]
 
