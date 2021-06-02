@@ -65,10 +65,24 @@ jobs:
     - uses: actions/checkout@v2
       with:
         ref: ${{ github.ref }}
-    - name: Publish Docker Image 
-      uses: elgohr/Publish-Docker-Github-Action@2.12
+    - name: Publish Threat Bus Docker Image
+      uses: elgohr/Publish-Docker-Github-Action@3.04
       with:
         name: tenzir/threatbus
+        username: ${{ secrets.DOCKERHUB_USER }}
+        password: ${{ secrets.DOCKERHUB_PASSWORD }}
+    - name: Publish pyvast-threatbus Docker Image
+      uses: elgohr/Publish-Docker-Github-Action@3.04
+      with:
+        name: tenzir/pyvast-threatbus
+        workdir: apps/vast
+        username: ${{ secrets.DOCKERHUB_USER }}
+        password: ${{ secrets.DOCKERHUB_PASSWORD }}
+    - name: Publish stix-shifter-threatbus Docker Image
+      uses: elgohr/Publish-Docker-Github-Action@3.04
+      with:
+        name: tenzir/stix-shifter-threatbus
+        workdir: apps/stix-shifter
         username: ${{ secrets.DOCKERHUB_USER }}
         password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
