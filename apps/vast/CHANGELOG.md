@@ -12,6 +12,14 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+- 🎁 `pyvast-threatbus` now collects metrics about received indicators that are
+  about to be matched retrospectively against VAST. The new metric is called
+  `retro_match_backlog` and allows users to determine if a backlog is
+  building up. A backlog builds when `pyvast-threatbus` hits the
+  user-configured limit of max backgroud tasks while at the same time VAST
+  responds slowly to the issued queries.
+  [#129]https://github.com/tenzir/threatbus/pull/129
+
 - 🎁 `pyvast-threatbus` now comes with its own Dockerfile. Pre-built images are
   available on [Dockerhub](https://hub.docker.com/r/tenzir/pyvast-threatbus).
   [#126](https://github.com/tenzir/threatbus/pull/126)
