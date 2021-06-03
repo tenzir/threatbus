@@ -89,3 +89,40 @@ class Gauge(Metric):
         super(Gauge, self).reset()
         with self._lock:
             self.value = 0
+
+
+class InfiniteGauge(Gauge):
+    """
+    A simple numeric gauge that can go up and down. This gauge can never be
+    resetted by a function call. Instead, it resets automatically when it's
+    value reaches the initial value of `0`.
+    """
+
+    def __init__(self, name: str):
+        super(InfiniteGauge, self).__init__(name)
+        self.value = 0
+        self.initial_value = 0
+
+    def __reset(self):
+        super(InfiniteGauge, self).reset()
+
+    def reset(self):
+        pass
+
+    def inc(self):
+        """
+        Increase the gauge value. Automatically resets it in case the value
+        equlas 0 after this operation.
+        """
+        super(InfiniteGauge, self).inc()
+        if self.value == self.initial_value:
+            self.__reset()
+
+    def dec(self):
+        """
+        Decrease the gauge value. Automatically resets it in case the value
+        equlas 0 after this operation.
+        """
+        super(InfiniteGauge, self).dec()
+        if self.value == self.initial_value:
+            self.__reset()
