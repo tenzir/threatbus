@@ -21,7 +21,7 @@ from shlex import split as lexical_split
 import socket
 from string import ascii_lowercase as letters
 import sys
-from .metrics import Gauge, Summary
+from .metrics import Gauge, InfiniteGauge, Summary
 from stix2 import parse, Indicator, Sighting
 from threatbus.logger import setup as setup_logging_threatbus
 from threatbus.data import Operation, ThreatBusSTIX2Constants
@@ -37,13 +37,18 @@ matcher_name = None
 async_tasks = []
 # The p2p topic that was given to the vast-bridge upon successful subscription.
 p2p_topic = None
-max_open_tasks = None
 # Boolean flag indicating that the user has issued a SIGNAL (e.g., SIGTERM).
 user_exit = False
+# An asyncio.Semaphore to control the amount of concurrent retro-match tasks.
+max_open_tasks = None
+# Set of all started but unfinished retro-match tasks. They may stack up when
+# users set `max_background_tasks` in the config.
+open_retro_match_tasks = set()
 
 # Metric definitions.
 metrics = []
 g_iocs_added = Gauge("added_iocs")
+g_retro_match_backlog = InfiniteGauge("retro_match_backlog")
 g_iocs_removed = Gauge("removed_iocs")
 metrics += [g_iocs_added, g_iocs_removed]
 s_retro_matches_per_ioc = Summary("retro_matches_per_ioc")
@@ -228,7 +233,11 @@ async def start(
 
     if retro_match:
         # add metrics for retro-matching to the metric output
-        metrics += [s_retro_matches_per_ioc, s_retro_query_time_s_per_ioc]
+        metrics += [
+            s_retro_matches_per_ioc,
+            s_retro_query_time_s_per_ioc,
+            g_retro_match_backlog,
+        ]
     if live_match:
         # add metrics for live-matching to the metric output
         metrics.append(g_live_matcher_sightings)
@@ -261,7 +270,7 @@ async def write_metrics(every: int, to: str):
         for m in metrics:
             if not m.is_set:
                 continue
-            if type(m) is Gauge:
+            if type(m) is Gauge or type(m) is InfiniteGauge:
                 line += f" {m.name}={m.value}"
             if type(m) is Summary:
                 line += (
@@ -274,7 +283,6 @@ async def write_metrics(every: int, to: str):
             line += f" {time.time_ns()}"  # append current nanoseconds ts
             with open(to, "a") as f:
                 f.write(line + "\n")
-
         await asyncio.sleep(every)
 
 
@@ -370,6 +378,7 @@ async def retro_match_vast(
         logger.debug(f"Retro-matched {reported} sighting(s) for indicator: {indicator}")
         s_retro_matches_per_ioc.observe(reported)
         s_retro_query_time_s_per_ioc.observe(time.time() - start)
+        g_retro_match_backlog.dec()
 
 
 async def ingest_vast_ioc(vast_binary: str, vast_endpoint: str, indicator: Indicator):
@@ -462,6 +471,7 @@ async def match_intel(
             # add new Indicator to matcher / query Indicator retrospectively
             g_iocs_added.inc()
             if retro_match:
+                g_retro_match_backlog.inc()
                 asyncio.create_task(
                     retro_match_vast(
                         vast_binary,
