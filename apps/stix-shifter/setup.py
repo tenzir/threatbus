@@ -32,6 +32,7 @@ setup(
         "black >= 19.10b",
         "coloredlogs >= 14.0",
         "confuse",
+        "python-dateutil",
         "pyzmq >= 19",
         "stix2 >= 2.1",
         "stix-shifter >= 3.4.2",

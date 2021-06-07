@@ -11,7 +11,16 @@ Every entry has a category for which we use the following visual abbreviations:
 - ⚡️ Breaking Changes
 - 🐞 Bug Fixes
 
-<!-- ## Unreleased -->
+## Unreleased
+
+- 🎁 `stix-shifter-threatbus` now reports back STIX-2 Sightings to Threat Bus.
+  STIX-Shifter transmission results are first translated, using the respective
+  native STIX-Shifter module's translation function. The resulting STIX-2.0
+  bundles are then traversed to create sightings for every contained
+  observation. These sightings are then finally returned to Threat Bus via
+  ZeroMQ. The original observation objects are kept in each sighting's context
+  data.
+
 
 ## [2021.05.27]
 
