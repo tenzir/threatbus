@@ -56,7 +56,7 @@ You can also run this app via Docker.
   ```
 - Run it (and mount a custom config file into the container):
   ```
-  docker run --net=host -v /path/to/your/conf.yaml:/opt/tenzir/threatbus/pyvast-threatbus/config.yaml
+  docker run --net=host -v /path/to/your/conf.yaml:/opt/tenzir/threatbus/pyvast-threatbus/config.yaml tenzir/pyvast-threatbus:latest
   ```
 
 ## Features
