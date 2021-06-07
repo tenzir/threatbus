@@ -13,7 +13,7 @@ Every entry has a category for which we use the following visual abbreviations:
 ## Unreleased
 
 - 🎁 `pyvast-threatbus` now comes with its own Dockerfile. Pre-built images are
-  available on Dockerhub.
+  available on [Dockerhub](https://hub.docker.com/r/tenzir/pyvast-threatbus).
 
 
 ## [2021.05.27]
