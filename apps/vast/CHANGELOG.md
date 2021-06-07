@@ -14,7 +14,7 @@ Every entry has a category for which we use the following visual abbreviations:
 
 - 🎁 `pyvast-threatbus` now comes with its own Dockerfile. Pre-built images are
   available on [Dockerhub](https://hub.docker.com/r/tenzir/pyvast-threatbus).
-
+  [#126](https://github.com/tenzir/threatbus/pull/126)
 
 ## [2021.05.27]
 

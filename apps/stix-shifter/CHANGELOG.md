@@ -16,6 +16,7 @@ Every entry has a category for which we use the following visual abbreviations:
 - 🎁 `stix-shifter-threatbus` now comes with its own Dockerfile. Pre-built
   images are available on
   [Dockerhub](http://hub.docker.com/r/tenzir/stix-shifter-threatbus).
+  [#126](https://github.com/tenzir/threatbus/pull/126)
 
 - 🎁 `stix-shifter-threatbus` now reports back STIX-2 Sightings to Threat Bus.
   STIX-Shifter transmission results are first translated, using the respective
@@ -24,6 +25,7 @@ Every entry has a category for which we use the following visual abbreviations:
   observation. These sightings are then finally returned to Threat Bus via
   ZeroMQ. The original observation objects are kept in each sighting's context
   data.
+  [#125](https://github.com/tenzir/threatbus/pull/125)
 
 ## [2021.05.27]
 
