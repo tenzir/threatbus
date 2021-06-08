@@ -54,9 +54,13 @@ You can also run this app via Docker.
   ```
   docker build . -t tenzir/pyvast-threatbus:latest
   ```
-- Run it (and mount a custom config file into the container):
+- Run it to print the helptext.
   ```
-  docker run --net=host -v /path/to/your/conf.yaml:/opt/tenzir/threatbus/pyvast-threatbus/config.yaml tenzir/pyvast-threatbus:latest
+  docker run tenzir/pyvast-threatbus:latest
+  ```
+- Run and mount a custom config file into the container:
+  ```
+  docker run --net=host -v /path/to/your/conf.yaml:/opt/tenzir/threatbus/pyvast-threatbus/config.yaml tenzir/pyvast-threatbus:latest -c config.yaml
   ```
 
 ## Features

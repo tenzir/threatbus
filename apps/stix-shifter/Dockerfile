@@ -10,11 +10,10 @@ COPY setup.py .
 COPY README.md .
 COPY stix_shifter_threatbus stix_shifter_threatbus
 RUN python3 -m pip install .
-COPY config.yaml.example config.yaml
 
 RUN echo "Adding threatbus user" && useradd -m -d /home/threatbus --user-group threatbus
 RUN chown -R threatbus .
 USER threatbus:threatbus
 
 ENTRYPOINT ["stix-shifter-threatbus"]
-CMD ["-c", "config.yaml"]
+CMD ["-h"]

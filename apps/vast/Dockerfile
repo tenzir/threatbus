@@ -16,11 +16,10 @@ COPY setup.py .
 COPY README.md .
 COPY pyvast_threatbus pyvast_threatbus
 RUN python3 -m pip install .
-COPY config.yaml.example config.yaml
 
 RUN echo "Adding threatbus user" && useradd -m -d /home/threatbus --user-group threatbus
 RUN chown -R threatbus .
 USER threatbus:threatbus
 
 ENTRYPOINT ["pyvast-threatbus"]
-CMD ["-c", "config.yaml"]
+CMD ["-h"]
