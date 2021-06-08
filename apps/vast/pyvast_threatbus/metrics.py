@@ -112,7 +112,7 @@ class InfiniteGauge(Gauge):
     def inc(self):
         """
         Increase the gauge value. Automatically resets it in case the value
-        equlas 0 after this operation.
+        equals 0 after this operation.
         """
         super(InfiniteGauge, self).inc()
         if self.value == self.initial_value:

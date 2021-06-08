@@ -41,9 +41,6 @@ p2p_topic = None
 user_exit = False
 # An asyncio.Semaphore to control the amount of concurrent retro-match tasks.
 max_open_tasks = None
-# Set of all started but unfinished retro-match tasks. They may stack up when
-# users set `max_background_tasks` in the config.
-open_retro_match_tasks = set()
 
 # Metric definitions.
 metrics = []
