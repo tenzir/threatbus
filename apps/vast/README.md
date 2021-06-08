@@ -46,6 +46,23 @@ Start the application with a config file:
 ./pyvast_threatbus.py -c config.yaml
 ```
 
+### Docker
+
+You can also run this app via Docker.
+
+- Build it:
+  ```
+  docker build . -t tenzir/pyvast-threatbus:latest
+  ```
+- Run it to print the helptext.
+  ```
+  docker run tenzir/pyvast-threatbus:latest
+  ```
+- Run and mount a custom config file into the container:
+  ```
+  docker run --net=host -v /path/to/your/conf.yaml:/opt/tenzir/threatbus/pyvast-threatbus/config.yaml tenzir/pyvast-threatbus:latest -c config.yaml
+  ```
+
 ## Features
 
 This section explains the most important features of `pyvast-threatbus`.
