@@ -340,6 +340,7 @@ async def retro_match_vast(
     start = time.time()
     query = indicator_to_vast_query(indicator)
     if not query:
+        g_retro_match_backlog.dec()
         return
     global logger, max_open_tasks
     async with max_open_tasks:
@@ -360,6 +361,7 @@ async def retro_match_vast(
                 f"Timeout after {retro_match_timeout}s in retro-query for indicator {indicator}"
             )
         if not retro_result or len(retro_result) != 2:
+            g_retro_match_backlog.dec()
             return
         reported = 0
         stdout = retro_result[0]
