@@ -12,6 +12,12 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+- ⚡️ `pyvast-threatbus` now uses point queries over substring queries for
+  URI indicators, because such queries are much faster. This may result
+  in less matches than before. E.g., a URI indicator `tenzir.com` that
+  used to match `docs.tenzir.com` as well as `https://tenzir.com` now
+  only matches exactly the indicator.
+
 - 🎁 `pyvast-threatbus` now collects metrics about received indicators that are
   about to be matched retrospectively against VAST. The new metric is called
   `retro_match_backlog` and allows users to determine if a backlog is

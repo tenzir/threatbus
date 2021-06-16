@@ -77,7 +77,7 @@ def indicator_to_vast_query(indicator: Indicator) -> Union[str, None]:
     if vast_type == "ip" or vast_type == "ipv6":
         return ioc_value
     if vast_type == "url":
-        return f'"{ioc_value}" in net.uri'
+        return f'"{ioc_value}" == net.uri'
     if vast_type == "domain":
         return f'"{ioc_value}" == net.domain || "{ioc_value}" == net.hostname'
     return None

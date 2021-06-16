@@ -98,7 +98,7 @@ class TestMessageMapping(unittest.TestCase):
 
         ## test URL
         url = "example.com/foo/bar?query=123"
-        expected_vast_query = f'"{url}" in net.uri'
+        expected_vast_query = f'"{url}" == net.uri'
         other_ioc = Indicator(pattern_type="stix", pattern=f"[url:value = '{url}']")
         self.assertEqual(expected_vast_query, indicator_to_vast_query(other_ioc))
 
