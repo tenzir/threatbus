@@ -6,7 +6,11 @@ import atexit
 import coloredlogs
 import confuse
 import logging
+from os.path import dirname, join
+from parsuricata import parse_rules
+import re
 from shlex import split as lexical_split
+from shutil import copy
 import signal
 from stix2 import parse
 import sys
@@ -287,25 +291,39 @@ async def update_suricata_rules(indicator_queue: asyncio.Queue, rules_file: str)
             # Skip STIX- and other indicator types.
             indicator_queue.task_done()
             continue
-        if (
-            ThreatBusSTIX2Constants.X_THREATBUS_UPDATE.value
-            in indicator.object_properties()
-            and indicator.x_threatbus_update == Operation.REMOVE.value
-        ):
-            # TODO remove from file
+        try:
+            indicator_rule = parse_rules(indicator.pattern)[0]
+            sid = list(filter(lambda o: o.keyword == "sid", indicator_rule.options))[
+                0
+            ].settings
+        except Exception as e:
+            logger.error(f"Could not parse Suricata rule from indicator: {e}")
             indicator_queue.task_done()
             continue
-        with open(rules_file, "a") as rules:
-            ## Append the Suricata rule to the `threatbus.rules` file configured
-            ## in your `suricata.yaml`
-            pattern = indicator.pattern
-            if not pattern.endswith("\n"):
-                pattern += "\n"
-            rules.write(pattern)
-        logger.debug(f"Appended Threat Bus rule file with {indicator.pattern}")
-        # Do something with it, e.g., check its type and then start operating on
-        # the timestamps, the STIX pattern, ...
+        with open(rules_file, "r") as rfile:
+            rules = rfile.readlines()
+        tmp_file = join(dirname(rules_file), "temp.rules")
+        pattern = re.compile(f".*sid:\\s?{sid}")
+        with open(tmp_file, "w") as tfile:
+            ## Remove already exisintg rules with the same SID to enable update
+            ## and removal of rules.
+            for rule in rules:
+                if re.search(pattern, rule):
+                    continue
+                tfile.write(rule)
+            if (
+                ThreatBusSTIX2Constants.X_THREATBUS_UPDATE.value
+                not in indicator.object_properties()
+                or indicator.x_threatbus_update != Operation.REMOVE.value
+            ):
+                # Not a remove operation - append the new Suricata rule.
+                new_rule = indicator.pattern
+                if not new_rule.endswith("\n"):
+                    new_rule += "\n"
+                tfile.write(new_rule)
         indicator_queue.task_done()
+        copy(tmp_file, rules_file)
+        logger.debug(f"Updated Threat Bus rule file with {indicator.pattern}")
 
 
 async def reload_rules(socket: str, reload_interval: int):

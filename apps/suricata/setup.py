@@ -31,6 +31,7 @@ setup(
         "coloredlogs >= 14.0",
         "confuse",
         "pyzmq >= 19",
+        "parsuricata",
         "stix2 >= 2.1",
         "threatbus >= 2021.5.27",
     ],
