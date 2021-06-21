@@ -6,9 +6,11 @@ import atexit
 import coloredlogs
 import confuse
 import logging
+from shlex import split as lexical_split
 import signal
 from stix2 import parse
 import sys
+from threatbus.data import Operation, ThreatBusSTIX2Constants
 from threatbus.logger import setup as setup_logging_threatbus
 import zmq
 
@@ -56,6 +58,9 @@ def validate_config(config: confuse.Subview):
     assert config, "config must not be None"
     config["threatbus"].get(str)
     config["snapshot"].get(int)
+    config["socket"].as_filename()
+    config["rules_file"].as_filename()
+    config["reload_interval"].get(int)
 
 
 async def cancel_async_tasks():
@@ -178,7 +183,9 @@ async def heartbeat(endpoint: str, p2p_topic: str, interval: int = 5):
 ### --------------------------- The actual app logic ---------------------------
 
 
-async def start(zmq_endpoint: str, snapshot: int):
+async def start(
+    zmq_endpoint: str, snapshot: int, socket: str, rules_file: str, reload_interval: int
+):
     """
     Starts the Suricata app.
     @param zmq_endpoint The ZMQ management endpoint of Threat Bus ('host:port')
@@ -218,7 +225,10 @@ async def start(zmq_endpoint: str, snapshot: int):
     async_tasks.append(
         asyncio.create_task(receive(pub_endpoint, p2p_topic, indicator_queue))
     )
-    async_tasks.append(asyncio.create_task(update_suricata(indicator_queue)))
+    async_tasks.append(
+        asyncio.create_task(update_suricata_rules(indicator_queue, rules_file))
+    )
+    async_tasks.append(asyncio.create_task(reload_rules(socket, reload_interval)))
 
     loop = asyncio.get_event_loop()
     for s in [signal.SIGHUP, signal.SIGTERM, signal.SIGINT]:
@@ -261,18 +271,64 @@ async def receive(pub_endpoint: str, topic: str, indicator_queue: asyncio.Queue)
             await asyncio.sleep(0.01)  # Free event loop for other tasks
 
 
-async def update_suricata(indicator_queue: asyncio.Queue):
+async def update_suricata_rules(indicator_queue: asyncio.Queue, rules_file: str):
     """
     Updates the Suricata `threatbus.rules` with the received STIX-2 Indicator.
     @param indicator_queue The queue to receive IoCs from
+    @param rules_file The file to update with new rules.
     """
     while True:
         msg = await indicator_queue.get()
         indicator = parse(msg, allow_custom=True)
-        logger.debug(f"Got indicator from Threat Bus: {indicator}")
+        if (
+            indicator.pattern_type != "Suricata"
+            and indicator.pattern_type != "suricata"
+        ):
+            # Skip STIX- and other indicator types.
+            indicator_queue.task_done()
+            continue
+        if (
+            ThreatBusSTIX2Constants.X_THREATBUS_UPDATE.value
+            in indicator.object_properties()
+            and indicator.x_threatbus_update == Operation.REMOVE.value
+        ):
+            # TODO remove from file
+            indicator_queue.task_done()
+            continue
+        with open(rules_file, "a") as rules:
+            ## Append the Suricata rule to the `threatbus.rules` file configured
+            ## in your `suricata.yaml`
+            pattern = indicator.pattern
+            if not pattern.endswith("\n"):
+                pattern += "\n"
+            rules.write(pattern)
+        logger.debug(f"Appended Threat Bus rule file with {indicator.pattern}")
         # Do something with it, e.g., check its type and then start operating on
         # the timestamps, the STIX pattern, ...
         indicator_queue.task_done()
+
+
+async def reload_rules(socket: str, reload_interval: int):
+    """
+    Triggers a reload of all Suricata rules via `suricatasc` using the given
+    interval.
+    @param reload_interval The interval (seconds) in which to trigger a rule
+    reload.
+    """
+    while True:
+        proc = await asyncio.create_subprocess_exec(
+            *lexical_split(f"suricatasc -c ruleset-reload-nonblocking {socket}"),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+        if stderr:
+            logger.error(
+                f"Error while calling `suricatasc -c ruleset-reload-nonblocking [socket]`: {stderr.decode()}"
+            )
+        else:
+            logger.debug(f"Triggered rule reload. Log output: {stdout.decode()}")
+        await asyncio.sleep(reload_interval)
 
 
 def main():
@@ -309,6 +365,9 @@ def main():
                 start(
                     config["threatbus"].get(),
                     config["snapshot"].get(),
+                    config["socket"].as_filename(),
+                    config["rules_file"].as_filename(),
+                    config["reload_interval"].get(),
                 )
             )
         except (KeyboardInterrupt, SystemExit):
