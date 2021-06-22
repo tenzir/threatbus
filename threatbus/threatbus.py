@@ -227,8 +227,17 @@ def start(config: Settings):
 
 
 def main():
+    ## Default list of settings files for Dynaconf to parse.
+    settings_files = ["config.yaml", "config.yml"]
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", "-c", help="path to a configuration file")
+    args = parser.parse_args()
+    if args.config:
+        ## Allow users to provide a custom config file that takes precedence.
+        settings_files = [args.config]
+
     config = Dynaconf(
-        settings_files=["config.yaml"],
+        settings_files=settings_files,
         load_dotenv=True,
         envvar_prefix="THREATBUS",
     )
