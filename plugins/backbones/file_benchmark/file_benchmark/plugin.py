@@ -1,5 +1,6 @@
 from collections import defaultdict
-from confuse import Subview
+from dynaconf import Validator
+from dynaconf.utils.boxing import DynaBox
 from multiprocessing import JoinableQueue
 from stix2 import parse
 import threading
@@ -13,11 +14,6 @@ plugin_name = "file_benchmark"
 
 workers: List[threading.Thread] = list()
 subscriptions: Dict[str, Set[JoinableQueue]] = defaultdict(set)
-
-
-def validate_config(config):
-    config["input_file"].as_filename()
-    config["repetitions"].get(int)
 
 
 class FileProvisioner(threading.Thread):
@@ -49,6 +45,18 @@ class FileProvisioner(threading.Thread):
 
 
 @threatbus.backbone
+def config_validators() -> List[Validator]:
+    return [
+        Validator(f"plugins.backbones.{plugin_name}.input_file", required=True),
+        Validator(
+            f"plugins.backbones.{plugin_name}.repetitions",
+            is_type_of=int,
+            required=True,
+        ),
+    ]
+
+
+@threatbus.backbone
 def subscribe(topic: str, q: JoinableQueue):
     global logger, subscriptions
     logger.info(f"Adding subscription to: {topic}")
@@ -64,18 +72,15 @@ def unsubscribe(topic: str, q: JoinableQueue):
 
 
 @threatbus.backbone
-def run(config: Subview, logging: Subview, inq: JoinableQueue):
+def run(config: DynaBox, logging: DynaBox, inq: JoinableQueue):
     global logger, workers
+    assert plugin_name in config, f"Cannot find configuration for {plugin_name} plugin"
     logger = threatbus.logger.setup(logging, __name__)
     config = config[plugin_name]
-    try:
-        validate_config(config)
-    except Exception as e:
-        logger.fatal("Invalid config for plugin {}: {}".format(plugin_name, str(e)))
     workers.append(
         FileProvisioner(
-            config["input_file"].get(str),
-            config["repetitions"].get(int),
+            config.input_file,
+            config.repetitions,
         )
     )
     for w in workers:
