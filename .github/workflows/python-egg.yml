@@ -36,8 +36,7 @@ jobs:
   test:
     name: Unit Tests
     runs-on: ubuntu-latest
-    container: fixel/zeek:broker-latest
-      # The image is based on Debian-10 and has `zeek/broker` pre-installed
+    container: debian:bullseye
     steps:
     - uses: actions/checkout@v2
       with:
@@ -45,7 +44,7 @@ jobs:
     - name: Set up Dist Environment
       run: |
         apt-get -qq update
-        apt-get -qqy install python3-pip 
+        apt-get -qqy install python3-pip software-properties-common gnupg2 libbroker2 python3-broker
         update-alternatives --install /usr/bin/python python /usr/bin/python3 1
         python -m pip install --upgrade pip
         python -m pip install wheel setuptools
