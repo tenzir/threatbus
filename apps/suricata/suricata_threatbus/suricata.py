@@ -10,7 +10,7 @@ from os.path import dirname, join
 from parsuricata import parse_rules
 import re
 from shlex import split as lexical_split
-from shutil import copy
+from shutil import move
 import signal
 from stix2 import parse
 import sys
@@ -194,6 +194,9 @@ async def start(
     Starts the Suricata app.
     @param zmq_endpoint The ZMQ management endpoint of Threat Bus ('host:port')
     @param snapshot An integer value to request n days of historical IoC items
+    @param socket The Suricata UNIX socket to connect with
+    @param rules_file The Threat Bus rules file maintained by this app
+    @param reload_interval The periodic interval to reload Threat Bus rules
     """
     global logger, async_tasks, p2p_topic
     # needs to be created inside the same eventloop where it is used
@@ -322,7 +325,7 @@ async def update_suricata_rules(indicator_queue: asyncio.Queue, rules_file: str)
                     new_rule += "\n"
                 tfile.write(new_rule)
         indicator_queue.task_done()
-        copy(tmp_file, rules_file)
+        move(tmp_file, rules_file)
         logger.debug(f"Updated Threat Bus rule file with {indicator.pattern}")
 
 
