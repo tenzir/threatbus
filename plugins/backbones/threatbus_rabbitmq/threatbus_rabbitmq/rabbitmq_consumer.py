@@ -1,9 +1,8 @@
-from confuse import Subview
+from dynaconf.utils.boxing import DynaBox
 import json
 import pika
 from logging import Logger
 from stix2 import Indicator, Sighting, parse
-from socket import gethostname
 import threatbus
 from threatbus.data import (
     SnapshotRequest,
@@ -25,7 +24,7 @@ class RabbitMQConsumer(threatbus.StoppableWorker):
         self,
         conn_params: pika.ConnectionParameters,
         exchange_name: str,
-        queue_params: Subview,
+        queue_params: DynaBox,
         provision_callback: Callable[
             [str, Union[Indicator, Sighting, SnapshotEnvelope, SnapshotRequest]], None
         ],
@@ -34,7 +33,7 @@ class RabbitMQConsumer(threatbus.StoppableWorker):
         """
         @param conn_params Pika.ConnectionParameters to connect to RabbitMQ
         @param exchange_name The name of the RabbitMQ Threat Bus exchange
-        @param queue_params Confuse view of parameters to use for declaring queues
+        @param queue_params DynaBox config parameters to use for declaring queues
         @param provision_callback A callback to invoke after messages are retrieved and parsed successfully
         @param logger A pre-configured Logger instance
         """
@@ -51,21 +50,19 @@ class RabbitMQConsumer(threatbus.StoppableWorker):
         self._channel: Union[pika.channel.Channel, None] = None
 
         # Create names and parameters for exchanges and queues
-        join_symbol = queue_params["name_join_symbol"].get()
-        queue_name_suffix = queue_params["name_suffix"].get()
-        queue_name_suffix = queue_name_suffix if queue_name_suffix else gethostname()
+        join_symbol = queue_params.name_join_symbol
+        queue_name_suffix = queue_params.name_suffix
         self.queue_name = f"threatbus{join_symbol}{queue_name_suffix}"
 
-        queue_mode = "default" if not queue_params["lazy"].get(bool) else "lazy"
+        queue_mode = "default" if not queue_params.lazy else "lazy"
         self.queue_kwargs = {
-            "durable": queue_params["durable"].get(bool),
-            "exclusive": queue_params["exclusive"].get(bool),
-            "auto_delete": queue_params["auto_delete"].get(bool),
+            "durable": queue_params.durable,
+            "exclusive": queue_params.exclusive,
+            "auto_delete": queue_params.auto_delete,
             "arguments": {"x-queue-mode": queue_mode},
         }
-        max_items = queue_params["max_items"].get()
-        if max_items:
-            self.queue_kwargs["arguments"]["x-max-length"] = max_items
+        if queue_params.max_items:
+            self.queue_kwargs["arguments"]["x-max-length"] = queue_params.max_items
 
     def __provision(self, _channel, method_frame, _header_frame, msg):
         """
