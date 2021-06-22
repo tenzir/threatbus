@@ -1,7 +1,7 @@
-FROM fixel/zeek:broker-latest
+FROM debian:bullseye
 
 RUN apt-get -qq update && apt-get -qqy install \
-  python3-pip wget software-properties-common gnupg2
+  python3-pip software-properties-common gnupg2 libbroker2 python3-broker
 
 RUN pip3 install --upgrade pip
 
@@ -13,7 +13,7 @@ COPY README.md .
 COPY threatbus threatbus
 COPY plugins plugins
 RUN python3 -m pip install . && \
-  #python3 -m pip install plugins/apps/threatbus_cif3 && \
+  python3 -m pip install plugins/apps/threatbus_cif3 && \
   python3 -m pip install plugins/apps/threatbus_misp[zmq] && \
   python3 -m pip install plugins/apps/threatbus_zeek && \
   python3 -m pip install plugins/apps/threatbus_zmq_app && \
@@ -22,4 +22,4 @@ RUN python3 -m pip install . && \
 COPY config* ./
 
 ENTRYPOINT ["threatbus"]
-CMD ["-c", "config.yaml"]
+CMD ["-h"]
