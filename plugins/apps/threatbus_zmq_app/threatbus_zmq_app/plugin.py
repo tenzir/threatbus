@@ -1,4 +1,5 @@
-from confuse import Subview
+from dynaconf import Validator
+from dynaconf.utils.boxing import DynaBox
 import json
 from multiprocessing import JoinableQueue
 import random
@@ -42,7 +43,7 @@ class SubscriptionManager(threatbus.StoppableWorker):
 
     def __init__(
         self,
-        zmq_config: Subview,
+        zmq_config: DynaBox,
         subscribe_callback: Callable,
         unsubscribe_callback: Callable,
     ):
@@ -61,9 +62,9 @@ class SubscriptionManager(threatbus.StoppableWorker):
 
         context = zmq.Context()
         socket = context.socket(zmq.REP)  # REP socket for point-to-point reply
-        socket.bind(f"tcp://{self.zmq_config['host']}:{self.zmq_config['manage']}")
-        pub_endpoint = f"{self.zmq_config['host']}:{self.zmq_config['pub']}"
-        sub_endpoint = f"{self.zmq_config['host']}:{self.zmq_config['sub']}"
+        socket.bind(f"tcp://{self.zmq_config.host}:{self.zmq_config.manage}")
+        pub_endpoint = f"{self.zmq_config.host}:{self.zmq_config.pub}"
+        sub_endpoint = f"{self.zmq_config.host}:{self.zmq_config.sub}"
 
         poller = zmq.Poller()
         poller.register(socket, zmq.POLLIN)
@@ -152,7 +153,7 @@ class ZmqPublisher(threatbus.StoppableWorker):
     Publshes messages to all registered subscribers via ZeroMQ.
     """
 
-    def __init__(self, zmq_config: Subview):
+    def __init__(self, zmq_config: DynaBox):
         """
         @param zmq_config ZeroMQ configuration properties
         """
@@ -163,7 +164,7 @@ class ZmqPublisher(threatbus.StoppableWorker):
         global subscriptions, subscriptions_lock, logger
         context = zmq.Context()
         socket = context.socket(zmq.PUB)
-        socket.bind(f"tcp://{self.zmq_config['host']}:{self.zmq_config['pub']}")
+        socket.bind(f"tcp://{self.zmq_config.host}:{self.zmq_config.pub}")
 
         while self._running():
             subscriptions_lock.acquire()
@@ -209,7 +210,7 @@ class ZmqReceiver(threatbus.StoppableWorker):
     to the plugin's in-queue.
     """
 
-    def __init__(self, zmq_config: Subview, inq: JoinableQueue):
+    def __init__(self, zmq_config: DynaBox, inq: JoinableQueue):
         """
         @param zmq_config ZeroMQ configuration properties
         """
@@ -221,7 +222,7 @@ class ZmqReceiver(threatbus.StoppableWorker):
         global logger
         context = zmq.Context()
         socket = context.socket(zmq.SUB)
-        socket.bind(f"tcp://{self.zmq_config['host']}:{self.zmq_config['sub']}")
+        socket.bind(f"tcp://{self.zmq_config.host}:{self.zmq_config.sub}")
         stix2_topic_prefix = "stix2/"
         snapshotenvelope_topic = "threatbus/snapshotenvelope"
         socket.setsockopt(zmq.SUBSCRIBE, stix2_topic_prefix.encode())
@@ -257,12 +258,18 @@ class ZmqReceiver(threatbus.StoppableWorker):
                 continue
 
 
-def validate_config(config: Subview):
-    assert config, "config must not be None"
-    config["host"].get(str)
-    config["manage"].get(int)
-    config["pub"].get(int)
-    config["sub"].get(int)
+@threatbus.app
+def config_validators() -> List[Validator]:
+    return [
+        Validator(f"plugins.apps.{plugin_name}.host", required=True),
+        Validator(
+            f"plugins.apps.{plugin_name}.manage",
+            f"plugins.apps.{plugin_name}.pub",
+            f"plugins.apps.{plugin_name}.sub",
+            is_type_of=int,
+            required=True,
+        ),
+    ]
 
 
 def rand_string(length: int):
@@ -291,19 +298,16 @@ def snapshot(snapshot_request: SnapshotRequest, result_q: JoinableQueue):
 
 @threatbus.app
 def run(
-    config: Subview,
-    logging: Subview,
+    config: DynaBox,
+    logging: DynaBox,
     inq: JoinableQueue,
     subscribe_callback: Callable,
     unsubscribe_callback: Callable,
 ):
     global logger, workers
+    assert plugin_name in config, f"Cannot find configuration for {plugin_name} plugin"
     logger = threatbus.logger.setup(logging, __name__)
     config = config[plugin_name]
-    try:
-        validate_config(config)
-    except Exception as e:
-        logger.fatal("Invalid config for plugin {}: {}".format(plugin_name, str(e)))
     workers.append(ZmqPublisher(config))
     workers.append(ZmqReceiver(config, inq))
     workers.append(
