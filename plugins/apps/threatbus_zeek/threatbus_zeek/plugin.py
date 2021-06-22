@@ -1,5 +1,6 @@
 import broker
-from confuse import Subview
+from dynaconf import Validator
+from dynaconf.utils.boxing import DynaBox
 from multiprocessing import JoinableQueue
 import random
 import select
@@ -190,43 +191,47 @@ class BrokerReceiver(threatbus.StoppableWorker):
                 logger.error(f"Error mapping Broker event to STIX-2 Sighting: {e}")
 
 
-def validate_config(config):
-    assert config, "config must not be None"
-    config["host"].get(str)
-    config["port"].get(int)
-    config["module_namespace"].get(str)
+@threatbus.app
+def config_validators() -> List[Validator]:
+    return [
+        Validator(
+            f"plugins.apps.{plugin_name}.host",
+            f"plugins.apps.{plugin_name}.module_namespace",
+            required=True,
+        ),
+        Validator(
+            f"plugins.apps.{plugin_name}.port",
+            is_type_of=int,
+            required=True,
+        ),
+    ]
 
 
 @threatbus.app
 def run(
-    config: Subview,
-    logging: Subview,
+    config: DynaBox,
+    logging: DynaBox,
     inq: JoinableQueue,
     subscribe_callback: Callable,
     unsubscribe_callback: Callable,
 ):
     global logger, workers
     logger = threatbus.logger.setup(logging, __name__)
+    assert plugin_name in config, f"Cannot find configuration for {plugin_name} plugin"
     config = config[plugin_name]
-    try:
-        validate_config(config)
-    except Exception as e:
-        logger.fatal("Invalid config for plugin {}: {}".format(plugin_name, str(e)))
-    host, port, namespace = (
-        config["host"].get(),
-        config["port"].get(),
-        config["module_namespace"].get(),
-    )
+
     broker_opts = broker.BrokerOptions()
     broker_opts.forward = False
     ep = broker.Endpoint(broker.Configuration(broker_opts))
-    ep.listen(host, port)
+    ep.listen(config.host, config.port)
 
     workers.append(
-        SubscriptionManager(namespace, ep, subscribe_callback, unsubscribe_callback)
+        SubscriptionManager(
+            config.module_namespace, ep, subscribe_callback, unsubscribe_callback
+        )
     )
-    workers.append(BrokerReceiver(namespace, ep, inq))
-    workers.append(BrokerPublisher(namespace, ep))
+    workers.append(BrokerReceiver(config.module_namespace, ep, inq))
+    workers.append(BrokerPublisher(config.module_namespace, ep))
     for w in workers:
         w.start()
     logger.info("Zeek plugin started")
