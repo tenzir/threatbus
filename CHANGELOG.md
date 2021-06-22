@@ -12,6 +12,12 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+- ⚠️ The official [tenzir/threatbus](https://hub.docker.com/r/tenzir/threatbus)
+  Docker image now uses Debian:Bullseye as
+  [base image](https://hub.docker.com/_/debian) and uses the Debian-maintained
+  Broker libraries to enable communication with [Zeek](https://zeek.org/).
+  [#132](https://github.com/tenzir/threatbus/pull/132)
+
 - ⚠️  The Threat Bus community chat moved from Gitter to Slack. 
   [Join us](http://slack.tenzir.com) in the `#threatbus` channel for
   interactive discussions.
