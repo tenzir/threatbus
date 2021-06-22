@@ -1,5 +1,6 @@
 from cifsdk.client.http import HTTP as Client
-from confuse import Subview
+from dynaconf import Validator
+from dynaconf.utils.boxing import DynaBox
 from multiprocessing import JoinableQueue
 from queue import Empty
 import threatbus
@@ -18,7 +19,7 @@ class CIFPublisher(threatbus.StoppableWorker):
     Reports / publishes Indicators to the given CIF endpoint.
     """
 
-    def __init__(self, indicator_q: JoinableQueue, cif: Client, config: Subview):
+    def __init__(self, indicator_q: JoinableQueue, cif: Client, config: DynaBox):
         """
         @param indicator_q Publish all indicators from this queue to CIF
         @param cif The CIF client to use
@@ -34,12 +35,12 @@ class CIFPublisher(threatbus.StoppableWorker):
         if not self.cif:
             logger.error("CIF is not properly configured. Exiting.")
             return
-        confidence = self.config["confidence"].as_number()
+        confidence = self.config.confidence
         if not confidence:
             confidence = 5
-        tags = self.config["tags"].get(list)
-        tlp = self.config["tlp"].get(str)
-        group = self.config["group"].get(str)
+        tags = self.config.tags
+        tlp = self.config.tlp
+        group = self.config.group
 
         while self._running():
             try:
@@ -64,46 +65,59 @@ class CIFPublisher(threatbus.StoppableWorker):
                 self.indicator_q.task_done()
 
 
-def validate_config(config: Subview):
-    assert config, "config must not be None"
-    config["tags"].get(list)
-    config["tlp"].get(str)
-    config["confidence"].as_number()
-    config["group"].get(str)
-    config["api"].get(dict)
-    config["api"]["host"].get(str)
-    config["api"]["ssl"].get(bool)
-    config["api"]["token"].get(str)
+@threatbus.app
+def config_validators() -> List[Validator]:
+    return [
+        Validator(
+            f"plugins.apps.{plugin_name}.group",
+            f"plugins.apps.{plugin_name}.tlp",
+            required=True,
+        ),
+        Validator(
+            f"plugins.apps.{plugin_name}.confidence",
+            is_type_of=float,
+            required=True,
+        ),
+        Validator(
+            f"plugins.apps.{plugin_name}.tags",
+            is_type_of=list,
+            required=True,
+        ),
+        Validator(
+            f"plugins.apps.{plugin_name}.api.host",
+            f"plugins.apps.{plugin_name}.api.token",
+            required=True,
+        ),
+        Validator(
+            f"plugins.apps.{plugin_name}.api.ssl",
+            is_type_of=bool,
+            required=True,
+        ),
+    ]
 
 
 @threatbus.app
 def run(
-    config: Subview,
-    logging: Subview,
+    config: DynaBox,
+    logging: DynaBox,
     inq: JoinableQueue,
     subscribe_callback: Callable,
     unsubscribe_callback: Callable,
 ):
     global logger, workers
     logger = threatbus.logger.setup(logging, __name__)
+    assert plugin_name in config, f"Cannot find configuration for {plugin_name} plugin"
     config = config[plugin_name]
-    try:
-        validate_config(config)
-    except Exception as e:
-        logger.fatal("Invalid config for plugin {}: {}".format(plugin_name, str(e)))
 
-    remote, token, ssl = (
-        config["api"]["host"].get(),
-        config["api"]["token"].get(),
-        config["api"]["ssl"].get(),
-    )
     cif = None
     try:
-        cif = Client(remote=remote, token=token, verify_ssl=ssl)
+        cif = Client(
+            remote=config.api.host, token=config.api.token, verify_ssl=config.api.ssl
+        )
         cif.ping()
     except Exception as err:
         logger.error(
-            f"Cannot connect to CIFv3 at {remote}, using SSL: {ssl}. Exiting plugin. {err}"
+            f"Cannot connect to CIFv3 at {config.api.host}, using SSL: {config.api.ssl}. Exiting plugin. {err}"
         )
         return
 
