@@ -5,6 +5,7 @@ import asyncio
 import atexit
 import coloredlogs
 import confuse
+from datetime import datetime
 import logging
 from os.path import dirname, join
 from parsuricata import parse_rules
@@ -26,6 +27,10 @@ async_tasks = []
 p2p_topic = None
 # Boolean flag indicating that the user has issued a SIGNAL (e.g., SIGTERM).
 user_exit = False
+# Timestamp of the last write to the rule file maintained by this app.
+last_rule_file_update: datetime = datetime.now()
+# Timestamp of the last time Suricata was instructed to reload its rulesets.
+last_rule_ingest: datetime = datetime.now()
 
 ### --------------------------- Application helpers ---------------------------
 
@@ -284,6 +289,7 @@ async def update_suricata_rules(indicator_queue: asyncio.Queue, rules_file: str)
     @param indicator_queue The queue to receive IoCs from
     @param rules_file The file to update with new rules.
     """
+    global last_rule_file_update
     while True:
         msg = await indicator_queue.get()
         indicator = parse(msg, allow_custom=True)
@@ -326,6 +332,7 @@ async def update_suricata_rules(indicator_queue: asyncio.Queue, rules_file: str)
                 tfile.write(new_rule)
         indicator_queue.task_done()
         move(tmp_file, rules_file)
+        last_rule_file_update = datetime.now()
         logger.debug(f"Updated Threat Bus rule file with {indicator.pattern}")
 
 
@@ -336,7 +343,12 @@ async def reload_rules(socket: str, reload_interval: int):
     @param reload_interval The interval (seconds) in which to trigger a rule
     reload.
     """
+    global last_rule_ingest
     while True:
+        if last_rule_ingest > last_rule_file_update:
+            # Only trigger a re-ingest of Suricata rules if there was an update
+            await asyncio.sleep(reload_interval)
+            continue
         proc = await asyncio.create_subprocess_exec(
             *lexical_split(f"suricatasc -c ruleset-reload-nonblocking {socket}"),
             stdout=asyncio.subprocess.PIPE,
@@ -349,6 +361,7 @@ async def reload_rules(socket: str, reload_interval: int):
             )
         else:
             logger.debug(f"Triggered rule reload. Log output: {stdout.decode()}")
+        last_rule_ingest = datetime.now()
         await asyncio.sleep(reload_interval)
 
 
