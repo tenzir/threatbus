@@ -1,12 +1,14 @@
-from confuse import Subview
-import pluggy
+from dynaconf import Validator
+from dynaconf.utils.boxing import DynaBox
 from multiprocessing import JoinableQueue
+import pluggy
+from typing import List
 
 hookspec = pluggy.HookspecMarker("threatbus.backbone")
 
 
 @hookspec
-def run(config: Subview, logging: Subview, inq: JoinableQueue):
+def run(config: DynaBox, logging: DynaBox, inq: JoinableQueue):
     """Runs / starts a plugin spec with a configuration object
     @param config A configuration object for the app
     @param logging A configuration object for the logger
@@ -32,4 +34,12 @@ def unsubscribe(topic: str, q: JoinableQueue):
     """Unubscribes the given queue from the requested topic
     @param topic Unsubscribe from this topic (string)
     @param q The queue object that was subscribed to the given topic
+    """
+
+
+@hookspec
+def config_validators() -> List[Validator]:
+    """
+    Returns a list of dynaconf.Validators so the main Threat Bus runtime can
+    validate the user-specified configuration.
     """
