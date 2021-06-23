@@ -1,4 +1,4 @@
-import confuse
+from dynaconf import Dynaconf
 import queue
 import threading
 from stix2 import Indicator, parse, Sighting
@@ -13,8 +13,9 @@ class TestZmqMessageRoundtrip(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         super(TestZmqMessageRoundtrip, cls).setUpClass()
-        config = confuse.Configuration("threatbus")
-        config.set_file("config_integration_test.yaml")
+        config = Dynaconf(
+            settings_file="config_integration_test.yaml",
+        )
         cls.threatbus = start_threatbus(config)
         time.sleep(1)
 

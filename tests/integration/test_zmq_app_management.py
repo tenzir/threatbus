@@ -1,4 +1,4 @@
-import confuse
+from dynaconf import Dynaconf
 import json
 from threatbus import start as start_threatbus
 import time
@@ -34,8 +34,9 @@ class TestMessageRoundtrip(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         super(TestMessageRoundtrip, cls).setUpClass()
-        config = confuse.Configuration("threatbus")
-        config.set_file("config_integration_test.yaml")
+        config = Dynaconf(
+            settings_file="config_integration_test.yaml",
+        )
         cls.threatbus = start_threatbus(config)
         time.sleep(1)
 

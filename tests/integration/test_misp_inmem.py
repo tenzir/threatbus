@@ -1,4 +1,4 @@
-import confuse
+from dynaconf.utils.boxing import DynaBox
 from datetime import datetime
 from threatbus_misp import plugin as misp_plugin
 from threatbus_inmem import plugin as inmem_backbone
@@ -68,14 +68,19 @@ class TestRoundtrips(unittest.TestCase):
         socket = zmq.Context().socket(zmq.PUB)
         socket.bind(f"tcp://127.0.0.1:{misp_zmq_pub_port}")
 
-        config = confuse.Configuration("threatbus")
-        config["misp"].add({})
-        config["misp"]["zmq"].add({})
-        config["misp"]["zmq"]["host"] = "127.0.0.1"
-        config["misp"]["zmq"]["port"] = misp_zmq_pub_port
-        config["inmem"].add({})
-        config["console"] = False
-        config["file"] = False
+        config = DynaBox(
+            {
+                "misp": {
+                    "zmq": {
+                        "host": "127.0.0.1",
+                        "port": misp_zmq_pub_port,
+                    }
+                },
+                "inmem": {},
+                "console": False,
+                "file": False,
+            }
+        )
 
         # start MISP plugin and in-memory backbone
         empty_callback = lambda x, y: None
