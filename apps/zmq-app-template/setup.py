@@ -28,8 +28,7 @@ setup(
     include_package_data=True,
     install_requires=[
         "black >= 19.10b",
-        "coloredlogs >= 14.0",
-        "confuse",
+        "dynaconf >= 3.1.4",
         "pyzmq >= 19",
         "stix2 >= 2.1",
         "threatbus >= 2021.5.27",
