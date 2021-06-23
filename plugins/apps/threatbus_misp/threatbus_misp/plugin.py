@@ -10,7 +10,8 @@ try:
     dep_kafka = True
 except ModuleNotFoundError:
     pass
-from confuse import Subview
+from dynaconf import Validator
+from dynaconf.utils.boxing import DynaBox
 from datetime import datetime
 from itertools import product
 import json
@@ -88,7 +89,7 @@ class KafkaReceiver(threatbus.StoppableWorker):
     Binds a Kafka consumer to the the given host/port. Forwards all received messages to the inq.
     """
 
-    def __init__(self, kafka_config: Subview, inq: JoinableQueue):
+    def __init__(self, kafka_config: DynaBox, inq: JoinableQueue):
         """
         @param kafka_config A configuration object for Kafka binding
         @param inq The queue to which STIX-2 indicators are forwarded to
@@ -98,13 +99,11 @@ class KafkaReceiver(threatbus.StoppableWorker):
         self.inq = inq
 
     def run(self):
-        consumer = Consumer(self.kafka_config["config"].get(dict))
-        consumer.subscribe(self.kafka_config["topics"].get(list))
+        consumer = Consumer(self.kafka_config.config)
+        consumer.subscribe(self.kafka_config.topics)
         global logger, filter_config
         while self._running():
-            message = consumer.poll(
-                timeout=self.kafka_config["poll_interval"].get(float)
-            )
+            message = consumer.poll(timeout=self.kafka_config.poll_interval)
             if message is None:
                 continue
             if message.error():
@@ -137,7 +136,7 @@ class ZmqReceiver(threatbus.StoppableWorker):
     Binds a ZMQ poller to the the given host/port. Forwards all received messages to the inq.
     """
 
-    def __init__(self, zmq_config: Subview, inq: JoinableQueue):
+    def __init__(self, zmq_config: DynaBox, inq: JoinableQueue):
         """
         @param zmq_config A configuration object for ZeroMQ binding
         @param inq The queue to which STIX-2 Indicators are forwarded to
@@ -149,7 +148,7 @@ class ZmqReceiver(threatbus.StoppableWorker):
     def run(self):
         global logger, filter_config
         socket = zmq.Context().socket(zmq.SUB)
-        socket.connect(f"tcp://{self.zmq_config['host']}:{self.zmq_config['port']}")
+        socket.connect(f"tcp://{self.zmq_config.host}:{self.zmq_config.port}")
         # TODO: allow reception of more topics, i.e. handle events.
         socket.setsockopt(zmq.SUBSCRIBE, b"misp_json_attribute")
         poller = zmq.Poller()
@@ -183,38 +182,91 @@ class ZmqReceiver(threatbus.StoppableWorker):
             self.inq.put(ioc)
 
 
-def validate_config(config: Subview):
-    assert config, "config must not be None"
-    # redact fallback values to allow for omitting configuration blocks
-    config["api"].add({})
-    config["zmq"].add({})
-    config["kafka"].add({})
-    config["filter"].add([])
-
-    if config["zmq"].get(dict) and config["kafka"].get(dict):
-        raise AssertionError("either use ZeroMQ or Kafka, but not both")
-
-    if type(config["filter"].get()) is not list:
-        raise AssertionError("filter must be specified as list")
-
-    if config["api"].get(dict):
-        config["api"]["host"].get(str)
-        config["api"]["ssl"].get(bool)
-        config["api"]["key"].get(str)
-    if config["zmq"].get(dict):
-        assert (
-            dep_zmq
-        ), "MISP attribute export is configured via ZeroMQ, but the dependency is not installed. Install `threatbus-misp[zmq]` to use this setting."
-        config["zmq"]["host"].get(str)
-        config["zmq"]["port"].get(int)
-    if config["kafka"].get(dict):
-        assert (
-            dep_kafka
-        ), "MISP attribute export is configured via Apache Kafka, but the dependency is not installed. Install `threatbus-misp[kafka]` to use this setting."
-        config["kafka"]["topics"].get(list)
-        config["kafka"]["poll_interval"].add(1.0)
-        config["kafka"]["poll_interval"].get(float)
-        config["kafka"]["config"].get(dict)
+@threatbus.app
+def config_validators() -> List[Validator]:
+    ## The MISP plugin is installed with an optional dependency (either `zmq` or
+    ## `kafka`). Configuring one of these sections requires to have installed
+    ## the correct plugin package.
+    zmq_validator = Validator(
+        f"plugins.apps.{plugin_name}.zmq",
+        condition=lambda value: dep_zmq,
+        is_type_of=dict,
+        messages={
+            "condition": "MISP attribute export is configured via ZeroMQ (setting {name}), but the dependency is not installed. Install `threatbus-misp[zmq]` to use this setting."
+        },
+    )
+    kafka_validator = Validator(
+        f"plugins.apps.{plugin_name}.kafka",
+        condition=lambda value: dep_kafka,
+        is_type_of=dict,
+        messages={
+            "condition": "MISP attribute export is configured via Apache Kafka (setting {name}), but the dependency is not installed. Install `threatbus-misp[kafka]` to use this setting."
+        },
+    )
+    ## Using `kafka` or `zmq` is mutually exclusive, otherwise this plugin would
+    ## receive every indicator update twice. Configuring both sections in the
+    ## config file must be prohibited.
+    zmq_kafka_mut_exclusive_validator = Validator(
+        f"plugins.apps.{plugin_name}.zmq",
+        required=True,
+        ne=None,
+        when=Validator(f"plugins.apps.{plugin_name}.kafka", eq=None),
+        messages={
+            "operations": "Either configure the MISP plugin to use ZeroMQ or Kafka, but not both."
+        },
+    ) & Validator(
+        f"plugins.apps.{plugin_name}.zmq",
+        eq=None,
+        when=Validator(f"plugins.apps.{plugin_name}.kafka", required=True, ne=None),
+        messages={
+            "operations": "Either configure the MISP plugin to use ZeroMQ or Kafka, but not both."
+        },
+    )
+    return [
+        Validator(
+            f"plugins.apps.{plugin_name}.filter",
+            is_type_of=list,
+            default=[],
+        ),
+        Validator(
+            f"plugins.apps.{plugin_name}.api",
+            is_type_of=dict,
+            default={},
+        ),
+        zmq_kafka_mut_exclusive_validator,
+        zmq_validator,
+        Validator(
+            f"plugins.apps.{plugin_name}.zmq.host",
+            required=True,
+            when=Validator(f"plugins.apps.{plugin_name}.kafka", eq=None),
+        ),
+        Validator(
+            f"plugins.apps.{plugin_name}.zmq.port",
+            is_type_of=int,
+            required=True,
+            when=Validator(f"plugins.apps.{plugin_name}.kafka", eq=None),
+        ),
+        kafka_validator,
+        Validator(
+            f"plugins.apps.{plugin_name}.kafka.topics",
+            is_type_of=list,
+            must_exist=True,
+            when=Validator(f"plugins.apps.{plugin_name}.zmq", eq=None),
+        ),
+        Validator(
+            f"plugins.apps.{plugin_name}.kafka.poll_interval",
+            is_type_of=float,
+            default=1.0,
+            must_exist=True,
+            when=Validator(f"plugins.apps.{plugin_name}.zmq", eq=None),
+        ),
+        Validator(
+            f"plugins.apps.{plugin_name}.kafka.config",
+            is_type_of=dict,
+            must_exist=True,
+            when=Validator(f"plugins.apps.{plugin_name}.zmq", eq=None),
+        ),
+    ]
 
 
 @threatbus.app
@@ -272,46 +324,42 @@ def snapshot(snapshot_request: SnapshotRequest, result_q: JoinableQueue):
 
 @threatbus.app
 def run(
-    config: Subview,
-    logging: Subview,
+    config: DynaBox,
+    logging: DynaBox,
     inq: JoinableQueue,
     subscribe_callback: Callable,
     unsubscribe_callback: Callable,
 ):
     global logger, filter_config, workers
     logger = threatbus.logger.setup(logging, __name__)
+    assert plugin_name in config, f"Cannot find configuration for {plugin_name} plugin"
     config = config[plugin_name]
-    try:
-        validate_config(config)
-    except Exception as e:
-        logger.fatal("Invalid config for plugin {}: {}".format(plugin_name, str(e)))
 
-    filter_config = config["filter"].get(list)
+    filter_config = config.filter if "filter" in config else {}
 
     # start Attribute-update receiver
-    if config["zmq"].get():
-        workers.append(ZmqReceiver(config["zmq"], inq))
-    elif config["kafka"].get():
-        workers.append(KafkaReceiver(config["kafka"], inq))
+    if "zmq" in config:
+        workers.append(ZmqReceiver(config.zmq, inq))
+    elif "kafka" in config:
+        workers.append(KafkaReceiver(config.kafka, inq))
 
     # bind to MISP
-    if config["api"].get(dict):
+    if "api" in config:
         # TODO: MISP instances shall subscribe themselves to threatbus and each
         # subscription shall have an individual outq and receiving thread for intel
         # updates.
-        host, key, ssl = (
-            config["api"]["host"].get(),
-            config["api"]["key"].get(),
-            config["api"]["ssl"].get(),
-        )
         try:
             global misp, lock
             lock.acquire()
-            misp = pymisp.ExpandedPyMISP(url=host, key=key, ssl=ssl)
+            misp = pymisp.ExpandedPyMISP(
+                url=config.api.host, key=config.api.key, ssl=config.api.ssl
+            )
             lock.release()
         except Exception:
             # TODO: log individual error per MISP subscriber
-            logger.error(f"Cannot subscribe to MISP at {host}, using SSL: {ssl}")
+            logger.error(
+                f"Cannot subscribe to MISP at {config.api.host}, using SSL: {config.api.ssl}"
+            )
             lock.release()
         if not misp:
             logger.error("Failed to start MISP plugin")
