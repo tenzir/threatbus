@@ -1,0 +1,14 @@
+logging:
+  console: true
+  console_verbosity: DEBUG
+  file: true
+  file_verbosity: DEBUG
+  filename: suricata-threatbus.log
+
+threatbus: localhost:13370
+snapshot: 30
+# The socket to use for connecting with Suricata.
+socket: /var/run/suricata/suricata-command.socket
+rules_file: /var/lib/suricata/rules/threatbus.rules
+# Interval in seconds to trigger `suricatasc -c ruleset-reload-nonblocking`
+reload_interval: 60
