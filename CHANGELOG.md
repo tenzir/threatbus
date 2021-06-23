@@ -14,6 +14,16 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## [2021.06.24]
 
+- ⚠️ Threat Bus now uses [Dynaconf](https://github.com/rochacbruno/dynaconf) for
+  configuration management. Configuration via a config file works exactly as it
+  has worked before. Users can provide a path to the config file using the `-c`
+  option. Threat Bus now considers files named `config.yaml` and `config.yml` as
+  default configs if located in the same directory. Additionally, Threat Bus now
+  supports configration via environment variables and `.dotenv`. Env vars need
+  to be prefixed with `THREATBUS_` to be respected and always take precedence
+  over values in config files.
+  [#133](https://github.com/tenzir/threatbus/pull/133)
+
 - ⚠️ The official [tenzir/threatbus](https://hub.docker.com/r/tenzir/threatbus)
   Docker image now uses Debian:Bullseye as
   [base image](https://hub.docker.com/_/debian) and uses the Debian-maintained
