@@ -26,6 +26,7 @@ Every entry has a category for which we use the following visual abbreviations:
   in less matches than before. E.g., a URI indicator `tenzir.com` that
   used to match `docs.tenzir.com` as well as `https://tenzir.com` now
   only matches exactly the indicator.
+  [#130](https://github.com/tenzir/threatbus/pull/130)
 
 - 🎁 `pyvast-threatbus` now collects metrics about received indicators that are
   about to be matched retrospectively against VAST. The new metric is called
@@ -33,7 +34,7 @@ Every entry has a category for which we use the following visual abbreviations:
   building up. A backlog builds when `pyvast-threatbus` hits the
   user-configured limit of max backgroud tasks while at the same time VAST
   responds slowly to the issued queries.
-  [#129]https://github.com/tenzir/threatbus/pull/129
+  [#129](https://github.com/tenzir/threatbus/pull/129)
 
 - 🎁 `pyvast-threatbus` now comes with its own Dockerfile. Pre-built images are
   available on [Dockerhub](https://hub.docker.com/r/tenzir/pyvast-threatbus).
