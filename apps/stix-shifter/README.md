@@ -27,17 +27,20 @@ is yet to be implemented.]
 
 ## Quick Start
 
-You can configure the app via a YAML configuration file. See
-`config.yaml.example` for an example config file.
+You can configure the app via a YAML configuration file or via env vars. See
+`config.yaml.example` for an example config file. Rename the example to
+`config.yaml` before starting.
 
-Install `stix-shifter-threatbus` in a virtualenv and start it by passing a
-config file:
+Alternatively, configure the app via environment variables, similarly to Threat
+Bus, or pass a path to configuration file via `-c /path/to/config.yaml`.
+
+Install `stix-shifter-threatbus` in a virtualenv and start it:
 
 ```sh
 python -m venv venv
 source venv/bin/activate
 make dev-mode
-stix-shifter-threatbus -c config.yaml
+stix-shifter-threatbus
 ```
 
 ### Docker
