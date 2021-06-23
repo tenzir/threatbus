@@ -28,8 +28,7 @@ setup(
     include_package_data=True,
     install_requires=[
         "black >= 19.10b",
-        "coloredlogs >= 14.0",
-        "confuse",
+        "dynaconf >= 3.1.4",
         "python-dateutil",
         "pyzmq >= 19",
         "pyvast >= 2020.10.29",

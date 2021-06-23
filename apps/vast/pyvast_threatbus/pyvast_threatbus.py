@@ -3,8 +3,9 @@
 import argparse
 import asyncio
 import atexit
-import coloredlogs
-import confuse
+from dynaconf import Dynaconf, Validator
+from dynaconf.base import Settings
+from dynaconf.utils.boxing import DynaBox
 import json
 import logging
 from .message_mapping import (
@@ -53,26 +54,7 @@ s_retro_query_time_s_per_ioc = Summary("retro_query_time_per_ioc")
 g_live_matcher_sightings = Gauge("live_matcher_sightings")
 
 
-def setup_logging_with_level(level: str):
-    """
-    Sets up a the global logger for console logging with the given loglevel.
-    @param level The loglevel to use, e.g., "DEBUG"
-    """
-    global logger
-    log_level = logging.getLevelName(level.upper())
-
-    fmt = "%(asctime)s %(levelname)-8s %(message)s"
-    colored_formatter = coloredlogs.ColoredFormatter(fmt)
-
-    handler = logging.StreamHandler()
-    handler.setLevel(log_level)
-    if logger.level > log_level or logger.level == 0:
-        logger.setLevel(log_level)
-    handler.setFormatter(colored_formatter)
-    logger.addHandler(handler)
-
-
-def setup_logging_with_config(config: confuse.Subview):
+def setup_logging_with_config(config: DynaBox):
     """
     Sets up the global logger as configured in the `config` object.
     @param config The user-defined logging configuration
@@ -81,35 +63,47 @@ def setup_logging_with_config(config: confuse.Subview):
     logger = setup_logging_threatbus(config, logger_name)
 
 
-def validate_config(config: confuse.Subview):
-    assert config, "config must not be None"
-    config["vast"].get(str)
-    config["vast_binary"].get(str)
-    config["threatbus"].get(str)
-    config["snapshot"].get(int)
-    live_match = config["live_match"].get(bool)
-    retro_match = config["retro_match"].get(bool)
-    assert (
-        live_match or retro_match
-    ), "please enable at least one kind of matching (live_match and/or retro_match)"
-    config["retro_match_max_events"].get(int)
-    config["retro_match_timeout"].get(float)
-    config["max_background_tasks"].get(int)
+def validate_config(config: Settings):
+    """
+    Validates the given Dynaconf object. Throws if the config is invalid.
+    """
+    validators = [
+        Validator("logging.console", is_type_of=bool, required=True, eq=True)
+        | Validator("logging.file", is_type_of=bool, required=True, eq=True),
+        Validator(
+            "logging.console_verbosity",
+            is_in=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+            required=True,
+            when=Validator("logging.console", eq=True),
+        ),
+        Validator(
+            "logging.file_verbosity",
+            is_in=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+            required=True,
+            when=Validator("logging.file", eq=True),
+        ),
+        Validator(
+            "logging.filename", required=True, when=Validator("logging.file", eq=True)
+        ),
+        Validator(
+            "vast", "vast_binary", "threatbus", "metrics.filename", required=True
+        ),
+        Validator("live_match", "retro_match", is_type_of=bool, required=True),
+        Validator(
+            "snapshot",
+            "retro_match_max_events",
+            "max_background_tasks",
+            "metrics.interval",
+            is_type_of=int,
+            required=True,
+        ),
+        Validator("retro_match_timeout", is_type_of=float, required=True),
+        Validator("transform_context", "sink", default=None),
+        Validator("metrics.interval"),
+    ]
 
-    # fallback values for the optional arguments
-    config["transform_context"].add(None)
-    config["sink"].add(None)
-
-    # logging
-    if config["logging"]["console"].get(bool):
-        config["logging"]["console_verbosity"].get(str)
-    if config["logging"]["file"].get(bool):
-        config["logging"]["file_verbosity"].get(str)
-        config["logging"]["filename"].get(str)
-
-    # metrics
-    config["metrics"]["interval"].get(int)
-    config["metrics"]["filename"].get(str)
+    config.validators.register(*validators)
+    config.validators.validate()
 
 
 async def cancel_async_tasks():
@@ -772,52 +766,45 @@ async def heartbeat(endpoint: str, p2p_topic: str, interval: int = 5):
 
 
 def main():
+    ## Default list of settings files for Dynaconf to parse.
+    settings_files = ["config.yaml", "config.yml"]
     parser = argparse.ArgumentParser()
-    required_group = parser.add_argument_group("required named arguments")
-    required_group.add_argument(
-        "--config", "-c", help="path to a configuration file", required=True
-    )
+    parser.add_argument("--config", "-c", help="path to a configuration file")
     args = parser.parse_args()
-
-    # we need to use an underscore in the configuration name "pyvast_threatbus"
-    # confuse uses the configuration name to lookup environment variables, but
-    # it simply upper-cases that name. Dashes are not replaced properly. Using a
-    # dash in the configuration name makes it impossible to configure the
-    # APPNAMEDIR env variable to overwrite search paths, i.e., in systemd
-    # https://confit.readthedocs.io/en/latest/#search-paths
-    # https://github.com/beetbox/confuse/blob/v1.4.0/confuse/core.py#L555
-    config = confuse.Configuration("pyvast_threatbus")
-    config.set_args(args)
     if args.config:
-        config.set_file(args.config)
+        ## Allow users to provide a custom config file that takes precedence.
+        settings_files = [args.config]
+
+    config = Dynaconf(
+        settings_files=settings_files,
+        load_dotenv=True,
+        envvar_prefix="PYVAST_THREATBUS",
+    )
 
     try:
         validate_config(config)
     except Exception as e:
         sys.exit(ValueError(f"Invalid config: {e}"))
 
-    if config["logging"].get(dict):
-        setup_logging_with_config(config["logging"])
-    else:
-        setup_logging_with_level(config["loglevel"].get(str))
+    setup_logging_with_config(config.logging)
 
     while True:
         try:
             asyncio.run(
                 start(
-                    config["vast_binary"].get(),
-                    config["vast"].get(),
-                    config["threatbus"].get(),
-                    config["snapshot"].get(),
-                    config["live_match"].get(),
-                    config["retro_match"].get(),
-                    config["retro_match_max_events"].get(),
-                    config["retro_match_timeout"].get(),
-                    config["max_background_tasks"].get(),
-                    config["metrics"]["interval"].get(),
-                    config["metrics"]["filename"].get(),
-                    config["transform_context"].get(),
-                    config["sink"].get(),
+                    config.vast_binary,
+                    config.vast,
+                    config.threatbus,
+                    config.snapshot,
+                    config.live_match,
+                    config.retro_match,
+                    config.retro_match_max_events,
+                    config.retro_match_timeout,
+                    config.max_background_tasks,
+                    config.metrics.interval,
+                    config.metrics.filename,
+                    config.transform_context,
+                    config.sink,
                 )
             )
         except (KeyboardInterrupt, SystemExit):
