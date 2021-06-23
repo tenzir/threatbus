@@ -15,6 +15,10 @@ Make also sure that this app (e.g., user running this app) has the correct
 permissions to use the `suricatasc` command line utility and can read/write the
 rules file.
 
+Received rule updates are not applied instantaneously to minimize load on
+Suricata. Instead, users must configure the `reload_interval` (seconds) in the
+config file to enable periodic reloads for Suricata to pick up rule changes.
+
 ## Quick Start
 
 You can configure the app via a YAML configuration file. See
