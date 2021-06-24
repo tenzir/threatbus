@@ -11,7 +11,9 @@ Every entry has a category for which we use the following visual abbreviations:
 - ⚡️ Breaking Changes
 - 🐞 Bug Fixes
 
-## Unreleased
+<!-- ## Unreleased -->
+
+## [2021.06.24]
 
 - 🎁 `suricata-threatbus` has come to life. This stand-alone application
   connects to Threat Bus via ZeroMQ and bridges the gap between Threat Bus and
@@ -21,3 +23,4 @@ Every entry has a category for which we use the following visual abbreviations:
   their Suricata IDS installations.
   [#131](https://github.com/tenzir/threatbus/pull/131)
 
+[2021.06.24]: https://github.com/tenzir/threatbus/releases/tag/2021.06.24
