@@ -10,7 +10,9 @@ Every entry has a category for which we use the following visual abbreviations:
 - 🧬 Experimental Features
 - 🐞 Bug Fixes
 
-## Unreleased
+<!-- ## Unreleased -->
+
+## [2021.06.24]
 
 - ⚠️ The official [tenzir/threatbus](https://hub.docker.com/r/tenzir/threatbus)
   Docker image now uses Debian:Bullseye as
@@ -210,3 +212,4 @@ Every entry has a category for which we use the following visual abbreviations:
 [2021.03.25]: https://github.com/tenzir/threatbus/releases/tag/2021.03.25
 [2021.04.29]: https://github.com/tenzir/threatbus/releases/tag/2021.04.29
 [2021.05.27]: https://github.com/tenzir/threatbus/releases/tag/2021.05.27
+[2021.06.24]: https://github.com/tenzir/threatbus/releases/tag/2021.06.24

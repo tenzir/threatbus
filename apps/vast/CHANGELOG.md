@@ -10,7 +10,9 @@ Every entry has a category for which we use the following visual abbreviations:
 - ⚡️ Breaking Changes
 - 🐞 Bug Fixes
 
-## Unreleased
+<!-- ## Unreleased -->
+
+## [2021.06.24]
 
 - ⚡️ `pyvast-threatbus` now uses point queries over substring queries for
   URI indicators, because such queries are much faster. This may result
@@ -152,3 +154,4 @@ Every entry has a category for which we use the following visual abbreviations:
 [2021.03.25]: https://github.com/tenzir/threatbus/releases/tag/2021.03.25
 [2021.04.29]: https://github.com/tenzir/threatbus/releases/tag/2021.04.29
 [2021.05.27]: https://github.com/tenzir/threatbus/releases/tag/2021.05.27
+[2021.06.24]: https://github.com/tenzir/threatbus/releases/tag/2021.06.24
