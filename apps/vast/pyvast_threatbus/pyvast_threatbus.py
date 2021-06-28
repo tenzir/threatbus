@@ -772,6 +772,8 @@ def main():
     parser.add_argument("--config", "-c", help="path to a configuration file")
     args = parser.parse_args()
     if args.config:
+        if not args.config.endswith("yaml") and not args.config.endswith("yml"):
+            sys.exit("Please provide a `yaml` or `yml` configuration file.")
         ## Allow users to provide a custom config file that takes precedence.
         settings_files = [args.config]
 
