@@ -22,4 +22,3 @@ RUN chown -R threatbus .
 USER threatbus:threatbus
 
 ENTRYPOINT ["pyvast-threatbus"]
-CMD ["-h"]
