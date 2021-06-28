@@ -84,6 +84,13 @@ jobs:
         workdir: apps/stix-shifter
         username: ${{ secrets.DOCKERHUB_USER }}
         password: ${{ secrets.DOCKERHUB_PASSWORD }}
+    - name: Publish suricata-threatbus Docker Image
+      uses: elgohr/Publish-Docker-Github-Action@3.04
+      with:
+        name: tenzir/suricata-threatbus
+        workdir: apps/suricata
+        username: ${{ secrets.DOCKERHUB_USER }}
+        password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
   egg-release:
     name: Egg Release
