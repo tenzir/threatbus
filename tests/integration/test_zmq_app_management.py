@@ -130,8 +130,8 @@ class TestMessageRoundtrip(unittest.TestCase):
         self.assertTrue(type(reply) is dict)
         self.assertEquals(reply["status"], "success")
         self.assertIsNotNone(reply["topic"])
-        self.assertEquals(reply["pub_endpoint"], "127.0.0.1:13371")
-        self.assertEquals(reply["sub_endpoint"], "127.0.0.1:13372")
+        self.assertEquals(reply["pub_port"], 13371)
+        self.assertEquals(reply["sub_port"], 13372)
 
         p2p_topic = reply["topic"]  # needed for heartbeat and unsubscription
         self.valid_heartbeat["topic"] = p2p_topic
