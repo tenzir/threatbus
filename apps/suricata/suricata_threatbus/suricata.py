@@ -213,12 +213,15 @@ async def start(
     if not reply_is_success(reply):
         logger.error("Subscription failed")
         return
-    pub_endpoint = reply.get("pub_endpoint", None)
-    sub_endpoint = reply.get("sub_endpoint", None)
+    pub_port = reply.get("pub_port", None)
+    sub_port = reply.get("sub_port", None)
     topic = reply.get("topic", None)
-    if not pub_endpoint or not sub_endpoint or not topic:
+    if not pub_port or not sub_port or not topic:
         logger.error("Subscription failed")
         return
+    zmq_host = zmq_endpoint.split(:)[1]
+    pub_endpoint = f"{zmq_host}:{pub_port}"
+    sub_endpoint = f"{zmq_host}:{sub_port}"
 
     logger.info(f"Subscription successful. New p2p_topic: {topic}")
     if p2p_topic:
