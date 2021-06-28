@@ -83,6 +83,9 @@ export THREATBUS_LOGGING__CONSOLE=true
 threatbus -c /path/to/your/special-config.yaml
 ```
 
+Note that you must use a double underscores `__` in your env to refer to nested
+config variables.
+
 *Start Zeek as Threat Bus app*
 
 ```sh
