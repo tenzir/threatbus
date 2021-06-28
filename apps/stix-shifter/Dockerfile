@@ -16,4 +16,3 @@ RUN chown -R threatbus .
 USER threatbus:threatbus
 
 ENTRYPOINT ["stix-shifter-threatbus"]
-CMD ["-h"]

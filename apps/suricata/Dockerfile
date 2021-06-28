@@ -16,4 +16,3 @@ RUN chown -R threatbus .
 USER threatbus:threatbus
 
 ENTRYPOINT ["suricata-threatbus"]
-CMD ["-h"]

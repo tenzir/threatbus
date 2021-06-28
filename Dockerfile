@@ -22,4 +22,3 @@ RUN python3 -m pip install . && \
 COPY config* ./
 
 ENTRYPOINT ["threatbus"]
-CMD ["-h"]

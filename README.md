@@ -113,6 +113,10 @@ docker run tenzir/threatbus:latest --help
 docker run -p 47661:47661 -v $PWD/my-custom-config.yaml:/opt/tenzir/threatbus/my-custom-config.yaml tenzir/threatbus:latest -c my-custom-config.yaml
 ```
 
+Tip: Threat Bus checks for config files with default names. If you mount your
+config file to `/opt/tenzir/threatbus/config.yaml`, you can start the
+application without specifying the config file location with the `-c` parameter.
+
 ## Installation
 
 Install `threatbus` and all plugins that you require. Optionally, use a virtual
