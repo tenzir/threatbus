@@ -63,8 +63,6 @@ class SubscriptionManager(threatbus.StoppableWorker):
         context = zmq.Context()
         socket = context.socket(zmq.REP)  # REP socket for point-to-point reply
         socket.bind(f"tcp://{self.zmq_config.host}:{self.zmq_config.manage}")
-        pub_endpoint = f"{self.zmq_config.host}:{self.zmq_config.pub}"
-        sub_endpoint = f"{self.zmq_config.host}:{self.zmq_config.sub}"
 
         poller = zmq.Poller()
         poller.register(socket, zmq.POLLIN)
@@ -108,8 +106,8 @@ class SubscriptionManager(threatbus.StoppableWorker):
                         socket.send_json(
                             {
                                 "topic": p2p_topic,
-                                "pub_endpoint": pub_endpoint,
-                                "sub_endpoint": sub_endpoint,
+                                "pub_port": self.zmq_config.pub,
+                                "sub_port": self.zmq_config.sub,
                                 "status": "success",
                             }
                         )

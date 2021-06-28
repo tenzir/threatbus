@@ -79,18 +79,18 @@ In response, the app will either receive a `success` or `error` response.
   ```
   {
     "topic": <P2P_TOPIC>,
-    "pub_endpoint": "127.0.0.1:13371",
-    "sub_endpoint": "127.0.0.1:13372",
+    "pub_port": 13371,
+    "sub_port": 13372,
     "status": "success",
   }
   ```
 
-  The `pub_endpoint` and `sub_endpoint` of the reply provide the endpoints that
-  an app should connect with to participate in the pub/sub message exchange.
-  The app can access these endpoints following the
+  The `pub_port` and `sub_port` of the reply provide the port that an app should
+  connect with to participate in the pub/sub message exchange. A connecting app
+  can access these ports following the
   [ZeroMQ Pub/Sub](https://learning-0mq-with-pyzmq.readthedocs.io/en/latest/pyzmq/patterns/pubsub.html)
-  pattern. The plugin will publish messages on the `pub_endpoint` and accept
-  messages on the `sub_endpoint`.
+  pattern. The plugin will publish messages on the `pub_port` and accept
+  messages on the `sub_port`.
 
   The `topic` field of the response contains a unique topic for the client. That
   topic _must_ be used to receive messages. The unique topic is a 32 characters
