@@ -1,7 +1,8 @@
-import pluggy
-from confuse import Subview
+from dynaconf import Validator
+from dynaconf.utils.boxing import DynaBox
 from multiprocessing import JoinableQueue
-from typing import Callable
+import pluggy
+from typing import Callable, List
 from threatbus.data import SnapshotRequest
 
 hookspec = pluggy.HookspecMarker("threatbus.app")
@@ -9,8 +10,8 @@ hookspec = pluggy.HookspecMarker("threatbus.app")
 
 @hookspec
 def run(
-    config: Subview,
-    logging: Subview,
+    config: DynaBox,
+    logging: DynaBox,
     inq: JoinableQueue,
     subscribe_callback: Callable,
     unsubscribe_callback: Callable,
@@ -40,4 +41,12 @@ def snapshot(snapshot_request: SnapshotRequest, result_q: JoinableQueue):
     threatbus.data.SnapshotEnvelope are put to the result_q.
     @param snapshot_request @see threatbus.data.SnapshotRequest
     @param result_q Snapshot results are forwarded to this queue
+    """
+
+
+@hookspec
+def config_validators() -> List[Validator]:
+    """
+    Returns a list of dynaconf.Validators so the main Threat Bus runtime can
+    validate the user-specified configuration.
     """

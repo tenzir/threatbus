@@ -3,8 +3,9 @@
 import argparse
 import asyncio
 import atexit
-import coloredlogs
-import confuse
+from dynaconf import Dynaconf, Validator
+from dynaconf.base import Settings
+from dynaconf.utils.boxing import DynaBox
 import json
 import logging
 from .message_mapping import map_bundle_to_sightings
@@ -32,26 +33,7 @@ user_exit = False
 ### --------------------------- Application helpers ---------------------------
 
 
-def setup_logging_with_level(level: str):
-    """
-    Sets up a the global logger for console logging with the given loglevel.
-    @param level The loglevel to use, e.g., "DEBUG"
-    """
-    global logger
-    log_level = logging.getLevelName(level.upper())
-
-    fmt = "%(asctime)s %(levelname)-8s %(message)s"
-    colored_formatter = coloredlogs.ColoredFormatter(fmt)
-
-    handler = logging.StreamHandler()
-    handler.setLevel(log_level)
-    if logger.level > log_level or logger.level == 0:
-        logger.setLevel(log_level)
-    handler.setFormatter(colored_formatter)
-    logger.addHandler(handler)
-
-
-def setup_logging_with_config(config: confuse.Subview):
+def setup_logging_with_config(config: DynaBox):
     """
     Sets up the global logger as configured in the `config` object.
     @param config The user-defined logging configuration
@@ -61,21 +43,60 @@ def setup_logging_with_config(config: confuse.Subview):
     logging.getLogger("stix-shifter-utils").propagate = False
 
 
-def validate_config(config: confuse.Subview):
-    assert config, "config must not be None"
-    config["threatbus"].get(str)
-    config["snapshot"].get(int)
+def validate_config(config: Settings):
+    """
+    Validates the given Dynaconf object. Throws if the config is invalid.
+    """
+    validators = [
+        Validator("logging.console", is_type_of=bool, required=True, eq=True)
+        | Validator("logging.file", is_type_of=bool, required=True, eq=True),
+        Validator(
+            "logging.console_verbosity",
+            is_in=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+            required=True,
+            when=Validator("logging.console", eq=True),
+        ),
+        Validator(
+            "logging.file_verbosity",
+            is_in=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+            required=True,
+            when=Validator("logging.file", eq=True),
+        ),
+        Validator(
+            "logging.filename", required=True, when=Validator("logging.file", eq=True)
+        ),
+        Validator("threatbus", required=True),
+        Validator("snapshot", is_type_of=int, required=True),
+        Validator("modules", is_type_of=dict, required=True),
+    ]
 
-    for mod in config["modules"].get(dict):
-        config["modules"][mod].get(dict)
-        config["modules"][mod]["max_results"].get(int)
-        config["modules"][mod]["connection"].get(dict)
-        config["modules"][mod]["data_source"].get(dict)
-        config["modules"][mod]["data_source"]["type"].get(str)
-        config["modules"][mod]["data_source"]["name"].get(str)
-        config["modules"][mod]["data_source"]["id"].get(str)
-        config["modules"][mod]["transmission"].add({})  # default to empty config
-        config["modules"][mod]["translation"].add({})  # default to empty config
+    if "modules" in config:
+        for mod in config.modules.keys():
+            validators.append(
+                Validator(f"modules.{mod}.max_results", is_type_of=int, required=True)
+            )
+            validators.append(
+                Validator(f"modules.{mod}.connection", is_type_of=dict, required=True)
+            )
+            validators.append(
+                Validator(f"modules.{mod}.data_source", is_type_of=dict, required=True)
+            )
+            validators.append(
+                Validator(f"modules.{mod}.data_source.type", required=True)
+            )
+            validators.append(
+                Validator(f"modules.{mod}.data_source.name", required=True)
+            )
+            validators.append(Validator(f"modules.{mod}.data_source.id", required=True))
+            validators.append(
+                Validator(f"modules.{mod}.transmission", is_type_of=dict, default={})
+            )  # default to empty config
+            validators.append(
+                Validator(f"modules.{mod}.translation", is_type_of=dict, default={})
+            )  # default to empty config
+
+    config.validators.register(*validators)
+    config.validators.validate()
 
 
 async def cancel_async_tasks():
@@ -442,40 +463,37 @@ async def report_sightings(sub_endpoint: str, sightings_queue: asyncio.Queue):
 
 
 def main():
+    ## Default list of settings files for Dynaconf to parse.
+    settings_files = ["config.yaml", "config.yml"]
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", "-c", help="Path to a configuration file")
+    parser.add_argument("--config", "-c", help="path to a configuration file")
     args = parser.parse_args()
-
-    # Note that you must use names without dashes, use underscores instead for
-    # `confuse` to work without errors.
-    # Confuse uses the configuration name to lookup environment variables, but
-    # it simply upper-cases that name. Dashes are not replaced properly. Using a
-    # dash in the configuration name makes it impossible to configure the
-    # APPNAMEDIR env variable to overwrite search paths, i.e., in systemd
-    # https://confit.readthedocs.io/en/latest/#search-paths
-    # https://github.com/beetbox/confuse/blob/v1.4.0/confuse/core.py#L555
-    config = confuse.Configuration("stix_shifter")
-    config.set_args(args)
     if args.config:
-        config.set_file(args.config)
+        if not args.config.endswith("yaml") and not args.config.endswith("yml"):
+            sys.exit("Please provide a `yaml` or `yml` configuration file.")
+        ## Allow users to provide a custom config file that takes precedence.
+        settings_files = [args.config]
+
+    config = Dynaconf(
+        settings_files=settings_files,
+        load_dotenv=True,
+        envvar_prefix="STIX_SHIFTER_THREATBUS",
+    )
 
     try:
         validate_config(config)
     except Exception as e:
         sys.exit(ValueError(f"Invalid config: {e}"))
 
-    if config["logging"].get(dict):
-        setup_logging_with_config(config["logging"])
-    else:
-        setup_logging_with_level(config["loglevel"].get(str))
+    setup_logging_with_config(config.logging)
 
     while True:
         try:
             asyncio.run(
                 start(
-                    config["threatbus"].get(),
-                    config["snapshot"].get(),
-                    config["modules"].get(dict),
+                    config.threatbus,
+                    config.snapshot,
+                    config.modules,
                 )
             )
         except (KeyboardInterrupt, SystemExit):

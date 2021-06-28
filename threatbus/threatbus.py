@@ -1,11 +1,13 @@
 import argparse
-import confuse
 from datetime import timedelta
+from dynaconf import Dynaconf, Validator
+from dynaconf.base import Settings
 from logging import Logger
 import pluggy
 from multiprocessing import JoinableQueue
 from queue import Empty
 import signal
+import sys
 from threatbus import appspecs, backbonespecs, logger, stoppable_worker
 from threatbus.data import MessageType, SnapshotRequest, SnapshotEnvelope
 from threading import Lock
@@ -18,7 +20,7 @@ class ThreatBus(stoppable_worker.StoppableWorker):
         backbones: pluggy.hooks._HookRelay,
         apps: pluggy.hooks._HookRelay,
         logger: Logger,
-        config: confuse.Subview,
+        config: Settings,
     ):
         super(ThreatBus, self).__init__()
         self.backbones = backbones
@@ -131,14 +133,14 @@ class ThreatBus(stoppable_worker.StoppableWorker):
 
     def run(self):
         self.logger.info("Starting plugins...")
-        logging = self.config["logging"]
+        logging = self.config.logging
         self.backbones.run(
-            config=self.config["plugins"]["backbones"], logging=logging, inq=self.inq
+            config=self.config.plugins.backbones, logging=logging, inq=self.inq
         )
         self.subscribe("threatbus/snapshotrequest", self.snapshot_q)
         self.subscribe("threatbus/snapshotenvelope", self.snapshot_q)
         self.apps.run(
-            config=self.config["plugins"]["apps"],
+            config=self.config.plugins.apps,
             logging=logging,
             inq=self.inq,
             subscribe_callback=self.subscribe,
@@ -147,20 +149,35 @@ class ThreatBus(stoppable_worker.StoppableWorker):
         self.handle_snapshots()
 
 
-def validate_config(config: confuse.Subview):
-    if config["logging"]["console"].get(bool):
-        config["logging"]["console_verbosity"].get(str)
-    if config["logging"]["file"].get(bool):
-        config["logging"]["file_verbosity"].get(str)
-        config["logging"]["filename"].get(str)
+def validate_threatbus_config(config: Settings):
+    """
+    Validates the given Dynaconf object. Throws if the config is invalid.
+    """
+    validators = [
+        Validator("logging.console", is_type_of=bool, required=True, eq=True)
+        | Validator("logging.file", is_type_of=bool, required=True, eq=True),
+        Validator(
+            "logging.console_verbosity",
+            is_in=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+            required=True,
+            when=Validator("logging.console", eq=True),
+        ),
+        Validator(
+            "logging.file_verbosity",
+            is_in=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+            required=True,
+            when=Validator("logging.file", eq=True),
+        ),
+        Validator(
+            "logging.filename", required=True, when=Validator("logging.file", eq=True)
+        ),
+        Validator("plugins.apps", "plugins.backbones", required=True),
+    ]
+    config.validators.register(*validators)
+    config.validators.validate()
 
 
-def start(config: confuse.Subview):
-    try:
-        validate_config(config)
-    except Exception as e:
-        raise ValueError("Invalid config: {}".format(str(e)))
-
+def start(config: Settings):
     backbones = pluggy.PluginManager("threatbus.backbone")
     backbones.add_hookspecs(backbonespecs)
     backbones.load_setuptools_entrypoints("threatbus.backbone")
@@ -169,13 +186,17 @@ def start(config: confuse.Subview):
     apps.add_hookspecs(appspecs)
     apps.load_setuptools_entrypoints("threatbus.app")
 
-    tb_logger = logger.setup(config["logging"], "threatbus")
-    configured_apps = set(config["plugins"]["apps"].keys())
+    tb_logger = logger.setup(config.logging, "threatbus")
+
+    configured_apps = set(config.plugins.apps.keys())
     installed_apps = set(dict(apps.list_name_plugin()).keys())
+
+    ## Notify user about configuration mismatches between installed and
+    ## configured plugins.
     for unwanted_app in installed_apps - configured_apps:
         tb_logger.info(f"Disabling installed, but unconfigured app '{unwanted_app}'")
         apps.unregister(name=unwanted_app)
-    configured_backbones = set(config["plugins"]["backbones"].keys())
+    configured_backbones = set(config.plugins.backbones.keys())
     installed_backbones = set(dict(backbones.list_name_plugin()).keys())
     for unwanted_backbones in installed_backbones - configured_backbones:
         tb_logger.info(
@@ -189,6 +210,16 @@ def start(config: confuse.Subview):
             f"Found configuration for '{unconfigured_app}' but no corresponding plugin is installed."
         )
 
+    ## Validate all plugins that are both installed and configured
+    for validators in apps.hook.config_validators():
+        config.validators.register(*validators)
+    for validators in backbones.hook.config_validators():
+        config.validators.register(*validators)
+    try:
+        config.validators.validate()
+    except Exception as e:
+        sys.exit(f"Invalid config: {e}")
+
     bus_thread = ThreatBus(backbones.hook, apps.hook, tb_logger, config)
     signal.signal(signal.SIGINT, bus_thread.stop_signal)
     bus_thread.start()
@@ -196,16 +227,28 @@ def start(config: confuse.Subview):
 
 
 def main():
-    config = confuse.Configuration("threatbus")
+    ## Default list of settings files for Dynaconf to parse.
+    settings_files = ["config.yaml", "config.yml"]
     parser = argparse.ArgumentParser()
-    required_group = parser.add_argument_group("required named arguments")
-    required_group.add_argument(
-        "--config", "-c", help="path to a configuration file", required=True
-    )
+    parser.add_argument("--config", "-c", help="path to a configuration file")
     args = parser.parse_args()
-    config.set_args(args)
     if args.config:
-        config.set_file(args.config)
+        if not args.config.endswith("yaml") and not args.config.endswith("yml"):
+            sys.exit("Please provide a `yaml` or `yml` configuration file.")
+        ## Allow users to provide a custom config file that takes precedence.
+        settings_files = [args.config]
+
+    config = Dynaconf(
+        settings_files=settings_files,
+        load_dotenv=True,
+        envvar_prefix="THREATBUS",
+    )
+
+    try:
+        validate_threatbus_config(config)
+    except Exception as e:
+        sys.exit(f"Invalid config: {e}")
+
     start(config)
 
 

@@ -1,5 +1,5 @@
 import broker
-import confuse
+from dynaconf.utils.boxing import DynaBox
 from datetime import datetime, timedelta, timezone
 from multiprocessing import JoinableQueue
 from stix2 import Indicator, Sighting
@@ -18,13 +18,17 @@ class TestPluginInterface(unittest.TestCase):
         cls.host = "127.0.0.1"
         cls.port = 47761
         # setup the zeek plugin
-        config = confuse.Configuration("threatbus")
-        config["zeek"].add({})
-        config["zeek"]["host"] = cls.host
-        config["zeek"]["port"] = cls.port
-        config["zeek"]["module_namespace"] = "Tenzir"
-        config["console"] = False
-        config["file"] = False
+        config = DynaBox(
+            {
+                "zeek": {
+                    "host": cls.host,
+                    "port": cls.port,
+                    "module_namespace": "Tenzir",
+                },
+                "console": False,
+                "file": False,
+            }
+        )
 
         cls.inq = JoinableQueue()
         cls.subscribe_callback = MagicMock()

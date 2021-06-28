@@ -3,8 +3,9 @@
 import argparse
 import asyncio
 import atexit
-import coloredlogs
-import confuse
+from dynaconf import Dynaconf, Validator
+from dynaconf.base import Settings
+from dynaconf.utils.boxing import DynaBox
 import logging
 import signal
 from stix2 import parse
@@ -24,26 +25,7 @@ user_exit = False
 ### --------------------------- Application helpers ---------------------------
 
 
-def setup_logging_with_level(level: str):
-    """
-    Sets up a the global logger for console logging with the given loglevel.
-    @param level The loglevel to use, e.g., "DEBUG"
-    """
-    global logger
-    log_level = logging.getLevelName(level.upper())
-
-    fmt = "%(asctime)s %(levelname)-8s %(message)s"
-    colored_formatter = coloredlogs.ColoredFormatter(fmt)
-
-    handler = logging.StreamHandler()
-    handler.setLevel(log_level)
-    if logger.level > log_level or logger.level == 0:
-        logger.setLevel(log_level)
-    handler.setFormatter(colored_formatter)
-    logger.addHandler(handler)
-
-
-def setup_logging_with_config(config: confuse.Subview):
+def setup_logging_with_config(config: DynaBox):
     """
     Sets up the global logger as configured in the `config` object.
     @param config The user-defined logging configuration
@@ -52,10 +34,33 @@ def setup_logging_with_config(config: confuse.Subview):
     logger = setup_logging_threatbus(config, logger_name)
 
 
-def validate_config(config: confuse.Subview):
-    assert config, "config must not be None"
-    config["threatbus"].get(str)
-    config["snapshot"].get(int)
+def validate_config(config: Settings):
+    """
+    Validates the given Dynaconf object. Throws if the config is invalid.
+    """
+    validators = [
+        Validator("logging.console", is_type_of=bool, required=True, eq=True)
+        | Validator("logging.file", is_type_of=bool, required=True, eq=True),
+        Validator(
+            "logging.console_verbosity",
+            is_in=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+            required=True,
+            when=Validator("logging.console", eq=True),
+        ),
+        Validator(
+            "logging.file_verbosity",
+            is_in=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+            required=True,
+            when=Validator("logging.file", eq=True),
+        ),
+        Validator(
+            "logging.filename", required=True, when=Validator("logging.file", eq=True)
+        ),
+        Validator("threatbus", required=True),
+        Validator("snapshot", is_type_of=int, required=True),
+    ]
+    config.validators.register(*validators)
+    config.validators.validate()
 
 
 async def cancel_async_tasks():
@@ -276,39 +281,36 @@ async def do_something_with_intel(indicator_queue: asyncio.Queue):
 
 
 def main():
+    ## Default list of settings files for Dynaconf to parse.
+    settings_files = ["config.yaml", "config.yml"]
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", "-c", help="Path to a configuration file")
+    parser.add_argument("--config", "-c", help="path to a configuration file")
     args = parser.parse_args()
-
-    # Note that you must use names without dashes, use underscores instead for
-    # `confuse` to work without errors.
-    # Confuse uses the configuration name to lookup environment variables, but
-    # it simply upper-cases that name. Dashes are not replaced properly. Using a
-    # dash in the configuration name makes it impossible to configure the
-    # APPNAMEDIR env variable to overwrite search paths, i.e., in systemd
-    # https://confit.readthedocs.io/en/latest/#search-paths
-    # https://github.com/beetbox/confuse/blob/v1.4.0/confuse/core.py#L555
-    config = confuse.Configuration("zmq_app_template")
-    config.set_args(args)
     if args.config:
-        config.set_file(args.config)
+        if not args.config.endswith("yaml") and not args.config.endswith("yml"):
+            sys.exit("Please provide a `yaml` or `yml` configuration file.")
+        ## Allow users to provide a custom config file that takes precedence.
+        settings_files = [args.config]
+
+    config = Dynaconf(
+        settings_files=settings_files,
+        load_dotenv=True,
+        envvar_prefix="ZMQ_APP_TEMPLATE",
+    )
 
     try:
         validate_config(config)
     except Exception as e:
         sys.exit(ValueError(f"Invalid config: {e}"))
 
-    if config["logging"].get(dict):
-        setup_logging_with_config(config["logging"])
-    else:
-        setup_logging_with_level(config["loglevel"].get(str))
+    setup_logging_with_config(config.logging)
 
     while True:
         try:
             asyncio.run(
                 start(
-                    config["threatbus"].get(),
-                    config["snapshot"].get(),
+                    config.threatbus,
+                    config.snapshot,
                 )
             )
         except (KeyboardInterrupt, SystemExit):

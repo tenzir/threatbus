@@ -15,6 +15,19 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## [2021.06.24]
 
+- ⚠️ `stix-shifter-threatbus` now uses
+  [Dynaconf](https://github.com/rochacbruno/dynaconf) for configuration
+  management. Configuration via a config file works exactly as it has worked
+  before. Users can provide a path to the config file using the `-c` option.
+  `stix-shifter-threatbus` now considers files named `config.yaml` and
+  `config.yml` as default configs if located in the same directory.
+  Additionally, `stix-shifter-threatbus` now supports configration via
+  environment variables and `.dotenv`. Env vars need to be prefixed with
+  `STIX_SHIFTER_THREATBUS_` to be respected and always take precedence over
+  values in config files.
+  [#133](https://github.com/tenzir/threatbus/pull/133)
+
+
 - 🎁 `stix-shifter-threatbus` now comes with its own Dockerfile. Pre-built
   images are available on
   [Dockerhub](http://hub.docker.com/r/tenzir/stix-shifter-threatbus).

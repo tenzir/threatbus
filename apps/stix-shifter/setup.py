@@ -30,8 +30,7 @@ setup(
     include_package_data=True,
     install_requires=[
         "black >= 19.10b",
-        "coloredlogs >= 14.0",
-        "confuse",
+        "dynaconf >= 3.1.4",
         "python-dateutil",
         "pyzmq >= 19",
         "stix2 >= 2.1",

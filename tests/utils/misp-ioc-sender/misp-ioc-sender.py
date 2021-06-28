@@ -2,7 +2,9 @@
 
 import argparse
 import coloredlogs
-import confuse
+from dynaconf import Dynaconf
+from dynaconf.base import Settings
+from dynaconf.utils.boxing import DynaBox
 from datetime import datetime
 import logging
 import pymisp
@@ -15,7 +17,7 @@ logging.getLogger("pymisp").setLevel(logging.CRITICAL)
 logger = None
 
 
-def setup_logging(config: confuse.Subview, name: str):
+def setup_logging(config: DynaBox, name: str):
     """
     Sets up the logging for this script, according to the given configuration
     object. Logging can go to a file, to console, or both.
@@ -27,16 +29,16 @@ def setup_logging(config: confuse.Subview, name: str):
     colored_formatter = coloredlogs.ColoredFormatter(fmt)
     plain_formatter = logging.Formatter(fmt)
     logger = logging.getLogger(name)
-    if config["file"]:
-        fh = logging.FileHandler(config["filename"].get(str))
-        fhLevel = logging.getLevelName(config["file_verbosity"].get(str).upper())
+    if "file" in config:
+        fh = logging.FileHandler(config.filename)
+        fhLevel = logging.getLevelName(config.file_verbosity.upper())
         logger.setLevel(fhLevel)
         fh.setLevel(fhLevel)
         fh.setFormatter(plain_formatter)
         logger.addHandler(fh)
-    if config["console"]:
+    if "console" in config:
         ch = logging.StreamHandler()
-        chLevel = logging.getLevelName(config["console_verbosity"].get(str).upper())
+        chLevel = logging.getLevelName(config.console_verbosity.upper())
         ch.setLevel(chLevel)
         if logger.level > chLevel or logger.level == 0:
             logger.setLevel(chLevel)
@@ -165,7 +167,7 @@ def report_sighting(misp: pymisp.api.PyMISP, attr: pymisp.MISPAttribute):
     logger.info(f"Reported sighting: {resp}")
 
 
-def start(config: confuse.Subview):
+def start(config: Settings):
     """
     Connects to MISP and makes it so that a DOMAIN-type indicator with the
     format `test-%YYYY-%mm-%dd.vast` appears to be added to MISP. Creates all
@@ -173,15 +175,10 @@ def start(config: confuse.Subview):
     @param config The user-defined configuration object
     """
     global logger
-    logger = setup_logging(config["logging"], "misp-ioc-sender")
+    logger = setup_logging(config.logging, "misp-ioc-sender")
 
-    host, key, ssl = (
-        config["misp"]["host"].get(),
-        config["misp"]["key"].get(),
-        config["misp"]["ssl"].get(),
-    )
-    event_uuid = config["event-uuid"].get()
-    misp = connect_misp(host, key, ssl)
+    event_uuid = config["event-uuid"]
+    misp = connect_misp(config.misp.host, config.misp.key, config.misp.ssl)
     event = get_or_create_event(misp, event_uuid)
     ioc = get_todays_attribute()
     attrs = [
@@ -200,18 +197,27 @@ def start(config: confuse.Subview):
             f"Found too many matching attributes for IoC '{ioc}' in the MISP event with UUID {event_uuid}"
         )
         return
-    if config["report_sighting"].get(bool):
+    if config.report_sighting:
         report_sighting(misp, attr)
 
 
 def main():
-    config = confuse.Configuration("misp-ioc-sender")
+    ## Default list of settings files for Dynaconf to parse.
+    settings_files = ["./config.yaml", "./config.yml"]
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", "-c", help="path to a configuration file")
     args = parser.parse_args()
-    config.set_args(args)
     if args.config:
-        config.set_file(args.config)
+        if not args.config.endswith("yaml") and not args.config.endswith("yml"):
+            sys.exit("Please provide a `yaml` or `yml` configuration file.")
+        ## Allow users to provide a custom config file that takes precedence.
+        settings_files = [args.config]
+
+    config = Dynaconf(
+        settings_files=settings_files,
+        load_dotenv=True,
+        envvar_prefix="PYVAST_THREATBUS",
+    )
     start(config)
 
 

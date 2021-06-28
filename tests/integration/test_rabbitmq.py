@@ -1,14 +1,10 @@
-import confuse
+from dynaconf.utils.boxing import DynaBox
 from datetime import datetime, timedelta
 from multiprocessing import JoinableQueue
+from stix2 import Indicator, Sighting
 from threatbus_rabbitmq import plugin
 from threatbus.data import (
-    Intel,
-    IntelData,
-    IntelType,
     MessageType,
-    Operation,
-    Sighting,
     SnapshotEnvelope,
     SnapshotRequest,
 )
@@ -20,30 +16,37 @@ class TestRoundtrips(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         # setup the backbone with a fan-in queue
-        config = confuse.Configuration("threatbus")
-        config["rabbitmq"].add({})
-        config["rabbitmq"]["host"] = "localhost"
-        config["rabbitmq"]["port"] = 35672
-        config["rabbitmq"]["username"] = "guest"
-        config["rabbitmq"]["password"] = "guest"
-        config["rabbitmq"]["vhost"] = "/"
-        config["rabbitmq"]["naming_join_pattern"] = "."
-        config["rabbitmq"]["queue"].add({})
-        config["rabbitmq"]["queue"]["durable"] = False
-        config["rabbitmq"]["queue"]["auto_delete"] = True
-        config["rabbitmq"]["queue"]["exclusive"] = False
-        config["rabbitmq"]["queue"]["lazy"] = False
-        config["rabbitmq"]["queue"]["max_items"] = 10
-        config["console"] = False
-        config["file"] = False
+        config = DynaBox(
+            {
+                "rabbitmq": {
+                    "host": "localhost",
+                    "port": 35672,
+                    "username": "guest",
+                    "password": "guest",
+                    "vhost": "/",
+                    "exchange_name": "threatbus",
+                    "queue": {
+                        "name_join_symbol": ".",
+                        "name_suffix": "threatbus",
+                        "durable": False,
+                        "auto_delete": True,
+                        "exclusive": False,
+                        "lazy": False,
+                        "max_items": 10,
+                    },
+                },
+                "console": False,
+                "file": False,
+            }
+        )
 
         cls.inq = JoinableQueue()
         plugin.run(config, config, cls.inq)
 
         # subscribe this test case as concumer
         cls.outq = JoinableQueue()
-        plugin.subscribe("threatbus/intel", cls.outq)
-        plugin.subscribe("threatbus/sighting", cls.outq)
+        plugin.subscribe("stix2/indicator", cls.outq)
+        plugin.subscribe("stix2/sighting", cls.outq)
         plugin.subscribe("threatbus/snapshotrequest", cls.outq)
         plugin.subscribe("threatbus/snapshotenvelope", cls.outq)
         time.sleep(1)
@@ -55,14 +58,13 @@ class TestRoundtrips(unittest.TestCase):
 
     def setUp(self):
         self.ts = datetime.now().astimezone()
-        self.intel_id = "intel-42"
-        self.indicator = "6.6.6.6"
-        self.intel_type = IntelType.IPSRC
-        self.operation = Operation.ADD
-        self.intel_data = IntelData(
-            self.indicator, self.intel_type, foo=23, more_args="MORE ARGS"
+        self.ioc_id = "indicator--42d31a5b-2da0-4bdd-9823-1723a98fc2fb"
+        self.ioc_value = "example.com"
+        self.ioc = Indicator(
+            id=self.ioc_id,
+            pattern_type="stix",
+            pattern=f"[domain-name:value = '{self.ioc_value}']",
         )
-        self.intel = Intel(self.ts, self.intel_id, self.intel_data, self.operation)
 
         self.sighting_context = {
             "ts": "2017-03-03T23:56:09.652643840",
@@ -95,9 +97,7 @@ class TestRoundtrips(unittest.TestCase):
             "_extra": {"vast-ioc": "172.31.129.17"},
             "source": "VAST",
         }
-        self.sighting = Sighting(
-            self.ts, self.intel_id, self.sighting_context, (self.indicator,)
-        )
+        self.sighting = Sighting(sighting_of_ref=self.ioc_id)
 
         self.snapshot_id = "SNAPSHOT_UUID"
         self.snapshot = timedelta(days=42, hours=23, minutes=13, seconds=37)
@@ -105,8 +105,8 @@ class TestRoundtrips(unittest.TestCase):
             MessageType.SIGHTING, self.snapshot_id, self.snapshot
         )
 
-        self.snapshot_envelope_intel = SnapshotEnvelope(
-            MessageType.INTEL, self.snapshot_id, self.intel
+        self.snapshot_envelope_indicator = SnapshotEnvelope(
+            MessageType.INDICATOR, self.snapshot_id, self.ioc
         )
         self.snapshot_envelope_sighting = SnapshotEnvelope(
             MessageType.SIGHTING, self.snapshot_id, self.sighting
@@ -116,9 +116,9 @@ class TestRoundtrips(unittest.TestCase):
         """
         Passes an Intel item to RabbitMQ and reads back the exact same item.
         """
-        self.inq.put(self.intel)
+        self.inq.put(self.ioc)
         out = self.outq.get(timeout=10)  # raise after 10s without item
-        self.assertEqual(self.intel, out)
+        self.assertEqual(self.ioc, out)
 
     def test_sighting_message_roundtrip(self):
         """
@@ -140,9 +140,9 @@ class TestRoundtrips(unittest.TestCase):
         """
         Passes an SnapshotEnvelope item to RabbitMQ and reads back the exact same item.
         """
-        self.inq.put(self.snapshot_envelope_intel)
+        self.inq.put(self.snapshot_envelope_indicator)
         out = self.outq.get(timeout=10)  # raise after 10s without item
-        self.assertEqual(self.snapshot_envelope_intel, out)
+        self.assertEqual(self.snapshot_envelope_indicator, out)
 
         self.inq.put(self.snapshot_envelope_sighting)
         out = self.outq.get(timeout=10)  # raise after 10s without item

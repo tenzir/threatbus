@@ -38,12 +38,16 @@ You can configure the app via a YAML configuration file. See
 `config.yaml.example` for an example config file that uses
 [fever alertify](https://github.com/DCSO/fever) to transform sighting contexts
 before they get printed to `STDOUT`. See the section
-[Features](/tenzir/threatbus/tree/master/apps/vast#features) for details.
+[Features](/tenzir/threatbus/tree/master/apps/vast#features) for details. Rename
+the example to `config.yaml` before starting.
 
-Start the application with a config file:
+Alternatively, configure the app via environment variables, similarly to Threat
+Bus, or pass a path to configuration file via `-c /path/to/config.yaml`.
+
+Start the application:
 
 ```sh
-./pyvast_threatbus.py -c config.yaml
+pyvast-threatbus
 ```
 
 ### Docker

@@ -1,5 +1,6 @@
 from collections import defaultdict
-from confuse import Subview
+from dynaconf import Validator
+from dynaconf.utils.boxing import DynaBox
 from multiprocessing import JoinableQueue
 from queue import Empty
 import threading
@@ -14,10 +15,6 @@ plugin_name = "inmem"
 subscriptions: Dict[str, Set[JoinableQueue]] = defaultdict(set)
 lock = threading.Lock()
 workers: List[threatbus.StoppableWorker] = list()
-
-
-def validate_config(config):
-    return True
 
 
 class Provisioner(threatbus.StoppableWorker):
@@ -53,6 +50,11 @@ class Provisioner(threatbus.StoppableWorker):
 
 
 @threatbus.backbone
+def config_validators() -> List[Validator]:
+    return []
+
+
+@threatbus.backbone
 def subscribe(topic: str, q: JoinableQueue):
     global logger, subscriptions, lock
     logger.info(f"Adding subscription to: {topic}")
@@ -72,14 +74,10 @@ def unsubscribe(topic: str, q: JoinableQueue):
 
 
 @threatbus.backbone
-def run(config: Subview, logging: Subview, inq: JoinableQueue):
+def run(config: DynaBox, logging: DynaBox, inq: JoinableQueue):
     global logger, workers
+    assert plugin_name in config, f"Cannot find configuration for {plugin_name} plugin"
     logger = threatbus.logger.setup(logging, __name__)
-    config = config[plugin_name]
-    try:
-        validate_config(config)
-    except Exception as e:
-        logger.fatal("Invalid config for plugin {}: {}".format(plugin_name, str(e)))
     workers.append(Provisioner(inq))
     for w in workers:
         w.start()

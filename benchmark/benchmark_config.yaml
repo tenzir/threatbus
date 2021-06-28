@@ -8,7 +8,6 @@ logging:
 plugins:
   backbones:
     file_benchmark:
-      input_type: intel
       input_file: bench.json
       repetitions: 10
     #rabbitmq:

@@ -1,8 +1,10 @@
 from collections import defaultdict
-from confuse import Subview
-import pika
+from dynaconf import Validator
+from dynaconf.utils.boxing import DynaBox
 from multiprocessing import JoinableQueue
+import pika
 from retry import retry
+from socket import gethostname
 from stix2 import Indicator, Sighting
 import threading
 import threatbus
@@ -17,26 +19,6 @@ plugin_name = "rabbitmq"
 subscriptions: Dict[str, set] = defaultdict(set)
 lock = threading.Lock()
 workers: List[threatbus.StoppableWorker] = list()
-
-
-def validate_config(config: Subview):
-    assert config, "config must not be None"
-    config["host"].get(str)
-    config["port"].get(int)
-    config["username"].get(str)
-    config["password"].get(str)
-    config["vhost"].get(str)
-    config["exchange_name"].get(str)
-    config["queue"].get(dict)
-    config["queue"]["name_join_symbol"].get(str)
-    config["queue"]["name_suffix"].add("")  # optional
-    config["queue"]["name_suffix"].get(str)
-    config["queue"]["durable"].get(bool)
-    config["queue"]["auto_delete"].get(bool)
-    config["queue"]["lazy"].get(bool)
-    config["queue"]["exclusive"].get(bool)
-    config["queue"]["max_items"].add(0)  # optional
-    config["queue"]["max_items"].get(int)
 
 
 def provision(
@@ -54,6 +36,45 @@ def provision(
             outq.put(msg)
     lock.release()
     logger.debug(f"Relayed message from RabbitMQ: {msg}")
+
+
+@threatbus.backbone
+def config_validators() -> List[Validator]:
+    return [
+        Validator(
+            f"plugins.backbones.{plugin_name}.host",
+            f"plugins.backbones.{plugin_name}.username",
+            f"plugins.backbones.{plugin_name}.password",
+            f"plugins.backbones.{plugin_name}.vhost",
+            f"plugins.backbones.{plugin_name}.exchange_name",
+            required=True,
+        ),
+        Validator(
+            f"plugins.backbones.{plugin_name}.port",
+            is_type_of=int,
+            required=True,
+        ),
+        Validator(
+            f"plugins.backbones.{plugin_name}.queue.durable",
+            f"plugins.backbones.{plugin_name}.queue.auto_delete",
+            f"plugins.backbones.{plugin_name}.queue.lazy",
+            f"plugins.backbones.{plugin_name}.queue.exclusive",
+            is_type_of=bool,
+            required=True,
+        ),
+        Validator(
+            f"plugins.backbones.{plugin_name}.queue.name_join_symbol", required=True
+        ),
+        Validator(
+            f"plugins.backbones.{plugin_name}.queue.name_suffix",
+            default=gethostname(),
+        ),
+        Validator(
+            f"plugins.backbones.{plugin_name}.queue.max_items",
+            is_type_of=int,
+            default=0,
+        ),
+    ]
 
 
 @retry(delay=5)
@@ -85,26 +106,21 @@ def unsubscribe(topic: str, q: JoinableQueue):
 
 
 @threatbus.backbone
-def run(config: Subview, logging: Subview, inq: JoinableQueue):
+def run(config: DynaBox, logging: DynaBox, inq: JoinableQueue):
     global subscriptions, lock, logger, workers
+    assert plugin_name in config, f"Cannot find configuration for {plugin_name} plugin"
     logger = threatbus.logger.setup(logging, __name__)
     config = config[plugin_name]
-    try:
-        validate_config(config)
-    except Exception as e:
-        logger.fatal("Invalid config for plugin {}: {}".format(plugin_name, str(e)))
-    host = config["host"].get(str)
-    port = config["port"].get(int)
-    username = config["username"].get(str)
-    password = config["password"].get(str)
-    vhost = config["vhost"].get(str)
-    exchange_name = config["exchange_name"].get(str)
-    credentials = pika.PlainCredentials(username, password)
-    conn_params = pika.ConnectionParameters(host, port, vhost, credentials)
-    workers.append(
-        RabbitMQConsumer(conn_params, exchange_name, config["queue"], provision, logger)
+    credentials = pika.PlainCredentials(config.username, config.password)
+    conn_params = pika.ConnectionParameters(
+        config.host, config.port, config.vhost, credentials
     )
-    workers.append(RabbitMQPublisher(conn_params, exchange_name, inq, logger))
+    workers.append(
+        RabbitMQConsumer(
+            conn_params, config.exchange_name, config.queue, provision, logger
+        )
+    )
+    workers.append(RabbitMQPublisher(conn_params, config.exchange_name, inq, logger))
     for w in workers:
         w.start()
     logger.info("RabbitMQ backbone started.")

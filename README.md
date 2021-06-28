@@ -66,8 +66,25 @@ are more integrations available, so make sure to check out all
 
 ```sh
 mv config.yaml.example config.yaml   # rename example config file
-threatbus -c config.yaml
+threatbus
 ```
+
+*Start with a specially named config file*
+
+```sh
+threatbus -c /path/to/your/special-config.yaml
+```
+
+*Environment variables take precedence over config file values. Prefix
+everything with `THREATBUS_`*
+
+```sh
+export THREATBUS_LOGGING__CONSOLE=true
+threatbus -c /path/to/your/special-config.yaml
+```
+
+Note that you must use a double underscores `__` in your env to refer to nested
+config variables.
 
 *Start Zeek as Threat Bus app*
 

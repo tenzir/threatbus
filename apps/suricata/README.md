@@ -22,15 +22,19 @@ config file to enable periodic reloads for Suricata to pick up rule changes.
 ## Quick Start
 
 You can configure the app via a YAML configuration file. See
-`config.yaml.example` for an example config file.
+`config.yaml.example` for an example config file. Rename the example to
+`config.yaml` before starting.
 
-Install `suricata-threatbus` in a virtualenv and start it with a config file:
+Alternatively, configure the app via environment variables, similarly to Threat
+Bus, or pass a path to configuration file via `-c /path/to/config.yaml`.
+
+Install `suricata-threatbus` in a virtualenv and start:
 
 ```sh
 python -m venv venv
 source venv/bin/activate
 make dev-mode
-suricata-threatbus -c config.yaml
+suricata-threatbus
 ```
 
 You first need to configure the `rules_file` option in the config file. See also

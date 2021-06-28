@@ -1,4 +1,4 @@
-import confuse
+from dynaconf import Dynaconf
 import os
 import queue
 from stix2 import Indicator, parse
@@ -60,8 +60,9 @@ def StopZeek():
 
 class TestZeekSightingReports(unittest.TestCase):
     def setUp(self):
-        config = confuse.Configuration("threatbus")
-        config.set_file("config_integration_test.yaml")
+        config = Dynaconf(
+            settings_file="config_integration_test.yaml",
+        )
         self.threatbus = start_threatbus(config)
         time.sleep(1)
 
