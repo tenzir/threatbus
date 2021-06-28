@@ -10,9 +10,7 @@ Every entry has a category for which we use the following visual abbreviations:
 - 🧬 Experimental Features
 - 🐞 Bug Fixes
 
-<!-- ## Unreleased -->
-
-## [2021.06.24]
+## Unreleased
 
 - ⚠️ Threat Bus now uses [Dynaconf](https://github.com/rochacbruno/dynaconf) for
   configuration management. Configuration via a config file works exactly as it
@@ -23,6 +21,8 @@ Every entry has a category for which we use the following visual abbreviations:
   to be prefixed with `THREATBUS_` to be respected and always take precedence
   over values in config files.
   [#133](https://github.com/tenzir/threatbus/pull/133)
+
+## [2021.06.24]
 
 - ⚠️ The official [tenzir/threatbus](https://hub.docker.com/r/tenzir/threatbus)
   Docker image now uses Debian:Bullseye as
