@@ -13,10 +13,11 @@ Every entry has a category for which we use the following visual abbreviations:
 ## Unreleased
 
 - 🐞 The metrics value serialization in `pyvast-threatbus` contained spaces in
-  the fields of the measurements, which is not valid according to the line
-  protocol spec and caused the measurement to be rejected. This behavior was
-  fixed to ensure all fields are separated by commas.
-  [#112](https://github.com/tenzir/threatbus/pull/136)
+  the fields of the measurements, which is not valid according to the
+  [line protocol spec](https://docs.influxdata.com/influxdb/v2.0/reference/syntax/line-protocol/)
+  and caused the measurement to be rejected. We fixed the format to ensure all
+  fields are separated by commas.
+  [#136](https://github.com/tenzir/threatbus/pull/136)
 
 ## [2021.06.24]
 
