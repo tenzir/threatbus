@@ -262,16 +262,20 @@ async def write_metrics(every: int, to: str):
     @param to the filepath to write to
     """
     while True:
-        line = f"pyvast-threatbus,host={socket.gethostname()}"
+        line = f"pyvast-threatbus,host={socket.gethostname()} "
         start_length = len(line)
         for m in metrics:
             if not m.is_set:
                 continue
             if type(m) is Gauge or type(m) is InfiniteGauge:
-                line += f" {m.name}={m.value}"
+                if len(line) > start_length:
+                    line += ","
+                line += f"{m.name}={m.value}"
             if type(m) is Summary:
+                if len(line) > start_length:
+                    line += ","
                 line += (
-                    f" {m.name}_min={m.min},{m.name}_max={m.max},{m.name}_avg={m.avg}"
+                    f"{m.name}_min={m.min},{m.name}_max={m.max},{m.name}_avg={m.avg}"
                 )
             m.reset()
 
