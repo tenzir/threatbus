@@ -1,6 +1,9 @@
 name: "Python Egg"
 on:
   push:
+    branches:
+      - master
+  pull_request:
   release:
     types: published
 env:
@@ -57,7 +60,7 @@ jobs:
 
   docker-release:
     name: Publish to DockerHub
-    if: github.ref == 'refs/heads/master' || github.event.action == 'published'
+    if: ${{ github.event_name == 'release' || github.event_name == 'push' }}
     runs-on: ubuntu-20.04
     needs: egg-install
     steps:
@@ -74,27 +77,27 @@ jobs:
       uses: elgohr/Publish-Docker-Github-Action@3.04
       with:
         name: tenzir/pyvast-threatbus
-        workdir: apps/vast
         username: ${{ secrets.DOCKERHUB_USER }}
         password: ${{ secrets.DOCKERHUB_PASSWORD }}
+        dockerfile: Dockerfile_pyvast_threatbus
     - name: Publish stix-shifter-threatbus Docker Image
       uses: elgohr/Publish-Docker-Github-Action@3.04
       with:
         name: tenzir/stix-shifter-threatbus
-        workdir: apps/stix-shifter
         username: ${{ secrets.DOCKERHUB_USER }}
         password: ${{ secrets.DOCKERHUB_PASSWORD }}
+        dockerfile: Dockerfile_stix_shifter_threatbus
     - name: Publish suricata-threatbus Docker Image
       uses: elgohr/Publish-Docker-Github-Action@3.04
       with:
         name: tenzir/suricata-threatbus
-        workdir: apps/suricata
         username: ${{ secrets.DOCKERHUB_USER }}
         password: ${{ secrets.DOCKERHUB_PASSWORD }}
+        dockerfile: Dockerfile_suricata_threatbus
 
   egg-release:
     name: Egg Release
-    if: github.event.action == 'published'
+    if: github.event_name == 'release'
     needs: egg-install
     runs-on: ubuntu-20.04
     env:
@@ -129,7 +132,6 @@ jobs:
     # This step ensures that assets from previous runs are cleaned up to avoid
     # failure of the next step (asset upload)
     - name: Delete existing Release Assets
-      if: github.event.action == 'published'
       uses: mknejp/delete-release-assets@v1
       with:
         token: ${{ secrets.GITHUB_TOKEN }}

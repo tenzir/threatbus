@@ -13,6 +13,11 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+- ⚠️ The Dockerfile of `suricata-threatbus` has moved to the repository toplevel
+  and now installs Threat Bus from source. This way, the Docker build always
+  uses the `latest` Threat Bus sources, instead of the latest version from PyPI.
+  [#141](https://github.com/tenzir/threatbus/pull/141)
+
 - 🎁 We now release a pre-built Docker image for `suricata-threatbus` together
   with our future Threat Bus releases.
   [#137](https://github.com/tenzir/threatbus/pull/137)
