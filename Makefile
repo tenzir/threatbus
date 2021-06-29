@@ -26,6 +26,7 @@ unit-tests:
 	$(MAKE) -C plugins/apps/threatbus_cif3 unit-tests
 	$(MAKE) -C apps/vast unit-tests
 	$(MAKE) -C apps/stix-shifter unit-tests
+	$(MAKE) -C apps/suricata unit-tests
 
 .PHONY: integration-tests
 integration-tests:
@@ -52,6 +53,7 @@ clean:
 	-$(MAKE) -C plugins/backbones/threatbus_rabbitmq clean
 	-$(MAKE) -C apps/vast clean
 	-$(MAKE) -C apps/stix-shifter clean
+	-$(MAKE) -C apps/suricata clean
 
 .PHONY: build
 build:
@@ -64,6 +66,7 @@ build:
 	$(MAKE) -C plugins/backbones/threatbus_rabbitmq build
 	$(MAKE) -C apps/vast build
 	$(MAKE) -C apps/stix-shifter build
+	$(MAKE) -C apps/suricata build
 
 .PHONY: dist
 dist:
@@ -76,6 +79,7 @@ dist:
 	$(MAKE) -C plugins/backbones/threatbus_rabbitmq dist
 	$(MAKE) -C apps/vast dist
 	$(MAKE) -C apps/stix-shifter dist
+	$(MAKE) -C apps/suricata dist
 
 .PHONY: install
 install:
@@ -88,6 +92,7 @@ install:
 	$(MAKE) -C plugins/backbones/threatbus_rabbitmq install
 	$(MAKE) -C apps/vast install
 	$(MAKE) -C apps/stix-shifter install
+	$(MAKE) -C apps/suricata install
 
 .PHONY: dev-mode
 dev-mode:
@@ -100,3 +105,4 @@ dev-mode:
 	$(MAKE) -C plugins/apps/threatbus_cif3 dev-mode
 	$(MAKE) -C apps/vast dev-mode
 	$(MAKE) -C apps/stix-shifter dev-mode
+	$(MAKE) -C apps/suricata dev-mode
