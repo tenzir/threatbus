@@ -12,6 +12,11 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+- ⚠️ The Dockerfile of `pyvast-threatbus` has moved to the repository toplevel
+  and now installs Threat Bus from source. This way, the Docker build always
+  uses the `latest` Threat Bus sources, instead of the latest version from PyPI.
+  [#141](https://github.com/tenzir/threatbus/pull/141)
+
 - 🐞 The metrics value serialization in `pyvast-threatbus` contained spaces in
   the fields of the measurements, which is not valid according to the
   [line protocol spec](https://docs.influxdata.com/influxdb/v2.0/reference/syntax/line-protocol/)
