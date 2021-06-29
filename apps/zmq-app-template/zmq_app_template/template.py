@@ -202,7 +202,7 @@ async def start(zmq_endpoint: str, snapshot: int):
     if not pub_port or not sub_port or not topic:
         logger.error("Subscription failed")
         return
-    zmq_host = zmq_endpoint.split(":")[1]
+    zmq_host = zmq_endpoint.split(":")[0]
     pub_endpoint = f"{zmq_host}:{pub_port}"
     sub_endpoint = f"{zmq_host}:{sub_port}"
 
