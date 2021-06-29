@@ -31,7 +31,7 @@ setup(
         "dynaconf>=3.1.4",
         "pluggy>=0.13",
         "python-dateutil>=2.8.1",
-        "stix2-patterns >= 0.3",
+        "stix2-patterns == 1.3.0",
         "stix2>=2.1",
     ],
     keywords=[
