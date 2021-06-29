@@ -1,5 +1,9 @@
 name: "Style Check"
-on: push
+on:
+  push:
+    branches:
+      - master
+  pull_request:
 env:
   DEBIAN_FRONTEND: noninteractive
 jobs:
