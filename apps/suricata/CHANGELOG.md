@@ -13,6 +13,11 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+- ⚠️ The Dockerfile of `suricata-threatbus` has moved to the repository toplevel
+  and now installs Threat Bus from source. This way, the Docker build always
+  uses the `latest` Threat Bus sources, instead of the latest version from PyPI.
+  [#141](https://github.com/tenzir/threatbus/pull/141)
+
 - 🐞 `suricata-threatbus` now implements the new zmq management protocol of the
   `threatbus-zmq-app` plugin. The app now simply re-uses the Threat Bus hostname
   as it is configured in the users `config.yaml` and appends the port
@@ -25,7 +30,6 @@ Every entry has a category for which we use the following visual abbreviations:
   [#137](https://github.com/tenzir/threatbus/pull/137)
 
 ## [2021.06.24]
-
 
 - ⚠️ `suricata-threatbus` now uses
   [Dynaconf](https://github.com/rochacbruno/dynaconf) for configuration

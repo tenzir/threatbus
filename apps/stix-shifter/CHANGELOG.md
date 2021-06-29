@@ -11,7 +11,13 @@ Every entry has a category for which we use the following visual abbreviations:
 - ⚡️ Breaking Changes
 - 🐞 Bug Fixes
 
-<!-- ## Unreleased -->
+## Unreleased
+
+- ⚠️ The Dockerfile of `stix-shifter-threatbus` has moved to the repository
+  toplevel and now installs Threat Bus from source. This way, the Docker build
+  always uses the `latest` Threat Bus sources, instead of the latest version
+  from PyPI.
+  [#141](https://github.com/tenzir/threatbus/pull/141)
 
 ## [2021.06.24]
 

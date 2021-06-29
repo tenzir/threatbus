@@ -11,10 +11,18 @@ RUN apt-get -qq update && apt-get -qqy install \
 
 RUN pip3 install --upgrade pip
 
-WORKDIR /opt/tenzir/threatbus/pyvast-threatbus
+# Install Threat Bus to have it as `latest` dependency when building the app.
+WORKDIR /opt/tenzir/threatbus
 COPY setup.py .
 COPY README.md .
-COPY pyvast_threatbus pyvast_threatbus
+COPY threatbus threatbus
+RUN python3 -m pip install .
+
+# Install the app.
+WORKDIR /opt/tenzir/threatbus/pyvast-threatbus
+COPY apps/vast/setup.py .
+COPY apps/vast/README.md .
+COPY apps/vast/pyvast_threatbus pyvast_threatbus
 RUN python3 -m pip install .
 
 RUN echo "Adding threatbus user" && useradd -m -d /home/threatbus --user-group threatbus
