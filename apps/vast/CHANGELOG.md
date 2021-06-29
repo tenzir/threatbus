@@ -12,6 +12,13 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+- 🐞 `pyvast-threatbus` now implements the new zmq management protocol of the
+  `threatbus-zmq-app` plugin. The app now simply re-uses the Threat Bus hostname
+  as it is configured in the users `config.yaml` and appends the port
+  specifications for `pub` and `sub` communication that it receives as part of
+  the subscription success response.
+  [#140](https://github.com/tenzir/threatbus/pull/140)
+
 - 🐞 The metrics value serialization in `pyvast-threatbus` contained spaces in
   the fields of the measurements, which is not valid according to the
   [line protocol spec](https://docs.influxdata.com/influxdb/v2.0/reference/syntax/line-protocol/)
