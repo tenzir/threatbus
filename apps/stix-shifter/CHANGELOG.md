@@ -19,7 +19,12 @@ Every entry has a category for which we use the following visual abbreviations:
   from PyPI.
   [#141](https://github.com/tenzir/threatbus/pull/141)
 
-## [2021.06.24]
+- 🐞 `stix-shifter-threatbus` now implements the new zmq management protocol of
+  the `threatbus-zmq-app` plugin. The app now simply re-uses the Threat Bus
+  hostname as it is configured in the users `config.yaml` and appends the port
+  specifications for `pub` and `sub` communication that it receives as part of
+  the subscription success response.
+  [#140](https://github.com/tenzir/threatbus/pull/140)
 
 - ⚠️ `stix-shifter-threatbus` now uses
   [Dynaconf](https://github.com/rochacbruno/dynaconf) for configuration
@@ -33,6 +38,7 @@ Every entry has a category for which we use the following visual abbreviations:
   values in config files.
   [#133](https://github.com/tenzir/threatbus/pull/133)
 
+## [2021.06.24]
 
 - 🎁 `stix-shifter-threatbus` now comes with its own Dockerfile. Pre-built
   images are available on

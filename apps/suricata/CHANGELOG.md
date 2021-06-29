@@ -18,12 +18,16 @@ Every entry has a category for which we use the following visual abbreviations:
   uses the `latest` Threat Bus sources, instead of the latest version from PyPI.
   [#141](https://github.com/tenzir/threatbus/pull/141)
 
+- 🐞 `suricata-threatbus` now implements the new zmq management protocol of the
+  `threatbus-zmq-app` plugin. The app now simply re-uses the Threat Bus hostname
+  as it is configured in the users `config.yaml` and appends the port
+  specifications for `pub` and `sub` communication that it receives as part of
+  the subscription success response.
+  [#140](https://github.com/tenzir/threatbus/pull/140)
+
 - 🎁 We now release a pre-built Docker image for `suricata-threatbus` together
   with our future Threat Bus releases.
   [#137](https://github.com/tenzir/threatbus/pull/137)
-
-## [2021.06.24]
-
 
 - ⚠️ `suricata-threatbus` now uses
   [Dynaconf](https://github.com/rochacbruno/dynaconf) for configuration
@@ -35,6 +39,8 @@ Every entry has a category for which we use the following visual abbreviations:
   `.dotenv`. Env vars need to be prefixed with `SURICATA_THREATBUS_` to be
   respected and always take precedence over values in config files.
   [#133](https://github.com/tenzir/threatbus/pull/133)
+
+## [2021.06.24]
 
 - 🎁 `suricata-threatbus` has come to life. This stand-alone application
   connects to Threat Bus via ZeroMQ and bridges the gap between Threat Bus and

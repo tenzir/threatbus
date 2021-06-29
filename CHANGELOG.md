@@ -12,6 +12,15 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+- 🐞 The content and format of the `threatbus-zmq-app` plugin's subscription
+  success response has changed. Prior to this change, the plugin used to respond
+  with an endpoint in the `host:port` format, which contained a wrong hostname
+  (e.g., `0.0.0.0` instead of a publicly reachable topic).
+  From now on, the plugin returns only the ports for `pub` and `sub`
+  communication and leaves it to the subscribing app to connect with the right
+  host/IP.
+  [#140](https://github.com/tenzir/threatbus/pull/140)
+
 - ⚠️ Threat Bus now uses [Dynaconf](https://github.com/rochacbruno/dynaconf) for
   configuration management. Configuration via a config file works exactly as it
   has worked before. Users can provide a path to the config file using the `-c`
