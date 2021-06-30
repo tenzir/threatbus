@@ -260,7 +260,7 @@ async def write_metrics(every: int, to: str):
     @param to the filepath to write to
     """
     while True:
-        line = f"pyvast-threatbus,host={socket.gethostname()} "
+        line = f"pyvast-threatbus,host={socket.getfqdn()} "
         start_length = len(line)
         for m in metrics:
             if not m.is_set:
