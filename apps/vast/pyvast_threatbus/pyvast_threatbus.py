@@ -339,13 +339,13 @@ async def retro_match_vast(
     @param indicator The STIX-2 Indicator to query VAST for
     @param sightings_queue The queue to put new sightings into
     """
-    start = time.time()
     query = indicator_to_vast_query(indicator)
     if not query:
         g_retro_match_backlog.dec()
         return
     global logger, max_open_tasks
     async with max_open_tasks:
+        start = time.time()
         vast = VAST(binary=vast_binary, endpoint=vast_endpoint, logger=logger)
         kwargs = {}
         if retro_match_max_events > 0:
