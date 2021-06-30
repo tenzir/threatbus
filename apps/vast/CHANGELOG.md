@@ -12,6 +12,10 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+- ⚠️ The metric for indicator query time now only reflects the actual time spent
+  querying VAST and does not regard unstarted VAST queries any longer.
+  [#145](https://github.com/tenzir/threatbus/pull/145)
+
 - ⚠️ Metrics sent by `pyvast-threatbus` used the short hostname as given by
   `socket.gethostname()`. This has been changed to use `socket.getfqdn()`.
   [#144](https://github.com/tenzir/threatbus/pull/144)
