@@ -12,6 +12,10 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+- ⚠️ Metrics sent by `pyvast-threatbus` used the short hostname as given by
+  `socket.gethostname()`. This has been changed to use `socket.getfqdn()`.
+  [#144](https://github.com/tenzir/threatbus/pull/144)
+
 - ⚠️ The Dockerfile of `pyvast-threatbus` has moved to the repository toplevel
   and now installs Threat Bus from source. This way, the Docker build always
   uses the `latest` Threat Bus sources, instead of the latest version from PyPI.
