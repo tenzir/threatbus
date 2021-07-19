@@ -122,6 +122,8 @@ application without specifying the config file location with the `-c` parameter.
 Install `threatbus` and all plugins that you require. Optionally, use a virtual
 environment.
 
+Note that Threat Bus requires at least Python 3.7+, earlier versions are not supported.
+
 ```
 virtualenv venv                       # optional
 source venv/bin/activate              # optional
