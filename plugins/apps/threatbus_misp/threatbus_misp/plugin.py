@@ -257,7 +257,6 @@ def config_validators() -> List[Validator]:
             f"plugins.apps.{plugin_name}.kafka.poll_interval",
             is_type_of=float,
             default=1.0,
-            must_exist=True,
             when=Validator(f"plugins.apps.{plugin_name}.zmq", eq=None),
         ),
         Validator(

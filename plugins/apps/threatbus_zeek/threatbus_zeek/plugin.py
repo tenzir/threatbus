@@ -196,13 +196,18 @@ def config_validators() -> List[Validator]:
     return [
         Validator(
             f"plugins.apps.{plugin_name}.host",
+            is_type_of=str,
+            default="localhost",
+        ),
+        Validator(
             f"plugins.apps.{plugin_name}.module_namespace",
-            required=True,
+            is_type_of=str,
+            default="Tenzir",
         ),
         Validator(
             f"plugins.apps.{plugin_name}.port",
             is_type_of=int,
-            required=True,
+            default=47761,
         ),
     ]
 

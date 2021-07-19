@@ -156,25 +156,26 @@ class ThreatBus(stoppable_worker.StoppableWorker):
 
 def validate_threatbus_config(config: Settings):
     """
-    Validates the given Dynaconf object. Throws if the config is invalid.
+    Validates the given Dynaconf object, potentially adding new entries for the default values.
+    Throws if the config is invalid.
     """
     validators = [
-        Validator("logging.console", is_type_of=bool, required=True, eq=True)
-        | Validator("logging.file", is_type_of=bool, required=True, eq=True),
+        Validator("logging.console", is_type_of=bool, required=True, default=True),
+        Validator("logging.file", is_type_of=bool, required=True, default=False),
         Validator(
             "logging.console_verbosity",
             is_in=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-            required=True,
-            when=Validator("logging.console", eq=True),
+            default="INFO",
         ),
         Validator(
             "logging.file_verbosity",
             is_in=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-            required=True,
-            when=Validator("logging.file", eq=True),
+            default="INFO",
         ),
         Validator(
-            "logging.filename", required=True, when=Validator("logging.file", eq=True)
+            "logging.filename",
+            required=True,
+            when=Validator("logging.file", eq=True, default="threatbus.log"),
         ),
         Validator("plugins.apps", "plugins.backbones", required=True),
     ]
