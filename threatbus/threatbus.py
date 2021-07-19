@@ -13,6 +13,11 @@ from threatbus.data import MessageType, SnapshotRequest, SnapshotEnvelope
 from threading import Lock
 from uuid import uuid4
 
+if sys.version_info >= (3, 8):
+    from importlib import metadata as importlib_metadata
+else:
+    import importlib_metadata
+
 
 class ThreatBus(stoppable_worker.StoppableWorker):
     def __init__(
@@ -177,32 +182,43 @@ def validate_threatbus_config(config: Settings):
     config.validators.validate()
 
 
+# Logic for this function taken from pluggy.PluginManager.load_setuptools_entrypoints()
+def list_installed(group):
+    result = []
+    for dist in list(importlib_metadata.distributions()):
+        result += [ep.name for ep in dist.entry_points if ep.group == group]
+    return result
+
+
 def start(config: Settings):
+
     backbones = pluggy.PluginManager("threatbus.backbone")
     backbones.add_hookspecs(backbonespecs)
-    backbones.load_setuptools_entrypoints("threatbus.backbone")
 
     apps = pluggy.PluginManager("threatbus.app")
     apps.add_hookspecs(appspecs)
-    apps.load_setuptools_entrypoints("threatbus.app")
 
     tb_logger = logger.setup(config.logging, "threatbus")
 
+    installed_apps = set(list_installed("threatbus.app"))
     configured_apps = set(config.plugins.apps.keys())
-    installed_apps = set(dict(apps.list_name_plugin()).keys())
+    for app in configured_apps:
+        apps.load_setuptools_entrypoints("threatbus.app", app)
+
+    installed_backbones = set(list_installed("threatbus.backbone"))
+    configured_backbones = set(config.plugins.backbones.keys())
+    for backbone in configured_backbones:
+        backbones.load_setuptools_entrypoints("threatbus.backbone", backbone)
 
     ## Notify user about configuration mismatches between installed and
     ## configured plugins.
     for unwanted_app in installed_apps - configured_apps:
-        tb_logger.info(f"Disabling installed, but unconfigured app '{unwanted_app}'")
-        apps.unregister(name=unwanted_app)
-    configured_backbones = set(config.plugins.backbones.keys())
-    installed_backbones = set(dict(backbones.list_name_plugin()).keys())
+        tb_logger.info(f"Ignoring installed, but unconfigured app '{unwanted_app}'")
+
     for unwanted_backbones in installed_backbones - configured_backbones:
         tb_logger.info(
-            f"Disabling installed, but unconfigured backbones '{unwanted_backbones}'"
+            f"Ignoring installed, but unconfigured backbones '{unwanted_backbones}'"
         )
-        backbones.unregister(name=unwanted_backbones)
     for unconfigured_app in (configured_apps - installed_apps).union(
         configured_backbones - installed_backbones
     ):
