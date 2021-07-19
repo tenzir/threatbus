@@ -62,14 +62,20 @@ The following example shows how to connect [Zeek][zeek] via Threat Bus. There
 are more integrations available, so make sure to check out all
 [Threat Bus projects on PyPI](https://pypi.org/search/?q=threatbus).
 
+The example assumes that `threatbus` is available in your PATH. See the
+section on [Installation](#installation) below for more information on how to
+get there.
+
 *Start Threat Bus*
 
 ```sh
-mv config.yaml.example config.yaml   # rename example config file
 threatbus
 ```
 
 *Start with a specially named config file*
+
+The `config.yaml.example` file in this directory gives an overview of
+the available config keys and their default values.
 
 ```sh
 threatbus -c /path/to/your/special-config.yaml
@@ -147,7 +153,7 @@ The integration tests require a local [Zeek][zeek] and
 [Docker](https://www.docker.com/) installation.
 
 
-## Plugin Development
+## Development
 
 Setup a virtual environment and install `threatbus` and some plugins with the
 in development mode:
