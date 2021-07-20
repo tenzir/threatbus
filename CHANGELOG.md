@@ -12,6 +12,14 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+- 🐞 Threatbus now only attempts to load plugins that are explicitly
+  listed in the config file.
+  [#150](https://github.com/tenzir/threatbus/pull/140)
+
+- 🎁 Many configuration options for `threatbus` and `pyvast-threatbus` now have
+  default values. See the example configs for a detailed list.
+  [#150](https://github.com/tenzir/threatbus/pull/140)
+
 - 🐞 The content and format of the `threatbus-zmq-app` plugin's subscription
   success response has changed. Prior to this change, the plugin used to respond
   with an endpoint in the `host:port` format, which contained a wrong hostname
