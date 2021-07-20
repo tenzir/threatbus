@@ -8,7 +8,7 @@ logging:
 threatbus: localhost:13370
 snapshot: 30
 # The socket to use for connecting with Suricata.
-socket: /var/run/suricata/suricata-command.socket
-rules_file: /var/lib/suricata/rules/threatbus.rules
+socket: /var/run/suricata/suricata-command.socket    # Required.
+rules_file: /var/lib/suricata/rules/threatbus.rules  # Required.
 # Interval in seconds to trigger `suricatasc -c ruleset-reload-nonblocking`
 reload_interval: 60
