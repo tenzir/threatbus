@@ -23,7 +23,7 @@ setup(
     description="A simplistic in-memory backbone for threatbus.",
     entry_points={"threatbus.backbone": ["inmem = threatbus_inmem.plugin"]},
     install_requires=[
-        "stix2 >= 2.1",
+        "stix2 >= 2.1, < 3.0",
         "threatbus >= 2021.5.27",
     ],
     keywords=[

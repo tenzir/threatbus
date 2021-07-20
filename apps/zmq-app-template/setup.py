@@ -30,7 +30,7 @@ setup(
         "black >= 19.10b",
         "dynaconf >= 3.1.4",
         "pyzmq >= 19",
-        "stix2 >= 2.1",
+        "stix2 >= 2.1, < 3.0",
         "threatbus >= 2021.5.27",
     ],
     keywords=[
