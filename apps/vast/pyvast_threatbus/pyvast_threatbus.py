@@ -68,38 +68,33 @@ def validate_config(config: Settings):
     Validates the given Dynaconf object. Throws if the config is invalid.
     """
     validators = [
-        Validator("logging.console", is_type_of=bool, required=True, eq=True)
-        | Validator("logging.file", is_type_of=bool, required=True, eq=True),
+        Validator("logging.console", is_type_of=bool, default=True),
+        Validator("logging.file", is_type_of=bool, default=False),
         Validator(
             "logging.console_verbosity",
             is_in=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-            required=True,
             when=Validator("logging.console", eq=True),
+            default="INFO",
         ),
         Validator(
             "logging.file_verbosity",
             is_in=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-            required=True,
             when=Validator("logging.file", eq=True),
+            default="INFO",
         ),
-        Validator(
-            "logging.filename", required=True, when=Validator("logging.file", eq=True)
-        ),
-        Validator(
-            "vast", "vast_binary", "threatbus", "metrics.filename", required=True
-        ),
-        Validator("live_match", "retro_match", is_type_of=bool, required=True),
-        Validator(
-            "snapshot",
-            "retro_match_max_events",
-            "max_background_tasks",
-            "metrics.interval",
-            is_type_of=int,
-            required=True,
-        ),
-        Validator("retro_match_timeout", is_type_of=float, required=True),
+        Validator("logging.filename", default="pyvast-threatbus.log"),
+        Validator("vast", default="localhost:42000"),
+        Validator("vast_binary", default="vast"),
+        Validator("threatbus", default="localhost:13370"),
+        Validator("metrics.filename", default="metrics.log"),
+        Validator("metrics.interval", is_type_of=int, default=10),
+        Validator("live_match", is_type_of=bool, default=False),
+        Validator("retro_match", is_type_of=bool, default=True),
+        Validator("snapshot", is_type_of=int, default=30),
+        Validator("retro_match_max_events", is_type_of=int, default=0),
+        Validator("max_background_tasks", is_type_of=int, default=100),
+        Validator("retro_match_timeout", is_type_of=float, default=5.0),
         Validator("transform_context", "sink", default=None),
-        Validator("metrics.interval"),
     ]
 
     config.validators.register(*validators)
