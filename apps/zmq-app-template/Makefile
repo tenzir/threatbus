@@ -33,4 +33,5 @@ install:
 
 .PHONY: dev-mode
 dev-mode:
+	pip install ../..
 	pip install --editable .

@@ -1,39 +1,52 @@
+# All values below are shown with their default values, except
+# for required values which do not have a default value and
+# optional settings which are unset by default.
+# Note that required settings do not have to be provided via the
+# configuration file but can also be passed as environment
+# variables; see the README for details.
+
 logging:
   console: true
-  console_verbosity: DEBUG
+  console_verbosity: INFO        # One of "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL".
   file: false
-  file_verbosity: DEBUG
+  file_verbosity: INFO
   filename: threatbus.log
 
 plugins:
   backbones:
+    # Requires the 'threatbus-inmem' package to be installed
+    inmem: {}
+
+    # Requires the 'threatbus-rabbitmq' package to be installed
     rabbitmq:
-      host: localhost
-      port: 5672
-      username: guest
-      password: guest
+      host: localhost            # Required.
+      port: 5672                 # Required.
+      username: guest            # Required.
+      password: guest            # Required.
       vhost: /
       exchange_name: threatbus
       queue:
-        name_suffix: "my_suffix" # optional. remove property / set empty to use 'hostname'
-        name_join_symbol: . # queue will be named "threatbus" + join_symbol + name_suffix
+        name_suffix: "my_suffix" # Optional. Default is the result of `gethostname()`.
+        name_join_symbol: .      # Queue will be named "threatbus" + join_symbol + name_suffix
         durable: true
         auto_delete: false
         lazy: true
         exclusive: false
-        max_items: 100000 # optional. remove property / set to 0 to allow infinite length
+        max_items: 0             # The value 0 to allow infinite length
 
   apps:
+    # Requires the 'threatbus-zeek' package to be installed
     zeek:
       host: "127.0.0.1"
       port: 47761
       module_namespace: Tenzir
+    # Requires the 'threatbus-misp' package to be installed
     misp:
-      api:
+      api:                       # Optional
         host: https://localhost
         ssl: false
         key: MISP_API_KEY
-      filter: # filter are optional. you can omit the entire section.
+      filter:                    # Optional.
         - orgs: # org IDs must be strings: https://github.com/MISP/PyMISP/blob/main/pymisp/data/schema.json
             - "1"
             - "25"
@@ -46,32 +59,36 @@ plugins:
             - hostname
             - domain
             - url
+      # Requires threatbus-misp[zmp] to be installed.
       zmq:
-        host: localhost
-        port: 50000
-      #kafka:
-      #  topics:
-      #  - misp_attribute
-      #  poll_interval: 1.0
-      #  # All config entries are passed as-is to librdkafka
-      #  # https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
-      #  config:
-      #    bootstrap.servers: "localhost:9092"
-      #    group.id: "threatbus"
-      #    auto.offset.reset: "earliest"
+        host: localhost          # Required.
+        port: 50000              # Required.
+      # Requires threatbus-misp[kafka] to be installed.
+      kafka:
+        topics:                  # Required.
+        - misp_attribute
+        poll_interval: 1.0
+        # All config entries are passed as-is to librdkafka
+        # https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
+        config:                  # Required.
+          bootstrap.servers: "localhost:9092"
+          group.id: "threatbus"
+          auto.offset.reset: "earliest"
+    # Requires the 'threatbus-zmq-app' package to be installed.
     zmq-app:
-      host: "127.0.0.1"
-      manage: 13370 # the port used for management messages
-      pub: 13371 # the port used to publish messages to connected apps
-      sub: 13372 # the port used to receive messages from connected apps
+      host: "127.0.0.1"          # Required.
+      manage: 13370              # Required. The port used for management messages.
+      pub: 13371                 # Required. The port used to publish messages to connected apps.
+      sub: 13372                 # Required. The port used to receive messages from connected apps.
+    # Requires the 'threatbus-cif3' package to be installed.
     cif3:
       api:
-        host: http://localhost:5000
-        ssl: false
-        token: CIF_TOKEN
+        host: http://localhost:5000  # Required.
+        ssl: false               # Required.
+        token: CIF_TOKEN         # Required.
       group: everyone
       confidence: 7.5
       tlp: amber
-      tags:
+      tags:                      # Required.
         - test
         - malicious

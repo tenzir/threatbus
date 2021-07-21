@@ -50,25 +50,23 @@ def validate_config(config: Settings):
     Validates the given Dynaconf object. Throws if the config is invalid.
     """
     validators = [
-        Validator("logging.console", is_type_of=bool, required=True, eq=True)
-        | Validator("logging.file", is_type_of=bool, required=True, eq=True),
+        Validator("logging.console", is_type_of=bool, default=True),
+        Validator("logging.file", is_type_of=bool, default=False),
         Validator(
             "logging.console_verbosity",
             is_in=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-            required=True,
-            when=Validator("logging.console", eq=True),
+            default="INFO",
         ),
         Validator(
             "logging.file_verbosity",
             is_in=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-            required=True,
-            when=Validator("logging.file", eq=True),
+            default="INFO",
         ),
-        Validator(
-            "logging.filename", required=True, when=Validator("logging.file", eq=True)
-        ),
-        Validator("threatbus", "socket", "rules_file", required=True),
-        Validator("snapshot", "reload_interval", is_type_of=int, required=True),
+        Validator("logging.filename", default="suricata-threatbus.log"),
+        Validator("threatbus", default="localhost:13370"),
+        Validator("socket", "rules_file", required=True),
+        Validator("snapshot", is_type_of=int, default=30),
+        Validator("reload_interval", is_type_of=int, default=60),
     ]
 
     config.validators.register(*validators)

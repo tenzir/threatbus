@@ -70,13 +70,16 @@ def config_validators() -> List[Validator]:
     return [
         Validator(
             f"plugins.apps.{plugin_name}.group",
+            default="everyone",
+        ),
+        Validator(
             f"plugins.apps.{plugin_name}.tlp",
-            required=True,
+            default="amber",
         ),
         Validator(
             f"plugins.apps.{plugin_name}.confidence",
             is_type_of=float,
-            required=True,
+            default=7.5,
         ),
         Validator(
             f"plugins.apps.{plugin_name}.tags",

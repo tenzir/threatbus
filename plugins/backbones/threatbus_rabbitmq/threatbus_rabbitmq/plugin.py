@@ -45,9 +45,17 @@ def config_validators() -> List[Validator]:
             f"plugins.backbones.{plugin_name}.host",
             f"plugins.backbones.{plugin_name}.username",
             f"plugins.backbones.{plugin_name}.password",
-            f"plugins.backbones.{plugin_name}.vhost",
-            f"plugins.backbones.{plugin_name}.exchange_name",
+            is_type_of=str,
             required=True,
+        ),
+        Validator(
+            f"plugins.backbones.{plugin_name}.vhost",
+            is_type_of=str,
+            default="/",
+        ),
+        Validator(
+            f"plugins.backbones.{plugin_name}.exchange_name",
+            default="threatbus",
         ),
         Validator(
             f"plugins.backbones.{plugin_name}.port",
@@ -56,14 +64,20 @@ def config_validators() -> List[Validator]:
         ),
         Validator(
             f"plugins.backbones.{plugin_name}.queue.durable",
-            f"plugins.backbones.{plugin_name}.queue.auto_delete",
             f"plugins.backbones.{plugin_name}.queue.lazy",
-            f"plugins.backbones.{plugin_name}.queue.exclusive",
             is_type_of=bool,
-            required=True,
+            default=True,
         ),
         Validator(
-            f"plugins.backbones.{plugin_name}.queue.name_join_symbol", required=True
+            f"plugins.backbones.{plugin_name}.queue.auto_delete",
+            f"plugins.backbones.{plugin_name}.queue.exclusive",
+            is_type_of=bool,
+            default=False,
+        ),
+        Validator(
+            f"plugins.backbones.{plugin_name}.queue.name_join_symbol",
+            required=True,
+            default=".",
         ),
         Validator(
             f"plugins.backbones.{plugin_name}.queue.name_suffix",
