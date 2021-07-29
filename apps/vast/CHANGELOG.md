@@ -10,7 +10,7 @@ Every entry has a category for which we use the following visual abbreviations:
 - ⚡️ Breaking Changes
 - 🐞 Bug Fixes
 
-## Unreleased
+## [2021.07.29]
 
 - ⚠️ The metric for indicator query time now only reflects the actual time spent
   querying VAST and does not regard unstarted VAST queries any longer.
@@ -194,3 +194,4 @@ Every entry has a category for which we use the following visual abbreviations:
 [2021.04.29]: https://github.com/tenzir/threatbus/releases/tag/2021.04.29
 [2021.05.27]: https://github.com/tenzir/threatbus/releases/tag/2021.05.27
 [2021.06.24]: https://github.com/tenzir/threatbus/releases/tag/2021.06.24
+[2021.07.29]: https://github.com/tenzir/threatbus/releases/tag/2021.07.29

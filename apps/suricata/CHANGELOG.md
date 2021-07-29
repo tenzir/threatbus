@@ -11,7 +11,7 @@ Every entry has a category for which we use the following visual abbreviations:
 - ⚡️ Breaking Changes
 - 🐞 Bug Fixes
 
-## Unreleased
+## [2021.07.29]
 
 - ⚠️ The Dockerfile of `suricata-threatbus` has moved to the repository toplevel
   and now installs Threat Bus from source. This way, the Docker build always
@@ -51,3 +51,4 @@ Every entry has a category for which we use the following visual abbreviations:
   [#131](https://github.com/tenzir/threatbus/pull/131)
 
 [2021.06.24]: https://github.com/tenzir/threatbus/releases/tag/2021.06.24
+[2021.07.29]: https://github.com/tenzir/threatbus/releases/tag/2021.07.29

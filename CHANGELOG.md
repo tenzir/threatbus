@@ -10,7 +10,7 @@ Every entry has a category for which we use the following visual abbreviations:
 - 🧬 Experimental Features
 - 🐞 Bug Fixes
 
-## Unreleased
+## [2021.07.29]
 
 - 🐞 Threatbus now only attempts to load plugins that are explicitly
   listed in the config file.
@@ -240,3 +240,4 @@ Every entry has a category for which we use the following visual abbreviations:
 [2021.04.29]: https://github.com/tenzir/threatbus/releases/tag/2021.04.29
 [2021.05.27]: https://github.com/tenzir/threatbus/releases/tag/2021.05.27
 [2021.06.24]: https://github.com/tenzir/threatbus/releases/tag/2021.06.24
+[2021.07.29]: https://github.com/tenzir/threatbus/releases/tag/2021.07.29
