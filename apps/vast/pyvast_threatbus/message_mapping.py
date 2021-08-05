@@ -4,6 +4,10 @@ from stix2 import Indicator, Sighting
 from threatbus.data import ThreatBusSTIX2Constants
 from threatbus.stix2_helpers import is_point_equality_ioc, split_object_path_and_value
 from typing import Tuple, Union
+import logging
+
+logger_name = "pyvast-threatbus"
+logger = logging.getLogger(logger_name)
 
 vast_ioc_type_map = {
     "ipv4-addr:value": "ip",
@@ -12,7 +16,7 @@ vast_ioc_type_map = {
     "url:value": "url",
 }
 
-threatbus_reference = "threatbus__"
+THREATBUS_REFERENCE = "threatbus__"
 
 
 def vast_escape_str(val: str):
@@ -36,7 +40,7 @@ def get_vast_type_and_value(pattern_str: str) -> Union[Tuple[str, str], None]:
     return vast_type, ioc_value
 
 
-def indicator_to_vast_matcher_ioc(indicator: Indicator) -> Union[str, None]:
+def indicator_to_vast_matcher_ioc(indicator: Indicator) -> Union[dict, None]:
     """
     Maps a STIX-2 Indicator to a VAST compatible IoC format (JSON), so that a
     VAST matcher can ingest it.
@@ -51,13 +55,11 @@ def indicator_to_vast_matcher_ioc(indicator: Indicator) -> Union[str, None]:
         return None
     (vast_type, ioc_value) = type_and_value
 
-    return json.dumps(
-        {
+    return {
             "value": ioc_value,
             "type": vast_type,
             "reference": f"{threatbus_reference}{indicator.id}",
         }
-    )
 
 
 def indicator_to_vast_query(indicator: Indicator) -> Union[str, None]:
@@ -121,23 +123,34 @@ def matcher_result_to_sighting(matcher_result: str) -> Union[Sighting, None]:
     @return a valid STIX-2 Sighting that references the IoC from the VAST
         matcher or None
     """
+# {"indicator": {"value": "\"reddit.com\"", "context": "\"threatbus__indicator--56538691-46ca-4c1c-960d-6592e5dbf645\""}, "type": "zeek.dns", "event": {"ts": "2021-08-06T14:33:16.769847040", "uid": "CGG3VBvnp9JKfVP56", "id.orig_h": "172.19.0.2", "id.orig_p": 37241, "id.resp_h": "1.1.1.1", "id.resp_p": 53, "proto": "udp", "trans_id": 53396, "rtt": "18.42ms", "query": "reddit.com", "qclass": 1, "qclass_name": "C_INTERNET", "qtype": 1, "qtype_name": "A", "rcode": 0, "rcode_name": "NOERROR", "AA": false, "TC": false, "RD": true, "RA": true, "Z": 2, "answers": ["151.101.193.140", "151.101.65.140", "151.101.1.140", "151.101.129.140"], "TTLs": ["2.47m", "2.47m", "2.47m", "2.47m"], "rejected": false}}
+    global logger
     if type(matcher_result) is not str:
         return None
     try:
         dct = json.loads(matcher_result)
-        ts = dct.get("ts", None)
+        ts = dct.get("event").get("ts")
         if type(ts) is str:
             ts = dateutil_parser.parse(ts)
-    except Exception:
+    except Exception as e:
+        logger.error(f"exception: {e}")
         return None
-    ref = dct.get("reference", "")
-    context = dct.get("context", {})
-    ioc_value = dct.get("value", "")
-    # ref = threatbus__indicator--46b3f973-5c03-41fc-9efe-49598a267a35
-    ref_len = len(threatbus_reference) + len("indicator--") + 36
-    if not ts or not ref or not len(ref) == ref_len:
+    ref = dct.get("indicator").get("context")
+    ioc_value = dct["indicator"]["value"]
+    # +36 for the uuid
+    # +2 for the double quotes
+    ref_len = len(THREATBUS_REFERENCE) + len("indicator--") + 36 + 2
+    if not ts:
+        logger.error('not ts')
         return None
-    ref = ref[len(threatbus_reference) :]
+    if not ref:
+        logger.error("not ref")
+        return None
+    if not len(ref) == ref_len:
+        logger.error(f"not len: {len(ref)} vs. {ref_len}")
+        return None
+    ref = ref[len(THREATBUS_REFERENCE)+1:-1]
+    context = {}
     context["source"] = "VAST"
     return Sighting(
         last_seen=ts,

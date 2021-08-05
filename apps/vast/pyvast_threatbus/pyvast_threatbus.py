@@ -89,6 +89,7 @@ def validate_config(config: Settings):
         Validator("metrics.filename", default="metrics.log"),
         Validator("metrics.interval", is_type_of=int, default=10),
         Validator("live_match", is_type_of=bool, default=False),
+        Validator("matcher_name", is_type_of=str, when=Validator("live_match", eq=True), required=True),
         Validator("retro_match", is_type_of=bool, default=True),
         Validator("snapshot", is_type_of=int, default=30),
         Validator("retro_match_max_events", is_type_of=int, default=0),
@@ -385,7 +386,7 @@ async def ingest_vast_ioc(vast_binary: str, vast_endpoint: str, indicator: Indic
     @param vast_endpoint The endpoint of a running vast node ('host:port')
     @param indicator The STIX-2 Indicator to query VAST for
     """
-    global logger
+    global logger, matcher_name
     vast_ioc = indicator_to_vast_matcher_ioc(indicator)
     if not vast_ioc:
         logger.error(
@@ -393,7 +394,7 @@ async def ingest_vast_ioc(vast_binary: str, vast_endpoint: str, indicator: Indic
         )
         return
     vast = VAST(binary=vast_binary, endpoint=vast_endpoint, logger=logger)
-    proc = await vast.import_(type="intel.indicator").json().exec(stdin=vast_ioc)
+    proc = await vast.matcher().add(matcher_name, vast_ioc["value"], vast_ioc["reference"]).exec()
     await proc.wait()
     logger.debug(f"Ingested indicator for VAST live matching: {indicator}")
 
@@ -413,8 +414,7 @@ async def remove_vast_ioc(vast_binary: str, vast_endpoint: str, indicator: Indic
         return None
     (vast_type, ioc_value) = type_and_value
     vast = VAST(binary=vast_binary, endpoint=vast_endpoint, logger=logger)
-    # TODO pass matcher_name once VAST supports more fine-grained deletion
-    await vast.matcher().intel().remove(ioc_value, vast_type).exec()
+    await vast.matcher().remove(matcher_name, ioc_value).exec()
     logger.debug(f"Removed indicator from VAST live matching: {indicator}")
 
 
@@ -494,12 +494,10 @@ async def live_match_vast(
     @param vast_binary The VAST binary command to use with PyVAST
     @param vast_endpoint The endpoint of a running VAST node
     @param sightings_queue The queue to put new sightings into
-    @param retro_match Boolean flag to use retro-matching over live-matching
     """
     global logger, matcher_name
     vast = VAST(binary=vast_binary, endpoint=vast_endpoint, logger=logger)
-    matcher_name = "threatbus-" + "".join(random.choice(letters) for i in range(10))
-    proc = await vast.matcher().start(name=matcher_name).exec()
+    proc = await vast.matcher().attach().json(matcher_name).exec()
     # returncode is None as long as the process did not terminate yet
     while proc.returncode is None:
         data = await proc.stdout.readline()
@@ -514,6 +512,7 @@ async def live_match_vast(
             logger.error(f"Cannot parse sighting-output from VAST: {vast_sighting}")
             continue
         g_live_matcher_sightings.inc()
+        logger.info(f"Got a new sighting from VAST")
         await sightings_queue.put(sighting)
     stderr = await proc.stderr.read()
     if stderr:
@@ -765,6 +764,8 @@ async def heartbeat(endpoint: str, p2p_topic: str, interval: int = 5):
 
 
 def main():
+    global matcher_name
+
     ## Default list of settings files for Dynaconf to parse.
     settings_files = ["config.yaml", "config.yml"]
     parser = argparse.ArgumentParser()
@@ -788,6 +789,10 @@ def main():
         sys.exit(ValueError(f"Invalid config: {e}"))
 
     setup_logging_with_config(config.logging)
+
+    # TODO: Pass matcher name as an argument instead of global var
+    if config.live_match:
+        matcher_name = config.matcher_name
 
     while True:
         try:
