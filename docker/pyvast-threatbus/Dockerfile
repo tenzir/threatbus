@@ -1,9 +1,8 @@
-# The used version here always refers to the latest released VAST version.
-# Use `latest` to get the most recent version of VAST as it is available on the
-# Git master branch at https://github.com/tenzir/vast.
-ARG VAST_VERSION=2021.07.29
+# This is a clone of the open-source Dockerfile for pyvast-threatbus,
+# but based on the closed-source VAST Dockerfile instead so we can
+# use the matcher plugin.
 
-FROM tenzir/vast:$VAST_VERSION
+FROM vast-pinned:${EVENT_HORIZON_VERSION:-latest}
 USER root
 
 RUN apt-get -qq update && apt-get -qqy install \
