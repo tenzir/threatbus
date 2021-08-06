@@ -5,7 +5,7 @@ from threatbus.data import (
     Subscription,
     Unsubscription,
 )
-from threatbus_zmq_app.message_mapping import Heartbeat, map_management_message
+from threatbus_zmq.message_mapping import Heartbeat, map_management_message
 
 
 class TestMessageMapping(unittest.TestCase):

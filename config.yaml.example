@@ -75,7 +75,7 @@ plugins:
           group.id: "threatbus"
           auto.offset.reset: "earliest"
     # Requires the 'threatbus-zmq-app' package to be installed.
-    zmq_app:
+    zmq:
       host: "127.0.0.1"          # Required.
       manage: 13370              # Required. The port used for management messages.
       pub: 13371                 # Required. The port used to publish messages to connected apps.

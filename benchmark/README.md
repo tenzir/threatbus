@@ -21,8 +21,8 @@ source venv/bin/activate
 # main threatbus
 pip install -e .
 
-# zmq-app plugin
-pip install -e plugins/apps/threatbus_zmq_app
+# zmq plugin
+pip install -e plugins/apps/threatbus_zmq
 
 # benchmark backbone to publish faked messages
 pip install -e plugins/backbones/file_benchmark
