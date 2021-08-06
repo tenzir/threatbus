@@ -24,7 +24,7 @@ plugins:
     #    exclusive: false
 
   apps:
-    zmq-app:
+    zmq_app:
       host: "127.0.0.1"
       manage: 13370
       pub: 13371

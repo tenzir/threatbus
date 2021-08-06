@@ -26,7 +26,7 @@ ZeroMQ application plugin for Threat Bus.
 Allows to connect any app via ZeroMQ that adheres to the Threat Bus ZMQ protocol.
 """
 
-plugin_name = "zmq-app"
+plugin_name = "zmq_app"
 subscriptions_lock = threading.Lock()
 # subscriptions: p2p_topic => (topic, queue)
 subscriptions: Dict[str, Tuple[str, JoinableQueue]] = dict()
