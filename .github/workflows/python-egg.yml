@@ -74,13 +74,13 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USER }}
         password: ${{ secrets.DOCKERHUB_PASSWORD }}
         tags: latest,${{ github.sha }}
-    - name: Publish pyvast-threatbus Docker Image
+    - name: Publish vast-threatbus Docker Image
       uses: elgohr/Publish-Docker-Github-Action@3.04
       with:
-        name: tenzir/pyvast-threatbus
+        name: tenzir/vast-threatbus
         username: ${{ secrets.DOCKERHUB_USER }}
         password: ${{ secrets.DOCKERHUB_PASSWORD }}
-        dockerfile: docker/pyvast-threatbus/Dockerfile
+        dockerfile: docker/vast-threatbus/Dockerfile
         tags: latest,${{ github.sha }}
     - name: Publish stix-shifter-threatbus Docker Image
       uses: elgohr/Publish-Docker-Github-Action@3.04

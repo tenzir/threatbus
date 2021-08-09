@@ -6,7 +6,7 @@ logging:
   console_verbosity: INFO
   file: false
   file_verbosity: INFO
-  filename: pyvast-threatbus.log
+  filename: vast-threatbus.log
 
 metrics:
   interval: 10 # set to 0 to disable metrics

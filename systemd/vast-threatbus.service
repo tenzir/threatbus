@@ -7,7 +7,7 @@ After=network-online.target
 Type=simple
 
 DynamicUser=yes
-LogsDirectory=pyvast-threatbus
+LogsDirectory=vast-threatbus
 
 # capabilities
 RestrictNamespaces=yes
@@ -28,7 +28,7 @@ ProtectKernelLogs=yes
 
 # service specifics
 TimeoutStopSec=600
-ExecStart=/opt/tenzir/threatbus/pyvast-threatbus -c /opt/tenzir/threatbus/pyvast-threatbus.yaml
+ExecStart=/opt/tenzir/threatbus/vast-threatbus -c /opt/tenzir/threatbus/vast-threatbus.yaml
 
 [Install]
 WantedBy=multi-user.target

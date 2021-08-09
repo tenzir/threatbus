@@ -44,7 +44,7 @@ A threat intelligence dissemination layer for open-source security tools.
 - **Official Plugins**: We maintain many plugins right in the official Threat
   Bus repository. Check out our integrations for [MISP][misp], [Zeek][zeek],
   [CIFv3][cif], and generally apps that connect via [ZeroMQ][zmq], like
-  [pyvast-threatbus][pyvast-threatbus] and our
+  [vast-threatbus][vast-threatbus] and our
   [OpenCTI connector][opencti-connector].
 
 - **Snapshotting**: The snapshot feature allows subscribers to directly request
@@ -256,7 +256,7 @@ Threat Bus comes with a [3-clause BSD license][license-url].
 [misp-zmq-config]: https://github.com/MISP/misp-book/tree/master/misp-zmq#misp-zeromq-configuration
 [plugin-types]: https://docs.tenzir.com/threatbus/plugins/overview
 [plugin-development]: https://docs.tenzir.com/threatbus/plugins/plugin-development
-[pyvast-threatbus]: https://github.com/tenzir/threatbus/tree/master/apps/vast
+[vast-threatbus]: https://github.com/tenzir/threatbus/tree/master/apps/vast
 
 [pypi-badge]: https://img.shields.io/pypi/v/threatbus.svg
 [pypi-url]: https://pypi.org/project/threatbus

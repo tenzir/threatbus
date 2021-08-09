@@ -12,6 +12,11 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+- ⚡️ We renamed PyVAST Threat Bus to VAST Threat Bus for clarity. The PyPI
+  package name and the binary name change from `pyvast-threatbus` to
+  `vast-threatbus` accordingly.
+  [#159](https://github.com/tenzir/threatbus/pull/159)
+
 - 🎁 Live matching with VAST works again!
   [#156](https://github.com/tenzir/threatbus/pull/156)
 

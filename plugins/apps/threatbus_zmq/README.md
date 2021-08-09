@@ -22,7 +22,7 @@ pip install threatbus-zmq
 ## Configuration
 
 The plugin uses ZeroMQ to communicate with applications, like
-[pyvast-threatbus](https://github.com/tenzir/threatbus/tree/master/apps/vast).
+[vast-threatbus](https://github.com/tenzir/threatbus/tree/master/apps/vast).
 The plugin serves three ZeroMQ endpoints to connect with. One endpoint for
 managing subscriptions (and thus snapshot requests). The other two endpoints
 exist for pub-sub operations.
