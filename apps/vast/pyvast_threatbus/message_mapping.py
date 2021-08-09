@@ -58,7 +58,7 @@ def indicator_to_vast_matcher_ioc(indicator: Indicator) -> Union[dict, None]:
     return {
         "value": ioc_value,
         "type": vast_type,
-        "reference": f"{threatbus_reference}{indicator.id}",
+        "reference": f"{THREATBUS_REFERENCE}{indicator.id}",
     }
 
 
@@ -95,6 +95,7 @@ def query_result_to_sighting(
     @param indicator The STIX-2 Indicator that the query result refers to
     @return a valid STIX-2 Sighting that references the given indicator or None
     """
+    global logger
     if type(query_result) is not str or type(indicator) is not Indicator:
         return None
     try:
@@ -102,6 +103,7 @@ def query_result_to_sighting(
         context["source"] = "VAST"
         ts = context.get("ts", context.get("timestamp", None))
         if not ts:
+            logger.error(f"Could not find timestamp")
             return None
         ts = dateutil_parser.parse(ts)
         return Sighting(
@@ -112,7 +114,8 @@ def query_result_to_sighting(
                 ThreatBusSTIX2Constants.X_THREATBUS_INDICATOR.value: indicator,
             },
         )
-    except Exception:
+    except Exception as e:
+        logger.error(f"Could not parse result {query_result} as sighting: {e}")
         return None
 
 
@@ -128,25 +131,25 @@ def matcher_result_to_sighting(matcher_result: str) -> Union[Sighting, None]:
         return None
     try:
         dct = json.loads(matcher_result)
-        ts = dct.get("event").get("ts")
+        ts = dct["event"]["ts"]
         if type(ts) is str:
             ts = dateutil_parser.parse(ts)
     except Exception as e:
         logger.error(f"exception: {e}")
         return None
-    ref = dct.get("indicator").get("context")
+    ref = dct["indicator"]["context"]
     ioc_value = dct["indicator"]["value"]
     # +36 for the uuid
     # +2 for the double quotes
     ref_len = len(THREATBUS_REFERENCE) + len("indicator--") + 36 + 2
     if not ts:
-        logger.error("not ts")
+        logger.error("Missing event timestamp in matcher result")
         return None
     if not ref:
-        logger.error("not ref")
+        logger.error("Missing 'context' in matcher result")
         return None
     if not len(ref) == ref_len:
-        logger.error(f"not len: {len(ref)} vs. {ref_len}")
+        logger.error(f"Unexpected length: got {len(ref)}, expected {ref_len}")
         return None
     ref = ref[len(THREATBUS_REFERENCE) + 1 : -1]
     context = {}
