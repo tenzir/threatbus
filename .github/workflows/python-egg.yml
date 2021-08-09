@@ -73,6 +73,7 @@ jobs:
         name: tenzir/threatbus
         username: ${{ secrets.DOCKERHUB_USER }}
         password: ${{ secrets.DOCKERHUB_PASSWORD }}
+        tags: latest,${{ github.sha }}
     - name: Publish pyvast-threatbus Docker Image
       uses: elgohr/Publish-Docker-Github-Action@3.04
       with:
@@ -80,6 +81,7 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USER }}
         password: ${{ secrets.DOCKERHUB_PASSWORD }}
         dockerfile: docker/pyvast-threatbus/Dockerfile
+        tags: latest,${{ github.sha }}
     - name: Publish stix-shifter-threatbus Docker Image
       uses: elgohr/Publish-Docker-Github-Action@3.04
       with:
@@ -87,6 +89,7 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USER }}
         password: ${{ secrets.DOCKERHUB_PASSWORD }}
         dockerfile: docker/stix-shifter-threatbus/Dockerfile
+        tags: latest,${{ github.sha }}
     - name: Publish suricata-threatbus Docker Image
       uses: elgohr/Publish-Docker-Github-Action@3.04
       with:
@@ -94,6 +97,7 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USER }}
         password: ${{ secrets.DOCKERHUB_PASSWORD }}
         dockerfile: docker/suricata-threatbus/Dockerfile
+        tags: latest,${{ github.sha }}
 
   egg-release:
     name: Egg Release
