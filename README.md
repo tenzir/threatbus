@@ -138,7 +138,7 @@ pip install threatbus-inmem           # inmemory backbone plugin
 pip install threatbus-rabbitmq        # RabbitMQ backbone plugin
 pip install threatbus-misp[zmq]       # MISP application plugin
 pip install threatbus-zeek            # Zeek application plugin
-pip install threatbus-zmq-app         # ZeroMQ application plugin
+pip install threatbus-zmq             # ZeroMQ application plugin
 pip install threatbus-<plugin_name>
 ```
 

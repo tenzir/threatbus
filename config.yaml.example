@@ -74,7 +74,7 @@ plugins:
           bootstrap.servers: "localhost:9092"
           group.id: "threatbus"
           auto.offset.reset: "earliest"
-    # Requires the 'threatbus-zmq-app' package to be installed.
+    # Requires the 'threatbus-zmq' package to be installed.
     zmq:
       host: "127.0.0.1"          # Required.
       manage: 13370              # Required. The port used for management messages.

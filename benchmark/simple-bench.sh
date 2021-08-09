@@ -31,7 +31,7 @@ rabbit_consumer() {
 }
 
 zmq() {
-  # Starts Threat Bus and sends messages to `zmq-app` plugin endpoint. Starts a dummy consumer. Measures roundtrip of receiving and publishing messages.
+  # Starts Threat Bus and sends messages to `zmq` plugin endpoint. Starts a dummy consumer. Measures roundtrip of receiving and publishing messages.
   rm threatbus.log
   config=benchmark_config.yaml
   sed -i.bak -e 's/foo/bar/' -- "$config"

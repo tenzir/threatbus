@@ -5,7 +5,7 @@ Threat Bus is a publish-subscribe broker for threat intelligence. It is expected
 that applications register themselves at the bus. This template provides a basic
 `async` Python application that can (un)subsscribe to/from Threat Bus via
 ZeroMQ. To connect via ZeroMQ, users must install and configure the
-[`threatbus-zmq-app`](https://pypi.org/project/threatbus-zmq-app/) plugin on
+[`threatbus-zmq`](https://pypi.org/project/threatbus-zmq/) plugin on
 their Threat Bus host.
 
 ## Quick Start

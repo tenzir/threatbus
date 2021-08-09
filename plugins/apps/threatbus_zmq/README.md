@@ -16,7 +16,7 @@ communicate via [ZeroMQ].
 ## Installation
 
 ```sh
-pip install threatbus-zmq-app
+pip install threatbus-zmq
 ```
 
 ## Configuration
@@ -30,7 +30,7 @@ exist for pub-sub operations.
 ```yaml
 ...
 plugins:
-  zmq-app:
+  zmq:
     host: "127.0.0.1"
     manage: 13370
     pub: 13371
@@ -52,12 +52,12 @@ endpoint that the plugin exposes.
 The manage endpoint uses the
 [ZeroMQ Request/Reply](https://learning-0mq-with-pyzmq.readthedocs.io/en/latest/pyzmq/patterns/client_server.html)
 pattern for message exchange. That means, all messages get an immediate response
-from the server. With each JSON reply, the zmq-app Threat Bus plugin sends a
+from the server. With each JSON reply, the zmq Threat Bus plugin sends a
 `status` field that indicates the success of the requested operation.
 
 ### Subscribe at the Plugin
 
-To subscribe to Threat Bus via the zmq-app plugin, an app needs to send a JSON
+To subscribe to Threat Bus via the zmq plugin, an app needs to send a JSON
 struct as follows to the `manage` endpoint of the plugin:
 
 ```
@@ -171,16 +171,16 @@ again later.
 ### Pub/Sub via ZeroMQ
 
 Once an app has subscribed to a certain Threat Bus topic using the `manage`
-endpoint of the zmq-app plugin, it gets a unique, random `p2p_topic` (see
+endpoint of the zmq plugin, it gets a unique, random `p2p_topic` (see
 above). The `p2p_topic` differs from the subscribed Threat Bus topic. The
-zmq-app plugin uses only the `p2p_topic` to publish messages to subscribers.
+zmq plugin uses only the `p2p_topic` to publish messages to subscribers.
 Messages are either STIX-2 Indicators and Sightings or are of the types
 specified in
 [`threatbus.data`](https://github.com/tenzir/threatbus/blob/master/threatbus/data.py),
 i.e., `SnapshotRequest`, and `SnapshotEnvelope`.
 
 ZeroMQ uses [prefix matching](https://zeromq.org/socket-api/#topics) for pub/sub
-connections. The zmq-app plugin leverages this feature to indicate the type of
+connections. The zmq plugin leverages this feature to indicate the type of
 each sent message to the subscriber. Hence, an app can simply match the topic
 suffix to determine the message type.
 
@@ -193,7 +193,7 @@ and so forth.
 
 Threat Bus' [snapshot](https://docs.tenzir.com/threatbus/features/snapshotting)
 feature allows apps to request a snapshot during subscription. Threat Bus always
-forwards snapshot requests to all app plugins. The `zmq-app` plugin again
+forwards snapshot requests to all app plugins. The `zmq` plugin again
 forwards these `SnapshotRequests` to all connected apps. Apps, however, can
 decide if they want to implement this feature, i.e., whether they respond to
 `SnapshotRequest` messages or not.
