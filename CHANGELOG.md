@@ -14,6 +14,7 @@ Every entry has a category for which we use the following visual abbreviations:
 
 - ⚡️ The `threatbus-zmq-app` package has been renamed to `threatbus-zmq`, to
   address some limitations in the configuration framework.
+  [#157](https://github.com/tenzir/threatbus/pull/157)
 
 ## [2021.07.29]
 
