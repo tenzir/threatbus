@@ -10,6 +10,11 @@ Every entry has a category for which we use the following visual abbreviations:
 - ⚡️ Breaking Changes
 - 🐞 Bug Fixes
 
+## Unreleased
+
+- 🎁 Live matching with VAST works again!
+  [#156](https://github.com/tenzir/threatbus/pull/156)
+
 ## [2021.07.29]
 
 - ⚠️ The metric for indicator query time now only reflects the actual time spent
