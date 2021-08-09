@@ -52,7 +52,7 @@ class TestMessageRoundtrip(unittest.TestCase):
         self.valid_subscription = {"action": "subscribe", "topic": self.topic}
         self.valid_unsubscription = {"action": "unsubscribe", "topic": self.topic}
 
-    def test_zmq_app_management_endpoint_failure(self):
+    def test_zmq_management_endpoint_failure(self):
         """
         Sends invalid messages to the management endpoint.
         """
@@ -67,7 +67,7 @@ class TestMessageRoundtrip(unittest.TestCase):
         self.assertTrue(type(reply) is dict)
         self.assertEquals(reply["status"], "error")
 
-    def test_zmq_app_plugin_heartbeat_failure(self):
+    def test_zmq_plugin_heartbeat_failure(self):
         """
         Sends heartbeat messages to the management endpoint that lead to errors.
         """
@@ -82,7 +82,7 @@ class TestMessageRoundtrip(unittest.TestCase):
         self.assertTrue(type(reply) is dict)
         self.assertEquals(reply["status"], "error")
 
-    def test_zmq_app_plugin_subscription_failure(self):
+    def test_zmq_plugin_subscription_failure(self):
         """
         Sends subscription messages to the management endpoint that lead to
         errors.
@@ -103,7 +103,7 @@ class TestMessageRoundtrip(unittest.TestCase):
         self.assertTrue(type(reply) is dict)
         self.assertEquals(reply["status"], "error")
 
-    def test_zmq_app_plugin_unsubscription_failure(self):
+    def test_zmq_plugin_unsubscription_failure(self):
         """
         Sends unsubscription messages to the management endpoint that lead to
         errors.
@@ -121,7 +121,7 @@ class TestMessageRoundtrip(unittest.TestCase):
         self.assertTrue(type(reply) is dict)
         self.assertEquals(reply["status"], "error")
 
-    def test_zmq_app_plugin_full_roundtrip_success(self):
+    def test_zmq_plugin_full_roundtrip_success(self):
         """
         Sends a successful subscription, then heartbeat, then unsubscribes via
         the management endpoint.

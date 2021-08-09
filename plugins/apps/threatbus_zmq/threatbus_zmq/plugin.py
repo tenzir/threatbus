@@ -7,7 +7,7 @@ import select
 from stix2 import Indicator, Sighting, parse
 import string
 import threading
-from threatbus_zmq_app.message_mapping import Heartbeat, map_management_message
+from threatbus_zmq.message_mapping import Heartbeat, map_management_message
 import threatbus
 from threatbus.data import (
     SnapshotEnvelope,
@@ -26,7 +26,7 @@ ZeroMQ application plugin for Threat Bus.
 Allows to connect any app via ZeroMQ that adheres to the Threat Bus ZMQ protocol.
 """
 
-plugin_name = "zmq-app"
+plugin_name = "zmq"
 subscriptions_lock = threading.Lock()
 # subscriptions: p2p_topic => (topic, queue)
 subscriptions: Dict[str, Tuple[str, JoinableQueue]] = dict()

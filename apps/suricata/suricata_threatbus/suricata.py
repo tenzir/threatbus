@@ -102,7 +102,7 @@ async def stop_signal():
 
 def send_manage_message(endpoint: str, action: dict, timeout: int = 5):
     """
-    Sends a 'management' message, following the threatbus-zmq-app protocol to
+    Sends a 'management' message, following the threatbus-zmq protocol to
     either subscribe or unsubscribe this application to/from Threat Bus.
     @param endpoint A host:port string to connect to via ZeroMQ
     @param action The message to send as JSON

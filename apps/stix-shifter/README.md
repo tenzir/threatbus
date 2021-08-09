@@ -16,7 +16,7 @@ choice via Threat Bus.
 
 The `stix-shifter-threatbus` app uses ZeroMQ to connect with Threat Bus. To
 connect via ZeroMQ, users must first install and configure the
-[`threatbus-zmq-app`](https://pypi.org/project/threatbus-zmq-app/) plugin on
+[`threatbus-zmq`](https://pypi.org/project/threatbus-zmq/) plugin on
 their Threat Bus host.
 
 This app functions as middleman between Threat Bus and security tools supported

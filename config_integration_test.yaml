@@ -10,7 +10,7 @@ plugins:
       host: "0.0.0.0"
       port: 47761
       module_namespace: Tenzir
-    zmq-app:
+    zmq:
       host: "127.0.0.1"
       manage: 13370
       pub: 13371

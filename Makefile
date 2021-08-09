@@ -20,7 +20,7 @@ unit-tests:
 	python -m unittest discover threatbus
 	$(MAKE) -C plugins/backbones/threatbus_inmem unit-tests
 	$(MAKE) -C plugins/backbones/threatbus_rabbitmq unit-tests
-	$(MAKE) -C plugins/apps/threatbus_zmq_app unit-tests
+	$(MAKE) -C plugins/apps/threatbus_zmq unit-tests
 	$(MAKE) -C plugins/apps/threatbus_misp unit-tests
 	$(MAKE) -C plugins/apps/threatbus_zeek unit-tests
 	$(MAKE) -C plugins/apps/threatbus_cif3 unit-tests
@@ -34,8 +34,8 @@ integration-tests:
 	docker pull rabbitmq$(:)3 > /dev/null 2>&1
 	docker run -d --rm --hostname=test-rabbit --name=rabbit-int -p 35672$(:)5672 rabbitmq$(:)3 > /dev/null 2>&1
 	-python -m unittest tests/integration/test_misp_inmem.py
-	-python -m unittest tests/integration/test_zmq_app_management.py
-	-python -m unittest tests/integration/test_zmq_app_message_roundtrips.py
+	-python -m unittest tests/integration/test__management.py
+	-python -m unittest tests/integration/test__message_roundtrips.py
 	-python -m unittest tests/integration/test_zeek_app.py
 	-python -m unittest tests/integration/test_zeek_inmem.py
 	-python -m unittest tests/integration/test_rabbitmq.py
@@ -47,7 +47,7 @@ clean:
 	-${RM} -r __pycache__ *egg-info build dist
 	-$(MAKE) -C plugins/apps/threatbus_zeek clean
 	-$(MAKE) -C plugins/apps/threatbus_misp clean
-	-$(MAKE) -C plugins/apps/threatbus_zmq_app clean
+	-$(MAKE) -C plugins/apps/threatbus_zmq clean
 	-$(MAKE) -C plugins/apps/threatbus_cif3 clean
 	-$(MAKE) -C plugins/backbones/threatbus_inmem clean
 	-$(MAKE) -C plugins/backbones/threatbus_rabbitmq clean
@@ -60,7 +60,7 @@ build:
 	python setup.py build
 	$(MAKE) -C plugins/apps/threatbus_zeek build
 	$(MAKE) -C plugins/apps/threatbus_misp build
-	$(MAKE) -C plugins/apps/threatbus_zmq_app build
+	$(MAKE) -C plugins/apps/threatbus_zmq build
 	$(MAKE) -C plugins/apps/threatbus_cif3 build
 	$(MAKE) -C plugins/backbones/threatbus_inmem build
 	$(MAKE) -C plugins/backbones/threatbus_rabbitmq build
@@ -73,7 +73,7 @@ dist:
 	python setup.py sdist bdist_wheel
 	$(MAKE) -C plugins/apps/threatbus_zeek dist
 	$(MAKE) -C plugins/apps/threatbus_misp dist
-	$(MAKE) -C plugins/apps/threatbus_zmq_app dist
+	$(MAKE) -C plugins/apps/threatbus_zmq dist
 	$(MAKE) -C plugins/apps/threatbus_cif3 dist
 	$(MAKE) -C plugins/backbones/threatbus_inmem dist
 	$(MAKE) -C plugins/backbones/threatbus_rabbitmq dist
@@ -86,7 +86,7 @@ install:
 	pip install .
 	$(MAKE) -C plugins/apps/threatbus_zeek install
 	$(MAKE) -C plugins/apps/threatbus_misp install
-	$(MAKE) -C plugins/apps/threatbus_zmq_app install
+	$(MAKE) -C plugins/apps/threatbus_zmq install
 	$(MAKE) -C plugins/apps/threatbus_cif3 install
 	$(MAKE) -C plugins/backbones/threatbus_inmem install
 	$(MAKE) -C plugins/backbones/threatbus_rabbitmq install
@@ -97,7 +97,7 @@ install:
 .PHONY: dev-mode
 dev-mode:
 	pip install --editable .
-	$(MAKE) -C plugins/apps/threatbus_zmq_app dev-mode
+	$(MAKE) -C plugins/apps/threatbus_zmq dev-mode
 	$(MAKE) -C plugins/backbones/threatbus_inmem dev-mode
 	$(MAKE) -C plugins/backbones/threatbus_rabbitmq dev-mode
 	$(MAKE) -C plugins/apps/threatbus_misp dev-mode

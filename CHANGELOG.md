@@ -10,6 +10,11 @@ Every entry has a category for which we use the following visual abbreviations:
 - 🧬 Experimental Features
 - 🐞 Bug Fixes
 
+## Unreleased
+
+- ⚡️ The `threatbus-zmq-app` package has been renamed to `threatbus-zmq`, to
+  address some limitations in the configuration framework.
+
 ## [2021.07.29]
 
 - 🐞 Threatbus now only attempts to load plugins that are explicitly

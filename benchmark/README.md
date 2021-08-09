@@ -21,8 +21,8 @@ source venv/bin/activate
 # main threatbus
 pip install -e .
 
-# zmq-app plugin
-pip install -e plugins/apps/threatbus_zmq_app
+# zmq plugin
+pip install -e plugins/apps/threatbus_zmq
 
 # benchmark backbone to publish faked messages
 pip install -e plugins/backbones/file_benchmark
@@ -67,7 +67,7 @@ This file is used as configuration for Threat Bus. Depending on your benchmark
 type you *must* change it. You have two options:
 
 1. Enable the RabbitMQ backbone plugin, disable everything else
-2. Enable the `zmq-app` and `file_benchmark` plugins, disable everything else
+2. Enable the `zmq` and `file_benchmark` plugins, disable everything else
 
 ## Interpreting the Results
 

@@ -24,7 +24,7 @@ class TestZmqMessageRoundtrip(unittest.TestCase):
         cls.threatbus.stop()
         time.sleep(1)
 
-    def test_zmq_app_plugin_message_roundtrip(self):
+    def test_zmq_plugin_message_roundtrip(self):
         """
         Backend-agnostic message passing scenario. Sends a fixed amount of
         messages via the threatbus ZeroMQ app plugin, subscribes to Threat Bus,
