@@ -18,8 +18,8 @@ class TestMessageMapping(unittest.TestCase):
         self.ts = datetime.now(timezone.utc).astimezone()
         self.indicator_id = "indicator--46b3f973-5c03-41fc-9efe-49598a267a35"
         self.operation = Operation.REMOVE
-        self.ioc_value = "6.6.6.6"
-        self.pattern = f"[ipv4-addr:value = '{self.ioc_value}']"
+        self.ioc_value = "evil.com"
+        self.pattern = f"[domain-name:value = '{self.ioc_value}']"
         self.indicator = Indicator(
             pattern_type="stix",
             pattern=self.pattern,
@@ -27,7 +27,7 @@ class TestMessageMapping(unittest.TestCase):
             id=self.indicator_id,
         )
         self.valid_query_result = f'{{"timestamp": "{self.ts}", "flow_id": 1840147514011873, "pcap_cnt": 626, "src_ip": "{self.ioc_value}", "src_port": 1193, "dest_ip": "65.54.95.64", "dest_port": 80, "proto": "TCP", "event_type": "http", "community_id": "1:AzSEWwmsqEKUX5qrReAHI3Rpizg=", "http": {{"hostname": "download.windowsupdate.com", "url": "/v9/windowsupdate/a/selfupdate/WSUS3/x86/Other/wsus3setup.cab?0911180916", "http_port": null, "http_user_agent": "Windows-Update-Agent", "http_content_type": "application/octet-stream", "http_method": "HEAD", "http_refer": null, "protocol": "HTTP/1.1", "status": 200, "redirect": null, "length": 0}}, "tx_id": 0}}'
-        self.valid_matcher_result = f'{{"ts": "{self.ts}", "data_id": 8, "indicator_id": 5, "matcher": "threatbus-syeocdkfcy", "value": "{self.ioc_value}", "reference": "threatbus__{self.indicator_id}"}}'
+        self.valid_matcher_result = f'{{"indicator": {{"value": "{self.ioc_value}", "context": "\\"threatbus__{self.indicator_id}\\""}}, "type": "zeek.dns", "event": {{"ts": "{self.ts}", "uid": "CGG3VBvnp9JKfVP56", "id.orig_h": "172.19.0.2", "id.orig_p": 37241, "id.resp_h": "1.1.1.1", "id.resp_p": 53, "proto": "udp", "trans_id": 53396, "rtt": "18.42ms", "query": "reddit.com", "qclass": 1, "qclass_name": "C_INTERNET", "qtype": 1, "qtype_name": "A", "rcode": 0, "rcode_name": "NOERROR", "AA": false, "TC": false, "RD": true, "RA": true, "Z": 2, "answers": ["151.101.193.140", "151.101.65.140", "151.101.1.140", "151.101.129.140"], "TTLs": ["2.47m", "2.47m", "2.47m", "2.47m"], "rejected": false}} }}'
 
     def test_vast_escape_str(self):
         self.assertEqual(vast_escape_str('e"vil.com'), 'e\\"vil.com')
@@ -71,13 +71,11 @@ class TestMessageMapping(unittest.TestCase):
         )
 
     def test_indicator_to_vast_matcher_ioc(self):
-        expected_vast_ioc = json.dumps(
-            {
-                "value": self.ioc_value,
-                "type": "ip",
-                "reference": f"threatbus__{self.indicator_id}",
-            }
-        )
+        expected_vast_ioc = {
+            "value": self.ioc_value,
+            "type": "domain",
+            "reference": f"threatbus__{self.indicator_id}",
+        }
         self.assertEqual(
             expected_vast_ioc, indicator_to_vast_matcher_ioc(self.indicator)
         )
@@ -93,22 +91,24 @@ class TestMessageMapping(unittest.TestCase):
 
     def test_indicator_to_vast_query(self):
         ## test IP
-        expected_vast_query = f"{self.ioc_value}"
-        self.assertEqual(expected_vast_query, indicator_to_vast_query(self.indicator))
+        ip = "6.6.6.6"
+        expected_vast_query = f"{ip}"
+        ioc = Indicator(pattern_type="stix", pattern=f"[ipv4-addr:value = '{ip}']")
+        self.assertEqual(expected_vast_query, indicator_to_vast_query(ioc))
 
         ## test URL
         url = "example.com/foo/bar?query=123"
         expected_vast_query = f'"{url}" == net.uri'
-        other_ioc = Indicator(pattern_type="stix", pattern=f"[url:value = '{url}']")
-        self.assertEqual(expected_vast_query, indicator_to_vast_query(other_ioc))
+        ioc = Indicator(pattern_type="stix", pattern=f"[url:value = '{url}']")
+        self.assertEqual(expected_vast_query, indicator_to_vast_query(ioc))
 
         ## test domain
         domain = "example.com"
         expected_vast_query = f'"{domain}" == net.domain || "{domain}" == net.hostname'
-        other_ioc = Indicator(
+        ioc = Indicator(
             pattern_type="stix", pattern=f"[domain-name:value = '{domain}']"
         )
-        self.assertEqual(expected_vast_query, indicator_to_vast_query(other_ioc))
+        self.assertEqual(expected_vast_query, indicator_to_vast_query(ioc))
 
     def test_invalid_query_result_to_sighting(self):
         # valid query result, invalid Indicator
