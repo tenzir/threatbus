@@ -216,7 +216,7 @@ def main():
     config = Dynaconf(
         settings_files=settings_files,
         load_dotenv=True,
-        envvar_prefix="PYVAST_THREATBUS",
+        envvar_prefix="VAST_THREATBUS",
     )
     start(config)
 
