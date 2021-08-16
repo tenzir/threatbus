@@ -1,9 +1,10 @@
-PyVAST Threat Bus App
-=====================
+VAST Threat Bus App
+===================
 
-Threat Bus is a publish-subscribe broker for threat intelligence. It is expected
-that applications register themselves at the bus. Since VAST cannot do so on its
-own (yet), `pyvast-threatbus.py` implements that functionality in the meantime.
+Threat Bus is a publish-subscribe broker for threat intelligence. It is
+expected that applications register themselves at the bus. Since VAST cannot do
+so on its own (yet), `vast-threatbus.py` implements that functionality in the
+meantime.
 
 The application provides a thin layer around
 [PyVAST](https://docs.tenzir.com/vast/python-bindings/overview), VAST's Python
@@ -12,12 +13,12 @@ instance.
 
 ## Installation
 
-Install `pyvast-threatbus` via `pip`. Optionally, use a virtual environment.
+Install `vast-threatbus` via `pip`. Optionally, use a virtual environment.
 
 ```
 virtualenv venv           # optional
 source venv/bin/activate  # optional
-python -m pip install pyvast-threatbus
+python -m pip install vast-threatbus
 ```
 
 ## Development
@@ -47,7 +48,7 @@ Bus, or pass a path to configuration file via `-c /path/to/config.yaml`.
 Start the application:
 
 ```sh
-pyvast-threatbus
+vast-threatbus
 ```
 
 ### Docker
@@ -56,20 +57,20 @@ You can also run this app via Docker.
 
 - Build it:
   ```
-  docker build . -t tenzir/pyvast-threatbus:latest
+  docker build . -t tenzir/vast-threatbus:latest
   ```
 - Run it to print the helptext.
   ```
-  docker run tenzir/pyvast-threatbus:latest
+  docker run tenzir/vast-threatbus:latest
   ```
 - Run and mount a custom config file into the container:
   ```
-  docker run --net=host -v /path/to/your/conf.yaml:/opt/tenzir/threatbus/pyvast-threatbus/config.yaml tenzir/pyvast-threatbus:latest -c config.yaml
+  docker run --net=host -v /path/to/your/conf.yaml:/opt/tenzir/threatbus/vast-threatbus/config.yaml tenzir/vast-threatbus:latest -c config.yaml
   ```
 
 ## Features
 
-This section explains the most important features of `pyvast-threatbus`.
+This section explains the most important features of `vast-threatbus`.
 
 ### IoC Matching
 
@@ -82,13 +83,13 @@ VAST's
 [live matching](https://docs.tenzir.com/vast/features/threat-intel-matching)
 works as
 [continuous query](https://docs.tenzir.com/vast/cli/vast/export/#documentation).
-`pyvast-threatbus` subscribes to those continuous query results and reports all
+`vast-threatbus` subscribes to those continuous query results and reports all
 new IoC matches from VAST to Threat Bus as `Sightings`. You can enable live
 matching in the config file by setting `live_match: true`.
 
 #### Retro Matching
 
-`pyvast-threatbus` supports retro matching. You can enable it in the config file
+`vast-threatbus` supports retro matching. You can enable it in the config file
 by setting `retro_match: true`. This instructs the application to translate IoCs
 from Threat Bus to normal VAST queries instead of feeding the IoCs to a live
 matcher.
@@ -99,7 +100,7 @@ VAST by setting the config option `retro_match_max_events` to a positive integer
 
 ### Sighting Context Transformation
 
-You can configure `pyvast-threatbus` to invoke another program for parsing
+You can configure `vast-threatbus` to invoke another program for parsing
 Sighting `context` data via the config option `transform_context`.
 
 If set, the app translates the `x_threatbus_sighting_context` field of a STIX-2
@@ -122,7 +123,7 @@ actually matched IoC.
 
 ### Custom Sinks for Sightings
 
-`pyvast-threatbus` offers to send Sighting context to a configurable `sink`
+`vast-threatbus` offers to send Sighting context to a configurable `sink`
 _instead_ of reporting them back to Threat Bus. This can be configured via the
 `sink` configuration parameter. The special placeholder `STDOUT` can be used to
 print the Sighting context to `STDOUT`.

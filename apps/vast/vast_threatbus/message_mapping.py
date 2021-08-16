@@ -6,7 +6,7 @@ from threatbus.stix2_helpers import is_point_equality_ioc, split_object_path_and
 from typing import Tuple, Union
 import logging
 
-logger_name = "pyvast-threatbus"
+logger_name = "vast-threatbus"
 logger = logging.getLogger(logger_name)
 
 vast_ioc_type_map = {

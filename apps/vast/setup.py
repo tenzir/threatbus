@@ -23,7 +23,7 @@ setup(
     ],
     description="Connect the open source telemetry engine VAST with Threat Bus, the open source threat intelligence dissemination layer",
     entry_points={
-        "console_scripts": ["pyvast-threatbus=pyvast_threatbus.pyvast_threatbus:main"]
+        "console_scripts": ["vast-threatbus=vast_threatbus.vast_threatbus:main"]
     },
     include_package_data=True,
     install_requires=[
@@ -47,8 +47,8 @@ setup(
     license="BSD 3-clause",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    name="pyvast-threatbus",
-    packages=["pyvast_threatbus"],
+    name="vast-threatbus",
+    packages=["vast_threatbus"],
     python_requires=">=3.7",
     setup_requires=["setuptools", "wheel"],
     url="https://github.com/tenzir/threatbus",

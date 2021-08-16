@@ -19,14 +19,14 @@ COPY threatbus threatbus
 RUN python3 -m pip install .
 
 # Install the app.
-WORKDIR /opt/tenzir/threatbus/pyvast-threatbus
+WORKDIR /opt/tenzir/threatbus/vast-threatbus
 COPY apps/vast/setup.py .
 COPY apps/vast/README.md .
-COPY apps/vast/pyvast_threatbus pyvast_threatbus
+COPY apps/vast/vast_threatbus vast_threatbus
 RUN python3 -m pip install .
 
 RUN echo "Adding threatbus user" && useradd -m -d /home/threatbus --user-group threatbus
 RUN chown -R threatbus .
 USER threatbus:threatbus
 
-ENTRYPOINT ["pyvast-threatbus"]
+ENTRYPOINT ["vast-threatbus"]

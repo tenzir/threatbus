@@ -31,7 +31,7 @@ from threatbus.stix2_helpers import split_object_path_and_value
 import time
 import zmq
 
-logger_name = "pyvast-threatbus"
+logger_name = "vast-threatbus"
 logger = logging.getLogger(logger_name)
 matcher_name = None
 # List of all running async tasks of the bridge.
@@ -82,7 +82,7 @@ def validate_config(config: Settings):
             when=Validator("logging.file", eq=True),
             default="INFO",
         ),
-        Validator("logging.filename", default="pyvast-threatbus.log"),
+        Validator("logging.filename", default="vast-threatbus.log"),
         Validator("vast", default="localhost:42000"),
         Validator("vast_binary", default="vast"),
         Validator("threatbus", default="localhost:13370"),
@@ -261,7 +261,7 @@ async def write_metrics(every: int, to: str):
     @param to the filepath to write to
     """
     while True:
-        line = f"pyvast-threatbus,host={socket.getfqdn()} "
+        line = f"vast-threatbus,host={socket.getfqdn()} "
         start_length = len(line)
         for m in metrics:
             if not m.is_set:
@@ -314,7 +314,7 @@ async def receive(pub_endpoint: str, topic: str, indicator_queue: asyncio.Queue)
                 continue
             # the topic is suffixed with the message type
             if not topic.endswith("indicator"):
-                # pyvast-threatbus is not (yet) interested in Sightings or SnapshotRequests
+                # vast-threatbus is not (yet) interested in Sightings or SnapshotRequests
                 logger.debug(f"Skipping unsupported message: {msg}")
                 continue
             await indicator_queue.put(msg)
@@ -789,7 +789,7 @@ def main():
     config = Dynaconf(
         settings_files=settings_files,
         load_dotenv=True,
-        envvar_prefix="PYVAST_THREATBUS",
+        envvar_prefix="VAST_THREATBUS",
     )
 
     try:
@@ -828,7 +828,7 @@ def main():
             if user_exit:
                 # Tasks were cancelled because the user stopped the app.
                 return
-            logger.info("Restarting pyvast-threatbus ...")
+            logger.info("Restarting vast-threatbus ...")
 
 
 if __name__ == "__main__":
