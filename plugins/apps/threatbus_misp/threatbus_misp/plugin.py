@@ -222,16 +222,23 @@ def config_validators() -> List[Validator]:
             "operations": "Either configure the MISP plugin to use ZeroMQ or Kafka, but not both."
         },
     )
+    api_is_present = Validator(f"plugins.apps.{plugin_name}.api", required=True)
     return [
         Validator(
             f"plugins.apps.{plugin_name}.filter",
             is_type_of=list,
             default=[],
         ),
+        # TODO
         Validator(
-            f"plugins.apps.{plugin_name}.api",
-            is_type_of=dict,
-            default={},
+            f"plugins.apps.{plugin_name}.api.host",
+            f"plugins.apps.{plugin_name}.api.ssl",
+            f"plugins.apps.{plugin_name}.api.key",
+            when=Validator(f"plugins.apps.{plugin_name}.api", must_exist=True),
+            required=True,
+            messages={
+                "must_exist_true": "All of 'api.host', 'api.ssl', and 'api.key' must be defined when the 'api' key exists"
+            },
         ),
         zmq_kafka_mut_exclusive_validator,
         zmq_validator,
