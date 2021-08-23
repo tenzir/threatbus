@@ -34,10 +34,7 @@ def map_to_cif(
     if not indicator or type(indicator) is not Indicator:
         logger.debug(f"Expected STIX-2 indicator, discarding {indicator}")
         return None
-    if (
-        ThreatBusSTIX2Constants.X_THREATBUS_UPDATE.value
-        in indicator.object_properties()
-    ):
+    if ThreatBusSTIX2Constants.X_THREATBUS_UPDATE.value in indicator:
         logger.debug(
             f"CIFv3 only supports adding indicators, not deleting / editing. Discardig {indicator}"
         )

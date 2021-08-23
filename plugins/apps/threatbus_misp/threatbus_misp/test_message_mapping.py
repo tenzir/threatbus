@@ -161,7 +161,7 @@ class TestMessageMapping(unittest.TestCase):
             indicator.pattern, f"[domain-name:value = '{self.domain_ioc}']"
         )
         # test that no custom properties are set
-        for prop in indicator.object_properties():
+        for prop in indicator:
             self.assertTrue(not prop.startswith("x_threatbus_"))
 
     def test_valid_misp_attribute_removal(self):

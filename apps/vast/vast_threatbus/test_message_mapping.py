@@ -136,7 +136,7 @@ class TestMessageMapping(unittest.TestCase):
         self.assertEqual(parsed_sighting.sighting_of_ref, self.indicator_id)
         self.assertTrue(
             ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value
-            in parsed_sighting.object_properties()
+            in parsed_sighting
         )
         expected_context = json.loads(self.valid_query_result)
         expected_context["source"] = "VAST"
@@ -160,7 +160,7 @@ class TestMessageMapping(unittest.TestCase):
         self.assertEqual(parsed_sighting.sighting_of_ref, self.indicator_id)
         self.assertTrue(
             ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value
-            in parsed_sighting.object_properties()
+            in parsed_sighting
         )
         expected_context = {"source": "VAST"}
         self.assertEqual(parsed_sighting.x_threatbus_sighting_context, expected_context)

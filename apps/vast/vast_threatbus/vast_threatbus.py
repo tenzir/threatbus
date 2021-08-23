@@ -463,8 +463,7 @@ async def match_intel(
             )
             continue
         if (
-            ThreatBusSTIX2Constants.X_THREATBUS_UPDATE.value
-            in indicator.object_properties()
+            ThreatBusSTIX2Constants.X_THREATBUS_UPDATE.value in indicator
             and indicator.x_threatbus_update == Operation.REMOVE.value
         ):
             g_iocs_removed.inc()
@@ -603,7 +602,7 @@ async def report_sightings(
             context = (
                 sighting.x_threatbus_sighting_context
                 if ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value
-                in sighting.object_properties()
+                in sighting
                 else None
             )
             if not context:
@@ -634,8 +633,7 @@ async def transform_context(sighting: Sighting, transform_cmd: str) -> Sighting:
     """
     context = (
         sighting.x_threatbus_sighting_context
-        if ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value
-        in sighting.object_properties()
+        if ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value in sighting
         else None
     )
     if not context:
@@ -645,8 +643,7 @@ async def transform_context(sighting: Sighting, transform_cmd: str) -> Sighting:
         return
     indicator = (
         sighting.x_threatbus_indicator
-        if ThreatBusSTIX2Constants.X_THREATBUS_INDICATOR.value
-        in sighting.object_properties()
+        if ThreatBusSTIX2Constants.X_THREATBUS_INDICATOR.value in sighting
         else None
     )
     if indicator:
@@ -655,8 +652,7 @@ async def transform_context(sighting: Sighting, transform_cmd: str) -> Sighting:
         # try to find the indicator value instead
         ioc_value = (
             sighting.x_threatbus_indicator_value
-            if ThreatBusSTIX2Constants.X_THREATBUS_INDICATOR_VALUE.value
-            in sighting.object_properties()
+            if ThreatBusSTIX2Constants.X_THREATBUS_INDICATOR_VALUE.value in sighting
             else None
         )
     if not ioc_value:
