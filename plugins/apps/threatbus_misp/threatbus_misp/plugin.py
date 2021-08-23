@@ -222,14 +222,13 @@ def config_validators() -> List[Validator]:
             "operations": "Either configure the MISP plugin to use ZeroMQ or Kafka, but not both."
         },
     )
-    api_is_present = Validator(f"plugins.apps.{plugin_name}.api", required=True)
     return [
         Validator(
             f"plugins.apps.{plugin_name}.filter",
             is_type_of=list,
             default=[],
         ),
-        # TODO
+        # TODO: Allow default values for 'host' and 'ssl'.
         Validator(
             f"plugins.apps.{plugin_name}.api.host",
             f"plugins.apps.{plugin_name}.api.ssl",
