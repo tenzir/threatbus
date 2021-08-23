@@ -25,7 +25,7 @@ setup(
     install_requires=[
         "pika >= 1.1.0",
         "retry",
-        "stix2 >= 2.1, < 3.0",
+        "stix2 >= 3.0",
         "threatbus >= 2021.5.27",
     ],
     keywords=[

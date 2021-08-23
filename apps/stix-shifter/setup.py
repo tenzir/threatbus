@@ -33,7 +33,7 @@ setup(
         "dynaconf >= 3.1.4",
         "python-dateutil",
         "pyzmq >= 19",
-        "stix2 >= 2.1, < 3.0",
+        "stix2 >= 3.0",
         "stix-shifter >= 3.4.2",
         "stix-shifter-utils >= 3.4.2",
         "threatbus >= 2021.5.27",

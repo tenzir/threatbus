@@ -32,7 +32,7 @@ setup(
         "python-dateutil",
         "pyzmq >= 19",
         "pyvast >= 2020.10.29",
-        "stix2 >= 2.1, < 3.0",
+        "stix2 >= 3.0",
         "threatbus >= 2021.5.27",
     ],
     keywords=[

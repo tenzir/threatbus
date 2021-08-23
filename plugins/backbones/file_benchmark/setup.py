@@ -23,7 +23,7 @@ setup(
     description="A benchmark backbone for threatbus, that reads a file and provisions its contents.",
     entry_points={"threatbus.backbone": ["file_benchmark = file_benchmark.plugin"]},
     install_requires=[
-        "stix2 >= 2.1, < 3.0",
+        "stix2 >= 3.0",
         "threatbus >= 2021.2.24",
     ],
     keywords=["threatbus", "plugin"],

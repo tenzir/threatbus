@@ -26,7 +26,7 @@ setup(
     description="A plugin to enable threatbus communication with Zeek network monitor.",
     entry_points={"threatbus.app": ["zeek = threatbus_zeek.plugin"]},
     install_requires=[
-        "stix2 >= 2.1, < 3.0",
+        "stix2 >= 3.0",
         "threatbus >= 2021.5.27",
     ],
     keywords=[
