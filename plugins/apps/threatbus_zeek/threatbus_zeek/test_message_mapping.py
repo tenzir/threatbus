@@ -150,8 +150,7 @@ class TestMessageMapping(unittest.TestCase):
         self.assertEqual(sighting.last_seen, self.ts)
         self.assertEqual(sighting.sighting_of_ref, self.indicator_id)
         self.assertTrue(
-            ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value
-            in sighting.object_properties()
+            ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value in sighting
         )
         self.assertEqual(sighting.x_threatbus_sighting_context, context)
 
@@ -164,8 +163,7 @@ class TestMessageMapping(unittest.TestCase):
         self.assertEqual(sighting.last_seen, self.ts)
         self.assertEqual(sighting.sighting_of_ref, self.indicator_id)
         self.assertTrue(
-            ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value
-            in sighting.object_properties()
+            ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value in sighting
         )
         self.assertEqual(sighting.x_threatbus_sighting_context, context)
 

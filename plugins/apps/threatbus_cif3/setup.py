@@ -26,7 +26,7 @@ setup(
     description="A plugin to enable indicators to be submitted to CIFv3 in real-time",
     entry_points={"threatbus.app": ["cif3 = threatbus_cif3.plugin"]},
     install_requires=[
-        "stix2 >= 2.1, < 3.0",
+        "stix2 >= 3.0",
         "threatbus >= 2021.5.27",
         "cifsdk > 3.0.0rc4, < 4.0",
     ],

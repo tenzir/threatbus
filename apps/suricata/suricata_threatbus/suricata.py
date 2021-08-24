@@ -325,8 +325,7 @@ async def update_suricata_rules(indicator_queue: asyncio.Queue, rules_file: str)
                     continue
                 tfile.write(rule)
             if (
-                ThreatBusSTIX2Constants.X_THREATBUS_UPDATE.value
-                not in indicator.object_properties()
+                ThreatBusSTIX2Constants.X_THREATBUS_UPDATE.value not in indicator
                 or indicator.x_threatbus_update != Operation.REMOVE.value
             ):
                 # Not a remove operation - append the new Suricata rule.

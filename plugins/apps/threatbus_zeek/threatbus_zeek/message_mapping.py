@@ -129,8 +129,7 @@ def map_indicator_to_broker_event(
 
     operation = "ADD"  ## Zeek operation to add a new Intel item
     if (
-        ThreatBusSTIX2Constants.X_THREATBUS_UPDATE.value
-        in indicator.object_properties()
+        ThreatBusSTIX2Constants.X_THREATBUS_UPDATE.value in indicator
         and indicator.x_threatbus_update == Operation.REMOVE.value
     ):
         operation = "REMOVE"

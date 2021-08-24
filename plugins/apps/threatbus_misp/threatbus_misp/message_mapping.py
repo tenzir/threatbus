@@ -326,7 +326,7 @@ def stix2_sighting_to_misp(sighting: Sighting):
 
     misp_sighting = pymisp.MISPSighting()
     source = None
-    if "x_threatbus_source" in sighting.object_properties():
+    if "x_threatbus_source" in sighting:
         source = str(sighting.x_threatbus_source)
     misp_sighting.from_dict(
         id=misp_id(sighting.sighting_of_ref),
