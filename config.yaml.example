@@ -42,7 +42,7 @@ plugins:
       module_namespace: Tenzir
     # Requires the 'threatbus-misp' package to be installed
     misp:
-      api:                       # Optional
+      api:                       # Optional. If present, all of 'host', 'ssl', 'key' are required.
         host: https://localhost
         ssl: false
         key: MISP_API_KEY

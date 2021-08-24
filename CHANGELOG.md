@@ -16,6 +16,9 @@ Every entry has a category for which we use the following visual abbreviations:
   address some limitations in the configuration framework.
   [#157](https://github.com/tenzir/threatbus/pull/157)
 
+- 🐞 Fixed config validation for the 'apps.misp.api' setting.
+  [#161](https://github.com/tenzir/threatbus/pull/161)
+
 ## [2021.07.29]
 
 - 🐞 Threatbus now only attempts to load plugins that are explicitly
