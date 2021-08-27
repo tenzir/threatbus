@@ -10,7 +10,7 @@ Every entry has a category for which we use the following visual abbreviations:
 - 🧬 Experimental Features
 - 🐞 Bug Fixes
 
-## Unreleased
+## [2021.08.26]
 
 - ⚡️ The `threatbus-zmq-app` package has been renamed to `threatbus-zmq`, to
   address some limitations in the configuration framework.
@@ -18,6 +18,9 @@ Every entry has a category for which we use the following visual abbreviations:
 
 - 🐞 Fixed config validation for the 'apps.misp.api' setting.
   [#161](https://github.com/tenzir/threatbus/pull/161)
+
+- ⚠️ `vast-threatbus` now depends on version 3.0 of `stix2` package.
+  [#162](https://github.com/tenzir/threatbus/pull/162)
 
 ## [2021.07.29]
 
@@ -250,3 +253,4 @@ Every entry has a category for which we use the following visual abbreviations:
 [2021.05.27]: https://github.com/tenzir/threatbus/releases/tag/2021.05.27
 [2021.06.24]: https://github.com/tenzir/threatbus/releases/tag/2021.06.24
 [2021.07.29]: https://github.com/tenzir/threatbus/releases/tag/2021.07.29
+[2021.08.26]: https://github.com/tenzir/threatbus/releases/tag/2021.08.26

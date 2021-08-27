@@ -10,7 +10,7 @@ Every entry has a category for which we use the following visual abbreviations:
 - ⚡️ Breaking Changes
 - 🐞 Bug Fixes
 
-## Unreleased
+## [2021.08.26]
 
 - ⚡️ We renamed PyVAST Threat Bus to VAST Threat Bus for clarity. The PyPI
   package name and the binary name change from `pyvast-threatbus` to
@@ -19,6 +19,9 @@ Every entry has a category for which we use the following visual abbreviations:
 
 - 🎁 Live matching with VAST works again!
   [#156](https://github.com/tenzir/threatbus/pull/156)
+
+- ⚠️ `vast-threatbus` now depends on version 3.0 of `stix2` package.
+  [#162](https://github.com/tenzir/threatbus/pull/162)
 
 ## [2021.07.29]
 
@@ -205,3 +208,4 @@ Every entry has a category for which we use the following visual abbreviations:
 [2021.05.27]: https://github.com/tenzir/threatbus/releases/tag/2021.05.27
 [2021.06.24]: https://github.com/tenzir/threatbus/releases/tag/2021.06.24
 [2021.07.29]: https://github.com/tenzir/threatbus/releases/tag/2021.07.29
+[2021.08.26]: https://github.com/tenzir/threatbus/releases/tag/2021.08.26

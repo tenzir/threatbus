@@ -11,6 +11,11 @@ Every entry has a category for which we use the following visual abbreviations:
 - ⚡️ Breaking Changes
 - 🐞 Bug Fixes
 
+## [2021.08.26]
+
+- ⚠️ `stix-shifter-threatbus` now depends on version 3.0 of `stix2` package.
+  [#162](https://github.com/tenzir/threatbus/pull/162)
+
 ## [2021.07.29]
 
 - ⚠️ The Dockerfile of `stix-shifter-threatbus` has moved to the repository
@@ -69,3 +74,4 @@ Every entry has a category for which we use the following visual abbreviations:
 [2021.05.27]: https://github.com/tenzir/threatbus/releases/tag/2021.05.27
 [2021.06.24]: https://github.com/tenzir/threatbus/releases/tag/2021.06.24
 [2021.07.29]: https://github.com/tenzir/threatbus/releases/tag/2021.07.29
+[2021.08.26]: https://github.com/tenzir/threatbus/releases/tag/2021.08.26
