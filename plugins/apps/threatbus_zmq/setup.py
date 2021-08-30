@@ -28,7 +28,7 @@ setup(
     install_requires=[
         "pyzmq>=19",
         "python-dateutil>=2.8.1",
-        "stix2>=2.1,<3.0",
+        "stix2>=3.0",
         "threatbus>=2021.5.27",
     ],
     keywords=[
