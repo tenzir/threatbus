@@ -31,7 +31,7 @@ setup(
         "dynaconf >= 3.1.4",
         "pyzmq >= 19",
         "stix2 >= 3.0",
-        "threatbus >= 2021.5.27",
+        "threatbus >= 2021.8.26",
     ],
     keywords=[
         "open source",

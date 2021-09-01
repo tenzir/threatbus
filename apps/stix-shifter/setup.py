@@ -36,7 +36,7 @@ setup(
         "stix2 >= 3.0",
         "stix-shifter >= 3.4.2",
         "stix-shifter-utils >= 3.4.2",
-        "threatbus >= 2021.5.27",
+        "threatbus >= 2021.8.26",
     ],
     keywords=[
         "open source",
