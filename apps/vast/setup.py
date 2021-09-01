@@ -31,9 +31,9 @@ setup(
         "dynaconf >= 3.1.4",
         "python-dateutil",
         "pyzmq >= 19",
-        "pyvast >= 2020.10.29",
+        "pyvast >= 2021.6.24",
         "stix2 >= 3.0",
-        "threatbus >= 2021.5.27",
+        "threatbus >= 2021.8.26",
     ],
     keywords=[
         "open source",

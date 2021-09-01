@@ -32,7 +32,7 @@ setup(
         "pluggy>=0.13,<1.0",
         "python-dateutil>=2.8.1",
         "stix2-patterns == 1.3.0",
-        "stix2>=2.1,<3.0",
+        "stix2>=3.0",
     ],
     keywords=[
         "threatbus",
