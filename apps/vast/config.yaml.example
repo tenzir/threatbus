@@ -20,7 +20,7 @@ snapshot: 30
 live_match: false
 retro_match: true
 retro_match_max_events: 0 # set to 0 for unlimited results
-retro_match_timeout: 5 # set to 0 for no timeout
+retro_match_timeout: 5. # set to 0 for no timeout
 # Optional. The default is to not apply any transform context.
 transform_context: fever alertify --alert-prefix 'MY PREFIX' --extra-key my-ioc --ioc %ioc
 # Optional. The default is to report back sightings only to Threat Bus.
