@@ -10,6 +10,10 @@ Every entry has a category for which we use the following visual abbreviations:
 - 🧬 Experimental Features
 - 🐞 Bug Fixes
 
+## Unreleased
+
+- ⚠️  `threatbus` now depends on version 1.0 of `pluggy`.
+
 ## [2021.08.26]
 
 - ⚡️ The `threatbus-zmq-app` package has been renamed to `threatbus-zmq`, to
