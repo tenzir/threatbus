@@ -22,8 +22,8 @@ else:
 class ThreatBus(stoppable_worker.StoppableWorker):
     def __init__(
         self,
-        backbones: pluggy.hooks._HookRelay,
-        apps: pluggy.hooks._HookRelay,
+        backbones: pluggy._hooks._HookRelay,
+        apps: pluggy._hooks._HookRelay,
         logger: Logger,
         config: Settings,
     ):
