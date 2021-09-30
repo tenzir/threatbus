@@ -10,7 +10,7 @@ Every entry has a category for which we use the following visual abbreviations:
 - 🧬 Experimental Features
 - 🐞 Bug Fixes
 
-## Unreleased
+## [2021.09.30]
 
 - ⚠️  `threatbus` now depends on version 1.0 of `pluggy`.
 
@@ -258,3 +258,4 @@ Every entry has a category for which we use the following visual abbreviations:
 [2021.06.24]: https://github.com/tenzir/threatbus/releases/tag/2021.06.24
 [2021.07.29]: https://github.com/tenzir/threatbus/releases/tag/2021.07.29
 [2021.08.26]: https://github.com/tenzir/threatbus/releases/tag/2021.08.26
+[2021.09.30]: https://github.com/tenzir/threatbus/releases/tag/2021.09.30

@@ -11,6 +11,10 @@ Every entry has a category for which we use the following visual abbreviations:
 - ⚡️ Breaking Changes
 - 🐞 Bug Fixes
 
+## [2021.09.30]
+
+No user-facing changes.
+
 ## [2021.08.26]
 
 - ⚠️ `suricata-threatbus` now depends on version 3.0 of `stix2` package.
@@ -58,3 +62,4 @@ Every entry has a category for which we use the following visual abbreviations:
 [2021.06.24]: https://github.com/tenzir/threatbus/releases/tag/2021.06.24
 [2021.07.29]: https://github.com/tenzir/threatbus/releases/tag/2021.07.29
 [2021.08.26]: https://github.com/tenzir/threatbus/releases/tag/2021.08.26
+[2021.09.30]: https://github.com/tenzir/threatbus/releases/tag/2021.09.30
