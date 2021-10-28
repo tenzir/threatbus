@@ -28,10 +28,13 @@ See the `config.yaml.example` file to get started.
 
 ## Usage
 
-First, install the `requirements.txt` via `pip`. Then run the script and pass
+First, install the `poetry` via `pip install --user poetry`. Then run the script and pass
 the configuration file to it via the `-c` command line option.
 
 ```
-pip install -r requirements.txt
-python misp-ioc-sender.py -c config.yaml
+poerty install --no-dev
+# or with plugins
+poetry install
+poetry shell
+python tests/utils/misp-ioc-sender/misp-ioc-sender.py -c config.yaml
 ```

@@ -2,15 +2,15 @@ colon := :
 $(colon) := :
 
 .PHONY: all
-all: format build dist test
-
-.PHONY: install-dependencies
-install-dependencies:
-	python -m pip install -r requirements.txt
+all: format build test update
 
 .PHONY: format
 format:
 	python -m black .
+
+.PHONY: lint
+lint:
+	poetry run flake8
 
 .PHONY: test
 test: unit-tests integration-tests
@@ -44,7 +44,7 @@ integration-tests:
 
 .PHONY: clean
 clean:
-	-${RM} -r __pycache__ *egg-info build dist
+	-${RM} -r dist
 	-$(MAKE) -C plugins/apps/threatbus_zeek clean
 	-$(MAKE) -C plugins/apps/threatbus_misp clean
 	-$(MAKE) -C plugins/apps/threatbus_zmq clean
@@ -57,7 +57,7 @@ clean:
 
 .PHONY: build
 build:
-	python setup.py build
+	poetry build -vvv
 	$(MAKE) -C plugins/apps/threatbus_zeek build
 	$(MAKE) -C plugins/apps/threatbus_misp build
 	$(MAKE) -C plugins/apps/threatbus_zmq build
@@ -68,22 +68,9 @@ build:
 	$(MAKE) -C apps/stix-shifter build
 	$(MAKE) -C apps/suricata build
 
-.PHONY: dist
-dist:
-	python setup.py sdist bdist_wheel
-	$(MAKE) -C plugins/apps/threatbus_zeek dist
-	$(MAKE) -C plugins/apps/threatbus_misp dist
-	$(MAKE) -C plugins/apps/threatbus_zmq dist
-	$(MAKE) -C plugins/apps/threatbus_cif3 dist
-	$(MAKE) -C plugins/backbones/threatbus_inmem dist
-	$(MAKE) -C plugins/backbones/threatbus_rabbitmq dist
-	$(MAKE) -C apps/vast dist
-	$(MAKE) -C apps/stix-shifter dist
-	$(MAKE) -C apps/suricata dist
-
 .PHONY: install
 install:
-	pip install .
+	poetry install
 	$(MAKE) -C plugins/apps/threatbus_zeek install
 	$(MAKE) -C plugins/apps/threatbus_misp install
 	$(MAKE) -C plugins/apps/threatbus_zmq install
@@ -93,16 +80,15 @@ install:
 	$(MAKE) -C apps/vast install
 	$(MAKE) -C apps/stix-shifter install
 	$(MAKE) -C apps/suricata install
-
-.PHONY: dev-mode
-dev-mode:
-	pip install --editable .
-	$(MAKE) -C plugins/apps/threatbus_zmq dev-mode
-	$(MAKE) -C plugins/backbones/threatbus_inmem dev-mode
-	$(MAKE) -C plugins/backbones/threatbus_rabbitmq dev-mode
-	$(MAKE) -C plugins/apps/threatbus_misp dev-mode
-	$(MAKE) -C plugins/apps/threatbus_zeek dev-mode
-	$(MAKE) -C plugins/apps/threatbus_cif3 dev-mode
-	$(MAKE) -C apps/vast dev-mode
-	$(MAKE) -C apps/stix-shifter dev-mode
-	$(MAKE) -C apps/suricata dev-mode
+.PHONY: update
+update:
+	poetry update
+	$(MAKE) -C plugins/apps/threatbus_zeek update
+	$(MAKE) -C plugins/apps/threatbus_misp update
+	$(MAKE) -C plugins/apps/threatbus_zmq update
+	$(MAKE) -C plugins/apps/threatbus_cif3 update
+	$(MAKE) -C plugins/backbones/threatbus_inmem update
+	$(MAKE) -C plugins/backbones/threatbus_rabbitmq update
+	$(MAKE) -C apps/vast update
+	$(MAKE) -C apps/stix-shifter update
+	$(MAKE) -C apps/suricata update

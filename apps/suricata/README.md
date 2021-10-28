@@ -31,10 +31,8 @@ Bus, or pass a path to configuration file via `-c /path/to/config.yaml`.
 Install `suricata-threatbus` in a virtualenv and start:
 
 ```sh
-python -m venv venv
-source venv/bin/activate
-make dev-mode
-suricata-threatbus
+make install
+poetry shell
 ```
 
 You first need to configure the `rules_file` option in the config file. See also
