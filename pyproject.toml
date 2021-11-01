@@ -1,0 +1,51 @@
+[tool.poetry]
+name = "threatbus"
+version = "2021.09.30"
+description = "Threat Bus – A threat intelligence dissemination layer for open-source security tools."
+authors = ["Tenzir <engineering@tenzir.com>"]
+license = "BSD-3-Clause"
+classifiers = [
+  # https://pypi.org/classifiers/
+  "Development Status :: 4 - Beta",
+  "Environment :: Plugins",
+  "Operating System :: MacOS :: MacOS X",
+  "Operating System :: POSIX :: Linux",
+  "Topic :: Scientific/Engineering :: Information Analysis",
+  "Topic :: Scientific/Engineering :: Interface Engine/Protocol Translator",
+  "Topic :: Security",
+  "Topic :: Software Development :: Object Brokering",
+  "Topic :: System :: Distributed Computing",
+]
+keywords = [
+  "threatbus",
+  "threat intelligence",
+  "intel",
+  "sightings",
+  "open source threat intelligence",
+]
+
+[tool.poetry.dependencies]
+python = "^3.8 || ^3.9"
+coloredlogs = "^10.0"
+pluggy = "^1.0"
+python-dateutil = "^2.8.1"
+dynaconf = "^3.1.4"
+stix2 = "^3.0.0"
+stix2-patterns = "^1.3.0"
+
+[tool.poetry.dev-dependencies]
+threatbus-cif3 = { path = "plugins/apps/threatbus_cif3", develop = true }
+threatbus-misp = { path = "plugins/apps/threatbus_misp", extras = [
+  "zmq"
+], develop = true }
+threatbus-zeek = { path = "plugins/apps/threatbus_zeek", develop = true }
+threatbus-zmq = { path = "plugins/apps/threatbus_zmq", develop = true }
+threatbus-file-benchmark = { path = "plugins/backbones/threatbus_file_benchmark", develop = true }
+threatbus-inmem = { path = "plugins/backbones/threatbus_inmem", develop = true }
+threatbus-rabbitmq = { path = "plugins/backbones/threatbus_rabbitmq", develop = true }
+flake8 = "^4.0.1"
+black = "^21.9b0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

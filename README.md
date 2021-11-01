@@ -69,6 +69,8 @@ get there.
 *Start Threat Bus*
 
 ```sh
+poetry install --no-dev
+poetry shell
 threatbus
 ```
 
@@ -161,9 +163,8 @@ Setup a virtual environment and install `threatbus` and some plugins with the
 in development mode:
 
 ```
-virtualenv venv
-source venv/bin/activate
-make dev-mode
+poetry install
+poetry shell
 ```
 
 ### Configuration & Extension

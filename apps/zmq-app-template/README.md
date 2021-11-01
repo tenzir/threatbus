@@ -20,8 +20,6 @@ Bus, or pass a path to configuration file via `-c /path/to/config.yaml`.
 Install the template in a virtualenv and start it with a config file:
 
 ```sh
-python -m venv venv
-source venv/bin/activate
-make dev-mode
-zmq-app-template
+make install
+poetry shell
 ```

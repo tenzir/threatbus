@@ -11,3 +11,4 @@ config.yaml
 *.png
 **/threatbus.log
 *.json
+.eggs
