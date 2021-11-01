@@ -131,6 +131,14 @@ async def stop_signal():
     await cancel_async_tasks()
 
 
+async def check_low_priority_support(vast: VAST):
+    """
+    Checks whether the export command supports the `--low-priority` option.
+    """
+    helpmsg = await vast.export(help=True).exec()
+    return "--low-priority" in helpmsg
+
+
 async def start(
     vast_binary: str,
     vast_endpoint: str,
@@ -165,11 +173,12 @@ async def start(
     @param sink Forward sighting context to this sink (subprocess) instead of
         reporting back to Threat Bus
     """
-    global logger, async_tasks, p2p_topic, max_open_tasks, metrics
+    global logger, async_tasks, p2p_topic, low_priority_support, max_open_tasks, metrics
     # needs to be created inside the same eventloop where it is used
     max_open_tasks = asyncio.Semaphore(max_open_files)
     vast = VAST(binary=vast_binary, endpoint=vast_endpoint, logger=logger)
     assert await vast.test_connection() is True, "Cannot connect to VAST"
+    low_priority_support = await check_low_priority_support(vast)
 
     logger.debug(f"Calling Threat Bus management endpoint {zmq_endpoint}")
     reply = subscribe(zmq_endpoint, "stix2/indicator", snapshot)
@@ -349,6 +358,8 @@ async def retro_match_vast(
         start = time.time()
         vast = VAST(binary=vast_binary, endpoint=vast_endpoint, logger=logger)
         kwargs = {}
+        if low_priority_support:
+            kwargs["low-priority"] = True
         if retro_match_max_events > 0:
             kwargs["max_events"] = retro_match_max_events
         proc = await vast.export(**kwargs).json(query).exec()
