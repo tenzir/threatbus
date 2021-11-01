@@ -10,6 +10,12 @@ Every entry has a category for which we use the following visual abbreviations:
 - 🧬 Experimental Features
 - 🐞 Bug Fixes
 
+## [unreleased]
+
+- ⚠️ `vast-threatbus` now issues low priority queries if those are supported by
+  the version of VAST.
+  [#171](https://github.com/tenzir/threatbus/pull/171)
+
 ## [2021.09.30]
 
 - ⚠️  `threatbus` now depends on version 1.0 of `pluggy`.
