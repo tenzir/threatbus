@@ -1,7 +1,7 @@
 # The used version here always refers to the latest released VAST version.
 # Use `latest` to get the most recent version of VAST as it is available on the
 # Git master branch at https://github.com/tenzir/vast.
-ARG VAST_VERSION=2021.09.30
+ARG VAST_VERSION=2021.11.18
 
 FROM tenzir/vast:$VAST_VERSION
 USER root
