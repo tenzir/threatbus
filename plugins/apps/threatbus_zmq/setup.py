@@ -29,7 +29,7 @@ setup(
         "pyzmq>=19",
         "python-dateutil>=2.8.1",
         "stix2>=3.0",
-        "threatbus>=2021.9.30",
+        "threatbus>=2021.11.18",
     ],
     keywords=[
         "zeromq",
@@ -47,5 +47,5 @@ setup(
     packages=["threatbus_zmq"],
     python_requires=">=3.7",
     url="https://github.com/tenzir/threatbus",
-    version="2021.09.30",
+    version="2021.11.18",
 )

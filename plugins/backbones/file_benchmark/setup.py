@@ -24,7 +24,7 @@ setup(
     entry_points={"threatbus.backbone": ["file_benchmark = file_benchmark.plugin"]},
     install_requires=[
         "stix2 >= 3.0",
-        "threatbus >= 2021.9.30",
+        "threatbus >= 2021.11.18",
     ],
     keywords=["threatbus", "plugin"],
     license="BSD 3-clause",
@@ -34,5 +34,5 @@ setup(
     packages=["file_benchmark"],
     python_requires=">=3.7",
     url="https://github.com/tenzir/threatbus",
-    version="2021.09.30",
+    version="2021.11.18",
 )
