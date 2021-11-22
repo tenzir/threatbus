@@ -271,3 +271,5 @@ Every entry has a category for which we use the following visual abbreviations:
 [2021.07.29]: https://github.com/tenzir/threatbus/releases/tag/2021.07.29
 [2021.08.26]: https://github.com/tenzir/threatbus/releases/tag/2021.08.26
 [2021.09.30]: https://github.com/tenzir/threatbus/releases/tag/2021.09.30
+[2021.11.18]: https://github.com/tenzir/threatbus/releases/tag/2021.11.18
+[2021.11.22]: https://github.com/tenzir/threatbus/releases/tag/2021.11.22
