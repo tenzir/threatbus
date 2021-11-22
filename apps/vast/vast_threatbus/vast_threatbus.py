@@ -140,7 +140,6 @@ async def check_low_priority_support(vast: VAST):
     if proc.returncode != 0:
         return False
     stdout, _ = await proc.communicate()
-    print(str(stdout), file=sys.stderr)
     return "--low-priority" in str(stdout)
 
 
