@@ -36,7 +36,7 @@ setup(
         "stix2 >= 3.0",
         "stix-shifter >= 3.4.2",
         "stix-shifter-utils >= 3.4.2",
-        "threatbus >= 2021.11.18",
+        "threatbus >= 2021.11.22",
     ],
     keywords=[
         "open source",
@@ -54,5 +54,5 @@ setup(
     python_requires=">=3.7",
     setup_requires=["setuptools", "wheel"],
     url="https://github.com/tenzir/threatbus",
-    version="2021.11.18",
+    version="2021.11.22",
 )

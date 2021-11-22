@@ -135,8 +135,13 @@ async def check_low_priority_support(vast: VAST):
     """
     Checks whether the export command supports the `--low-priority` option.
     """
-    helpmsg = await vast.export(help=True).exec()
-    return "--low-priority" in helpmsg
+    proc = await vast.export(help=True).exec()
+    await proc.wait()
+    if proc.returncode != 0:
+        return False
+    stdout, _ = await proc.communicate()
+    print(str(stdout), file=sys.stderr)
+    return "--low-priority" in str(stdout)
 
 
 async def start(
@@ -359,7 +364,7 @@ async def retro_match_vast(
         vast = VAST(binary=vast_binary, endpoint=vast_endpoint, logger=logger)
         kwargs = {}
         if low_priority_support:
-            kwargs["low-priority"] = True
+            kwargs["low_priority"] = True
         if retro_match_max_events > 0:
             kwargs["max_events"] = retro_match_max_events
         proc = await vast.export(**kwargs).json(query).exec()
