@@ -18,12 +18,17 @@ if sys.version_info >= (3, 8):
 else:
     import importlib_metadata
 
+if pluggy.__version__.startswith("0"):
+    hook_relay_type = pluggy.hooks._HookRelay
+else:
+    hook_relay_type = pluggy._hooks._HookRelay
+
 
 class ThreatBus(stoppable_worker.StoppableWorker):
     def __init__(
         self,
-        backbones: pluggy._hooks._HookRelay,
-        apps: pluggy._hooks._HookRelay,
+        backbones: hook_relay_type,
+        apps: hook_relay_type,
         logger: Logger,
         config: Settings,
     ):
