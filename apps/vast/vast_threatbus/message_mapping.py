@@ -131,7 +131,8 @@ def matcher_result_to_sighting(matcher_result: str) -> Union[Sighting, None]:
         return None
     try:
         dct = json.loads(matcher_result)
-        ts = dct["event"]["ts"]
+        event = dct["event"]
+        ts = event.get("ts", event.get("timestamp", None))
         if type(ts) is str:
             ts = dateutil_parser.parse(ts)
     except Exception as e:
