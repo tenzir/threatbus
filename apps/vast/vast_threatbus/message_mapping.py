@@ -126,7 +126,7 @@ def matcher_result_to_sighting(matcher_result: str) -> Union[Sighting, None]:
     @return a valid STIX-2 Sighting that references the IoC from the VAST
         matcher or None
     """
-    global logger
+    global logger, matcher_name
     if type(matcher_result) is not str:
         return None
     try:
@@ -151,6 +151,8 @@ def matcher_result_to_sighting(matcher_result: str) -> Union[Sighting, None]:
             logger.error(f"Unexpected length: got {len(ref)}, expected {ref_len}")
             return None
         ref = ref[len(THREATBUS_REFERENCE) + 1 : -1]
+    if ref is None:
+        ref = matcher_name
     context = {}
     context["source"] = "VAST"
     return Sighting(
