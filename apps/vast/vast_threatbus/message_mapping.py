@@ -146,13 +146,11 @@ def matcher_result_to_sighting(matcher_result: str) -> Union[Sighting, None]:
     if not ts:
         logger.error("Missing event timestamp in matcher result")
         return None
-    if not ref:
-        logger.error("Missing 'context' in matcher result")
-        return None
-    if not len(ref) == ref_len:
-        logger.error(f"Unexpected length: got {len(ref)}, expected {ref_len}")
-        return None
-    ref = ref[len(THREATBUS_REFERENCE) + 1 : -1]
+    if ref is not None:
+        if len(ref) != ref_len:
+            logger.error(f"Unexpected length: got {len(ref)}, expected {ref_len}")
+            return None
+        ref = ref[len(THREATBUS_REFERENCE) + 1 : -1]
     context = {}
     context["source"] = "VAST"
     return Sighting(
