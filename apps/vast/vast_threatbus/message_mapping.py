@@ -131,7 +131,8 @@ def matcher_result_to_sighting(matcher_result: str) -> Union[Sighting, None]:
         return None
     try:
         dct = json.loads(matcher_result)
-        ts = dct["event"]["ts"]
+        event = dct["event"]
+        ts = event.get("ts", event.get("timestamp", None))
         if type(ts) is str:
             ts = dateutil_parser.parse(ts)
     except Exception as e:
@@ -145,13 +146,13 @@ def matcher_result_to_sighting(matcher_result: str) -> Union[Sighting, None]:
     if not ts:
         logger.error("Missing event timestamp in matcher result")
         return None
-    if not ref:
-        logger.error("Missing 'context' in matcher result")
-        return None
-    if not len(ref) == ref_len:
-        logger.error(f"Unexpected length: got {len(ref)}, expected {ref_len}")
-        return None
-    ref = ref[len(THREATBUS_REFERENCE) + 1 : -1]
+    if ref is not None:
+        if len(ref) != ref_len:
+            logger.error(f"Unexpected length: got {len(ref)}, expected {ref_len}")
+            return None
+        ref = ref[len(THREATBUS_REFERENCE) + 1 : -1]
+    if ref is None:
+        ref = f"note--00000000-0000-0000-0000-000000000000"
     context = {}
     context["source"] = "VAST"
     return Sighting(
