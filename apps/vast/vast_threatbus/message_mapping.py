@@ -1,7 +1,7 @@
 from dateutil import parser as dateutil_parser
 import json
 from stix2 import Indicator, Sighting
-from threatbus.data import ThreatBusSTIX2Constants
+from threatbus.data import ThreatBusSTIX2Constants, MatchType
 from threatbus.stix2_helpers import is_point_equality_ioc, split_object_path_and_value
 from typing import Tuple, Union
 import logging
@@ -111,6 +111,7 @@ def query_result_to_sighting(
             custom_properties={
                 ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value: context,
                 ThreatBusSTIX2Constants.X_THREATBUS_INDICATOR.value: indicator,
+                ThreatBusSTIX2Constants.X_THREATBUS_MATCH_TYPE.value: MatchType.RETRO,
             },
         )
     except Exception as e:
@@ -160,5 +161,6 @@ def matcher_result_to_sighting(matcher_result: str) -> Union[Sighting, None]:
         custom_properties={
             ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value: context,
             ThreatBusSTIX2Constants.X_THREATBUS_INDICATOR_VALUE.value: ioc_value,
+            ThreatBusSTIX2Constants.X_THREATBUS_MATCH_TYPE.value: MatchType.LIVE,
         },
     )
