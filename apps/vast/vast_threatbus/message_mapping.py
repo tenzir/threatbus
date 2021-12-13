@@ -152,7 +152,8 @@ def matcher_result_to_sighting(matcher_result: str) -> Union[Sighting, None]:
             return None
         ref = ref[len(THREATBUS_REFERENCE) + 1 : -1]
     if ref is None:
-        ref = f"note--00000000-0000-0000-0000-000000000000"
+        # All zeroes is no valid UUIDv4, at least these two bits must be set.
+        ref = f"note--00000000-0000-4000-8000-000000000000"
     context = {}
     context["source"] = "VAST"
     return Sighting(

@@ -16,7 +16,7 @@ Every entry has a category for which we use the following visual abbreviations:
   probabilistic filters. Note that to correlate sighting and indicator an exact
   filter must be used, as probabilistic filters do not store the STIX
   identifier of the indicator. VAST Threat Bus emits the invalid identifier
-  `note--00000000-0000-0000-0000-000000000000` for sightings generated from
+  `note--00000000-0000-4000-8000-000000000000` for sightings generated from
   matchers with probabilistic filters.
   [#176](https://github.com/tenzir/threatbus/pull/176)
 
