@@ -193,9 +193,13 @@ def is_whitelisted(misp_msg: dict, filter_config: List[Dict]):
         return True
     for fil in filter_config:
         if (
-            # we check int(org_id) as well because MISP can give us strings for
-            # numeric org IDs
-            (not fil.get("orgs", None) or org_id in fil["orgs"] or int(org_id) in fil["orgs"])
+            (
+                # we check int(org_id) as well because MISP can give us strings
+                # for numeric org IDs
+                not fil.get("orgs", None)
+                or org_id in fil["orgs"]
+                or int(org_id) in fil["orgs"]
+            )
             and (not fil.get("types", None) or intel_type in fil["types"])
             and (
                 not fil.get("tags", None)
