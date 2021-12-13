@@ -19,6 +19,11 @@ Every entry has a category for which we use the following visual abbreviations:
   `note--00000000-0000-4000-8000-000000000000` for sightings generated from
   matchers with probabilistic filters.
   [#176](https://github.com/tenzir/threatbus/pull/176)
+  [#178](https://github.com/tenzir/threatbus/pull/178)
+
+- 🐞 The MISP plugin now correctly handles orgids with string values in the
+  configuration. Thanks to @satta for contributing the fix!
+  [#177](https://github.com/tenzir/threatbus/pull/177)
 
 ## [2021.11.22]
 
