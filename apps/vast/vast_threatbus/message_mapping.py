@@ -100,7 +100,6 @@ def query_result_to_sighting(
         return None
     try:
         context = json.loads(query_result)
-        context["source"] = "VAST"
         ts = context.get("ts", context.get("timestamp", None))
         if not ts:
             logger.error(f"Could not find timestamp")
@@ -152,10 +151,9 @@ def matcher_result_to_sighting(matcher_result: str) -> Union[Sighting, None]:
             return None
         ref = ref[len(THREATBUS_REFERENCE) + 1 : -1]
     if ref is None:
-        # All zeroes is no valid UUIDv4, at least these two bits must be set.
+        # That's the minimal syntactically valid UUIDv4, see RFC 4122 / 4.1.1.
         ref = f"note--00000000-0000-4000-8000-000000000000"
-    context = {}
-    context["source"] = "VAST"
+    context = event
     return Sighting(
         last_seen=ts,
         sighting_of_ref=ref,

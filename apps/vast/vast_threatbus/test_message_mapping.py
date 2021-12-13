@@ -139,7 +139,6 @@ class TestMessageMapping(unittest.TestCase):
             in parsed_sighting
         )
         expected_context = json.loads(self.valid_query_result)
-        expected_context["source"] = "VAST"
         self.assertEqual(parsed_sighting.x_threatbus_sighting_context, expected_context)
 
     def test_invalid_matcher_result_to_sighting(self):
@@ -162,5 +161,5 @@ class TestMessageMapping(unittest.TestCase):
             ThreatBusSTIX2Constants.X_THREATBUS_SIGHTING_CONTEXT.value
             in parsed_sighting
         )
-        expected_context = {"source": "VAST"}
+        expected_context = json.loads(self.valid_matcher_result)["event"]
         self.assertEqual(parsed_sighting.x_threatbus_sighting_context, expected_context)
