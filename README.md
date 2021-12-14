@@ -246,7 +246,7 @@ Threat Bus comes with a [3-clause BSD license][license-url].
 
 
 [opencti]: https://www.opencti.io/
-[opencti-connector]: https://github.com/OpenCTI-Platform/connectors/tree/master/threatbus
+[opencti-connector]: https://github.com/OpenCTI-Platform/connectors/tree/master/stream/threatbus
 [misp]: https://github.com/misp/misp
 [vast]: https://github.com/tenzir/vast
 [docs]: https://docs.tenzir.com/threatbus
