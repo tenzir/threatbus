@@ -9,12 +9,14 @@ from typing import List, Union
 ## Threat Bus custom STIX-2 attributes
 @unique
 class ThreatBusSTIX2Constants(Enum):
-    # used in Sighting.custom_properties to reference the full STIX-2 Indicator
+    # Used in Sighting.custom_properties to reference the full STIX-2 Indicator
     X_THREATBUS_INDICATOR = "x_threatbus_indicator"
-    # used in Sighting.custom_properties to reference the Indicator value, in
+    # Used in Sighting.custom_properties to reference the Indicator value, in
     # case the full indicator is not present any more.
     X_THREATBUS_INDICATOR_VALUE = "x_threatbus_indicator_value"
-    # used in Sighting.custom_properties.context
+    # Use to Sighting.custom_properties to indicate live or retro match
+    X_THREATBUS_MATCH_TYPE = "x_threatbus_match_type"
+    # Used in Sighting.custom_properties.context
     X_THREATBUS_SOURCE = "x_threatbus_source"
     X_THREATBUS_SIGHTING_CONTEXT = "x_threatbus_sighting_context"
     # Indicates an update operation for the STIX-2 item. See Operation enum.
@@ -46,6 +48,13 @@ class Operation(Enum):
 class MessageType(Enum):
     INDICATOR = auto()
     SIGHTING = auto()
+
+
+# Let this enum inherit from string to enable JSON serialization.
+@unique
+class MatchType(str, Enum):
+    LIVE = "LIVE"
+    RETRO = "RETRO"
 
 
 @dataclass()

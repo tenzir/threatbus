@@ -545,7 +545,9 @@ async def live_match_vast(
     logger.critical("Unexpected exit of VAST matcher process.")
 
 
-async def invoke_cmd_for_context(cmd: str, context: dict, ioc: str = "%ioc"):
+async def invoke_cmd_for_context(
+    cmd: str, context: dict, ioc: str = "%ioc", matchtype: str = "%matchtype"
+):
     """
     Invoke a command as subprocess for the given context. The command string is
     treated as template string and occurences of "%ioc" are replaced with the
@@ -556,10 +558,14 @@ async def invoke_cmd_for_context(cmd: str, context: dict, ioc: str = "%ioc"):
         the actually matched IoC.
     @param context The context to forward as JSON
     @param ioc The value to replace '%ioc' with in the `cmd` string
+    @param matchtype The value to replace '%matchtype' with in the `cmd` string
     """
     if not ioc:
         ioc = "%ioc"
+    if not matchtype:
+        matchtype = "%matchtype"
     cmd = cmd.replace("%ioc", ioc)
+    cmd = cmd.replace("%matchtype", matchtype)
     proc = await asyncio.create_subprocess_exec(
         *lexical_split(cmd),
         stdout=asyncio.subprocess.PIPE,
@@ -620,6 +626,11 @@ async def report_sightings(
                 in sighting
                 else None
             )
+            matchtype = (
+                sighting.x_threatbus_match_type
+                if ThreatBusSTIX2Constants.X_THREATBUS_MATCH_TYPE.value in sighting
+                else None
+            )
             if not context:
                 logger.warn(
                     f"Cannot report sighting context to custom sink because no context data is found in the sighting {sighting}"
@@ -628,7 +639,7 @@ async def report_sightings(
             if sink.lower() == "stdout":
                 print(json.dumps(context))
             else:
-                await invoke_cmd_for_context(sink, context)
+                await invoke_cmd_for_context(sink, context, matchtype=matchtype)
         else:
             socket.send_string(f"{topic} {sighting.serialize()}")
         sightings_queue.task_done()
@@ -675,8 +686,13 @@ async def transform_context(sighting: Sighting, transform_cmd: str) -> Sighting:
             f"Cannot invoke `transform_context` command because no indicator value is found in the sighting {sighting}"
         )
         return
+    matchtype = (
+        sighting.x_threatbus_match_type
+        if ThreatBusSTIX2Constants.X_THREATBUS_MATCH_TYPE.value in sighting
+        else None
+    )
     transformed_context_raw = await invoke_cmd_for_context(
-        transform_cmd, context, ioc_value
+        transform_cmd, context, ioc=ioc_value, matchtype=matchtype
     )
     try:
         transformed_context = json.loads(transformed_context_raw)
