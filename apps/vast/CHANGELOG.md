@@ -12,6 +12,10 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+- 🎁 Added a new field `%matchtype` to the `transform_context` setting of
+  `vast-threatbus` that can be used to distinguish between live and retro
+  matches.
+
 - ⚠️ `vast-threatbus` no longer adds a `source` field to the `x_threatbus_sighting_context`
   field of generated sightings.
 

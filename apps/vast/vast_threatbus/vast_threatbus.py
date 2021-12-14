@@ -688,7 +688,7 @@ async def transform_context(sighting: Sighting, transform_cmd: str) -> Sighting:
         return
     matchtype = (
         sighting.x_threatbus_match_type
-        if ThreatBusSTIX2Constants.X_THREATBUS_MATCH_TYPE in sighting
+        if ThreatBusSTIX2Constants.X_THREATBUS_MATCH_TYPE.value in sighting
         else None
     )
     transformed_context_raw = await invoke_cmd_for_context(

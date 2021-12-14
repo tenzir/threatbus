@@ -15,7 +15,7 @@ class ThreatBusSTIX2Constants(Enum):
     # case the full indicator is not present any more.
     X_THREATBUS_INDICATOR_VALUE = "x_threatbus_indicator_value"
     # Use to Sighting.custom_properties to indicate live or retro match
-    X_THREATBUS_MATCHTYPE = "x_threatbus_matchtype"
+    X_THREATBUS_MATCH_TYPE = "x_threatbus_match_type"
     # Used in Sighting.custom_properties.context
     X_THREATBUS_SOURCE = "x_threatbus_source"
     X_THREATBUS_SIGHTING_CONTEXT = "x_threatbus_sighting_context"
@@ -45,15 +45,16 @@ class Operation(Enum):
 
 
 @unique
-class MatchType(Enum):
-    LIVE = "LIVE"
-    RETRO = "RETRO"
-
-
-@unique
 class MessageType(Enum):
     INDICATOR = auto()
     SIGHTING = auto()
+
+
+# Let this enum inherit from string to enable JSON serialization.
+@unique
+class MatchType(str, Enum):
+    LIVE = "LIVE"
+    RETRO = "RETRO"
 
 
 @dataclass()
