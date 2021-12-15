@@ -76,7 +76,7 @@ plugins:
       ssl: false
       key: MISP_API_KEY
     filter: # filter are optional. you can omit the entire section.
-      - orgs: # org IDs must be strings: https://github.com/MISP/PyMISP/blob/main/pymisp/data/schema.json
+      - orgs: # creator org IDs must be strings: https://github.com/MISP/PyMISP/blob/main/pymisp/data/schema.json
           - "1"
           - "25"
         tags:
@@ -112,8 +112,8 @@ The plugin can be configured with a list of filters. Every filter describes a
 whitelist for MISP attributes (IoCs). The MISP plugin will only forward IoCs to
 Threat Bus if the whitelisted properties are present.
 
-A filter consists of three sub-whitelists for organizations, types, and tags.
-To pass through the filter, an attribute must provide at least one of the
+A filter consists of three sub-whitelists for creator organizations, types, and
+tags. To pass through the filter, an attribute must provide at least one of the
 whitelisted properties of each of the whitelists. More precisely, entries of
 each whitelist are linked by an `"or"`-function, the whitelists themselves are
 linked by an `"and"`-function, as follows:

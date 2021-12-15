@@ -97,7 +97,7 @@ class TestMessageMapping(unittest.TestCase):
             "published": false,
             "analysis": "0",
             "threat_level_id": "1",
-            "org_id": "1",
+            "org_id": "3",
             "orgc_id": "1",
             "distribution": "1",
             "sharing_group_id": "0",
