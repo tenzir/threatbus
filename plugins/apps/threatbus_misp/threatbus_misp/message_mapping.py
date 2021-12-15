@@ -183,10 +183,10 @@ def is_whitelisted(misp_msg: dict, filter_config: List[Dict]):
     attr = misp_msg.get("Attribute", None)
     if not event or not attr:
         return False
-    org_id = event.get("org_id", None)
+    orgc_id = event.get("orgc_id", None)
     intel_type = attr.get("type", None)
     tags = get_tags(attr)
-    if not org_id or not intel_type:
+    if not orgc_id or not intel_type:
         return False
     if not filter_config:
         # no whitelist = allow all
@@ -197,8 +197,8 @@ def is_whitelisted(misp_msg: dict, filter_config: List[Dict]):
                 # we check int(org_id) as well because MISP can give us strings
                 # for numeric org IDs
                 not fil.get("orgs", None)
-                or org_id in fil["orgs"]
-                or int(org_id) in fil["orgs"]
+                or orgc_id in fil["orgs"]
+                or int(orgc_id) in fil["orgs"]
             )
             and (not fil.get("types", None) or intel_type in fil["types"])
             and (
