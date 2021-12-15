@@ -12,6 +12,9 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## Unreleased
 
+- ⚠️ The `orgs` filter option in the MISP plugin now refers to the creator org
+  (`orgc_id`) instead of the owner org (`org_id`) of incoming MISP events.
+
 - 🎁 Added a new field `%matchtype` to the `transform_context` setting of
   `vast-threatbus` that can be used to distinguish between live and retro
   matches.
