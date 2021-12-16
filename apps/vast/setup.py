@@ -33,7 +33,7 @@ setup(
         "pyzmq >= 19",
         "pyvast >= 2021.6.24",
         "stix2 >= 3.0",
-        "threatbus >= 2021.11.22",
+        "threatbus >= 2021.12.16",
     ],
     keywords=[
         "open source",
@@ -52,5 +52,5 @@ setup(
     python_requires=">=3.7",
     setup_requires=["setuptools", "wheel"],
     url="https://github.com/tenzir/threatbus",
-    version="2021.11.22",
+    version="2021.12.16",
 )
