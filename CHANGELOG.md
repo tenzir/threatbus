@@ -10,7 +10,7 @@ Every entry has a category for which we use the following visual abbreviations:
 - 🧬 Experimental Features
 - 🐞 Bug Fixes
 
-## Unreleased
+## [2021.12.16]
 
 - ⚠️ The `orgs` filter option in the MISP plugin now refers to the creator org
   (`orgc_id`) instead of the owner org (`org_id`) of incoming MISP events.
@@ -301,3 +301,4 @@ Every entry has a category for which we use the following visual abbreviations:
 [2021.09.30]: https://github.com/tenzir/threatbus/releases/tag/2021.09.30
 [2021.11.18]: https://github.com/tenzir/threatbus/releases/tag/2021.11.18
 [2021.11.22]: https://github.com/tenzir/threatbus/releases/tag/2021.11.22
+[2021.12.16]: https://github.com/tenzir/threatbus/releases/tag/2021.12.16
