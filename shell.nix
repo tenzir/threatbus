@@ -1,17 +1,18 @@
 { pkgs ? import <nixpkgs> {} }:
+
 let
   myAppEnv = pkgs.poetry2nix.mkPoetryEnv {
     projectDir = ./.;
     editablePackageSources = {
       pyvast-threatbus = ./apps/vast;
       threatbus = ./threatbus;
-      threatbus_inmem = ./plugins/backbones/threatbus_inmem;
-      threatbus_rabbitmq = ./plugins/backbones/threatbus_rabbitmq;
-      file_benchmark = ./plugins/backbones/file_benchmark;
-      threatbus_cif3 = ./plugins/apps/threatbus_cif3;
-      threatbus_misp = ./plugins/apps/threatbus_misp;
-      threatbus_zeek = ./plugins/apps/threatbus_zeek;
-      threatbus_zmq-app = ./plugins/apps/threatbus_zmq_app;
+      threatbus-inmem = ./plugins/backbones/threatbus_inmem;
+      threatbus-rabbitmq = ./plugins/backbones/threatbus_rabbitmq;
+      file-benchmark = ./plugins/backbones/file_benchmark;
+      threatbus-cif3 = ./plugins/apps/threatbus_cif3;
+      threatbus-misp = ./plugins/apps/threatbus_misp;
+      threatbus-zeek = ./plugins/apps/threatbus_zeek;
+      threatbus-zmq-app = ./plugins/apps/threatbus_zmq_app;
     };
     overrides = pkgs.poetry2nix.overrides.withDefaults (final: prev: {
       python-snappy = prev.python-snappy.overridePythonAttrs (oa: {
