@@ -576,7 +576,7 @@ async def invoke_cmd_for_context(
     await proc.stdin.drain()
     proc.stdin.close()
     stdout, stderr = await proc.communicate()
-    if stderr:
+    if proc.returncode != 0 and stderr:
         logger.error(f"Error while transforming sighting context: {stderr}")
     return stdout
 
