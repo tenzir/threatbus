@@ -10,6 +10,10 @@ Every entry has a category for which we use the following visual abbreviations:
 - 🧬 Experimental Features
 - 🐞 Bug Fixes
 
+## [2022.01.27]
+
+No user-facing changes.
+
 ## [2021.12.16]
 
 - ⚠️ The `orgs` filter option in the MISP plugin now refers to the creator org
@@ -302,3 +306,4 @@ Every entry has a category for which we use the following visual abbreviations:
 [2021.11.18]: https://github.com/tenzir/threatbus/releases/tag/2021.11.18
 [2021.11.22]: https://github.com/tenzir/threatbus/releases/tag/2021.11.22
 [2021.12.16]: https://github.com/tenzir/threatbus/releases/tag/2021.12.16
+[2022.01.27]: https://github.com/tenzir/threatbus/releases/tag/2022.01.27
