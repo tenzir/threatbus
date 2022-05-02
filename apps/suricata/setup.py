@@ -28,7 +28,7 @@ setup(
     include_package_data=True,
     install_requires=[
         "black >= 19.10b",
-        "dynaconf >= 3.1.4",
+        "dynaconf>=3.1.4,!=3.1.8",
         "pyzmq >= 19",
         "parsuricata",
         "stix2 >= 3.0",
