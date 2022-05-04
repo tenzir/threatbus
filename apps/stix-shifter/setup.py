@@ -30,7 +30,7 @@ setup(
     include_package_data=True,
     install_requires=[
         "black >= 19.10b",
-        "dynaconf >= 3.1.4",
+        "dynaconf>=3.1.4,!=3.1.8",
         "python-dateutil",
         "pyzmq >= 19",
         "stix2 >= 3.0",
