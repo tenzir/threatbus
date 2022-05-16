@@ -27,7 +27,7 @@ setup(
     entry_points={"threatbus.app": ["zeek = threatbus_zeek.plugin"]},
     install_requires=[
         "stix2 >= 3.0",
-        "threatbus >= 2022.1.27",
+        "threatbus >= 2022.5.16",
     ],
     keywords=[
         "Zeek",
@@ -50,5 +50,5 @@ setup(
     python_requires=">=3.7",
     setup_requires=["setuptools", "wheel"],
     url="https://github.com/tenzir/threatbus",
-    version="2022.1.27",
+    version="2022.5.16",
 )

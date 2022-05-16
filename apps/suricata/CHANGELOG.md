@@ -11,6 +11,10 @@ Every entry has a category for which we use the following visual abbreviations:
 - ⚡️ Breaking Changes
 - 🐞 Bug Fixes
 
+## [2022.05.16]
+
+No user-facing changes.
+
 ## [2022.01.27]
 
 No user-facing changes.
