@@ -99,7 +99,7 @@ def validate_config(config: Settings):
         Validator("snapshot", is_type_of=int, default=30),
         Validator("retro_match_max_events", is_type_of=int, default=0),
         Validator("max_background_tasks", is_type_of=int, default=500),
-        Validator("retro_match_timeout", is_type_of=float, default=5.0),
+        Validator("retro_match_timeout", is_type_of=float, default=3600.0),
         Validator("transform_context", "sink", default=None),
     ]
 
