@@ -26,7 +26,7 @@ setup(
         "pika >= 1.1.0",
         "retry",
         "stix2 >= 3.0",
-        "threatbus >= 2022.1.27",
+        "threatbus >= 2022.5.16",
     ],
     keywords=[
         "message broker",
@@ -46,5 +46,5 @@ setup(
     packages=["threatbus_rabbitmq"],
     python_requires=">=3.7",
     url="https://github.com/tenzir/threatbus",
-    version="2022.1.27",
+    version="2022.5.16",
 )

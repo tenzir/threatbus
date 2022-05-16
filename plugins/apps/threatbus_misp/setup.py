@@ -28,7 +28,7 @@ setup(
     install_requires=[
         "pymisp >= 2.4.120",
         "stix2 >= 3.0",
-        "threatbus >= 2022.1.27",
+        "threatbus >= 2022.5.16",
     ],
     extras_require={"kafka": ["confluent-kafka>=1.3.0"], "zmq": ["pyzmq>=18.1.1"]},
     keywords=[
@@ -49,5 +49,5 @@ setup(
     packages=["threatbus_misp"],
     python_requires=">=3.7",
     url="https://github.com/tenzir/threatbus",
-    version="2022.1.27",
+    version="2022.5.16",
 )
