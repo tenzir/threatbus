@@ -12,8 +12,8 @@ Every entry has a category for which we use the following visual abbreviations:
 
 ## [2022.05.16]
 
-- ⚠️ To make use of VASTs new query query scheduler `vast-threatbus` now runs up
-  to 500 queries in parallel by default. It also waits for one hour before
+- ⚠️ To make use of VAST's new query query scheduler `vast-threatbus` now runs
+  up to 500 queries in parallel by default. It also waits for one hour before
   aborting a query.
   [#190](https://github.com/tenzir/threatbus/pull/190)
 
