@@ -10,6 +10,12 @@ Every entry has a category for which we use the following visual abbreviations:
 - ⚡️ Breaking Changes
 - 🐞 Bug Fixes
 
+## Unreleased
+ 
+- ⚠️ To make use of VASTs new query query scheduler `vast-threatbus` now runs up
+  to 500 queries in parallel by default. It also waits for one hour before
+  aborting a query.
+
 ## [2022.01.27]
 
 No user-facing changes.
